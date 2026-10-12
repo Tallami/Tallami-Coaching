@@ -10,3 +10,15 @@ Thumbs.db
 .claude/settings.local.json
 __pycache__/
 *.pyc
+
+# testing
+/coverage/
+/test-results/
+/playwright-report/
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# misc
+*.pem
