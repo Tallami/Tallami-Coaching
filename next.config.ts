@@ -1,7 +1,25 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
 
+/**
+ * Encabezados base para todas las rutas. Sin CSP a propósito: una CSP con
+ * nonce obliga a renderizar cada página en cada pedido y las páginas dejan de
+ * ser estáticas.
+ */
+const SECURITY_HEADERS = [
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "X-Frame-Options", value: "DENY" },
+  {
+    key: "Permissions-Policy",
+    value: "camera=(), microphone=(), geolocation=()",
+  },
+];
+
 const nextConfig: NextConfig = {
+  async headers() {
+    return [{ source: "/:path*", headers: SECURITY_HEADERS }];
+  },
   cacheComponents: true,
   partialPrefetching: true,
   experimental: {
