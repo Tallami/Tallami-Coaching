@@ -1,7 +1,7 @@
 {
   "Metadata": {
     "title": "Tallami Coaching · Coaching de Fortnite competitivo",
-    "description": "Coaching de Fortnite competitivo com o Tallami, o coach freelancer por trás de {count} títulos da FNCS. VOD reviews, aulas 1 a 1, planos de jogo e coaching de torneio."
+    "description": "Coaching de Fortnite competitivo com o Tallami, o coach por trás de {count} títulos da FNCS. VOD reviews, aulas 1 a 1, planos de jogo e coaching de torneio."
   },
   "Common": {
     "skipLink": "Ir para o conteúdo"
@@ -17,14 +17,11 @@
   },
   "Hero": {
     "imageAlt": "Tallami sorrindo com fones de ouvido no palco de um torneio",
-    "summaryLabel": "Resumo dos resultados como coach",
-    "titlesLabel": "títulos da FNCS",
-    "firstPlacesLabel": "primeiros lugares",
     "title": "Treine com o coach por trás de {count} títulos da FNCS",
     "lede": "Eu reviso suas partidas como numa final: onde você rotacionou tarde, que luta você não precisava ter pego e o que fazer diferente na próxima. Coaching de Fortnite competitivo da Argentina para toda a América Latina.",
     "ctaServices": "Ver serviços e preços",
     "ctaResults": "Ver resultados",
-    "role": "Coach freelancer de Fortnite competitivo, Argentina"
+    "role": "Coach de Fortnite competitivo, Argentina"
   },
   "Results": {
     "title": "Resultados como coach",
@@ -62,21 +59,15 @@
         "name": "Coaching de torneio",
         "description": "Acompanho a sua dupla ou trio durante o torneio. O preço é por dupla ou trio.",
         "cta": "Reservar para minha dupla ou trio"
-      },
-      "academy": {
-        "name": "Academia Tallami",
-        "description": "Treinamento contínuo com pagamento mensal.",
-        "cta": "Entrar na Academia Tallami"
       }
     },
     "units": {
-      "perTeam": "por dupla ou trio",
-      "perMonth": "por mês"
+      "perTeam": "por dupla ou trio"
     },
     "pro": {
       "name": "Temporada Pro",
-      "unit": "por jogador + {percent}% dos prêmios",
-      "description": "Coaching durante toda a temporada. A entrada é por candidatura.",
+      "unit": "por equipe, toda a temporada",
+      "description": "Coaching para a sua dupla ou trio durante toda a temporada. A entrada é por candidatura.",
       "cta": "Candidatar-se à Temporada Pro"
     }
   },
@@ -118,7 +109,7 @@
       },
       "pro": {
         "question": "Como entro na Temporada Pro?",
-        "answer": "Você envia uma candidatura. Se ela for aprovada, o preço é {price} por jogador mais {percent}% dos prêmios."
+        "answer": "Você envia uma candidatura. Se ela for aprovada, são {price} por equipe por toda a temporada."
       }
     }
   },

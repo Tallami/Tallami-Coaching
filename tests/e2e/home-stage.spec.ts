@@ -9,6 +9,12 @@ const HERO_TITLES = [
   ["/en", "Train with the coach behind 3 FNCS titles"],
 ] as const;
 
+const HERO_ROLES = [
+  ["/es", "Coach de Fortnite competitivo, Argentina"],
+  ["/pt", "Coach de Fortnite competitivo, Argentina"],
+  ["/en", "Competitive Fortnite coach, Argentina"],
+] as const;
+
 const LAN_TITLE = "Campeonatos presenciales";
 
 const LAN_ITEMS_ES = [
@@ -55,20 +61,31 @@ test.describe("hero", () => {
     });
   }
 
-  test("hero counters show FNCS titles and first places", async ({ page }) => {
+  test("hero has no results counters", async ({ page }) => {
     await page.goto("/es");
 
-    const group = page.getByRole("group", {
-      name: "Resumen de resultados como coach",
-    });
-    const titles = group.locator("div").filter({ hasText: "títulos de FNCS" });
-    const firstPlaces = group
-      .locator("div")
-      .filter({ hasText: "primeros puestos" });
+    const hero = page.locator("section[aria-labelledby='hero-title']");
 
-    await expect(titles.locator("strong")).toHaveText("3");
-    await expect(firstPlaces.locator("strong")).toHaveText("6");
+    await expect(
+      page.getByRole("group", { name: "Resumen de resultados como coach" }),
+    ).toHaveCount(0);
+    await expect(hero.locator("strong")).toHaveCount(0);
+    await expect(hero).not.toContainText("primeros puestos");
   });
+
+  for (const [path, role] of HERO_ROLES) {
+    test(`hero lower third names the role without freelance at ${path}`, async ({
+      page,
+    }) => {
+      await page.goto(path);
+
+      await expect(
+        page
+          .locator("section[aria-labelledby='hero-title']")
+          .getByText(role, { exact: true }),
+      ).toBeVisible();
+    });
+  }
 
   test("hero buttons point to the services and results sections", async ({
     page,

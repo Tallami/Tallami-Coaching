@@ -59,41 +59,6 @@
   margin-bottom: 40px;
 }
 
-/* Marcador de resultados */
-.bug {
-  position: absolute;
-  right: var(--spacing-gutter);
-  top: 104px;
-}
-
-.bugBox {
-  display: grid;
-  grid-template-columns: auto auto;
-  gap: 1px;
-  background: var(--color-stage-line);
-  border-radius: 4px;
-  overflow: hidden;
-  font-stretch: 85%;
-}
-
-.bugBox > div {
-  background: rgba(11, 20, 51, 0.86);
-  padding: 10px 16px;
-}
-
-.bugBox strong {
-  display: block;
-  font-size: 1.6rem;
-  line-height: 1;
-  font-weight: 800;
-  color: var(--color-gold);
-}
-
-.bugBox span {
-  font-size: 0.9rem;
-  color: var(--color-on-stage-2);
-}
-
 /* Zócalo de nombre */
 .lowerThird {
   display: inline-grid;
@@ -142,14 +107,6 @@
   .inner {
     padding-top: 132px;
   }
-
-  .bug {
-    position: relative;
-    top: auto;
-    right: auto;
-    display: inline-block;
-    margin: 0 0 32px;
-  }
 }
 
 @media (max-width: 640px) {
@@ -172,14 +129,5 @@
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-  }
-
-  .inner .bug {
-    order: 5;
-    margin: 0 0 32px;
-  }
-
-  .inner .lowerThird {
-    order: 6;
   }
 }

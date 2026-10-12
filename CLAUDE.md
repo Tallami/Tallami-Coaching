@@ -5,7 +5,7 @@ Plan completo del proyecto: https://claude.ai/code/artifact/591e86f6-ddbb-4512-9
 
 ## Quién es Tallami
 - Coach de Fortnite competitivo, Argentina. Redes: x.com/tallami1, twitch.tv/tallami, youtube.com/@tallami1, instagram.com/tallami1, tiktok.com/@tallami
-- Palmarés como coach: 3 victorias de FNCS (CH5S2 con Randu & Lewa, CH5S3 con K1ng & Fazer, CH6S1 con K1ng & Fazer & Phzin), Reload Elite 1º (Phzin & Edson; Romero & Lewa), Second Chance 1º (K1ng & Fazer), Globals 2024 (22º), 2025 (11º y 12º), 2026 (14º), EWC ESL 9º, EWC Reload 5º.
+- Palmarés como coach: 3 victorias de FNCS (CH5S2 con Randu & Lewa, CH5S3 con K1ng & Fazer, CH6S1 con K1ng & Fazer & Phzin), Reload Elite Series 1º (Phzin & Edson; Romero & Lewa), Second Chance 1º (K1ng & Fazer), Globals 2024 (22º), 2025 (11º y 12º), 2026 (14º), Esports World Cup (ESL 9º, Reload 5º).
 - USD 45.300 en ganancias de coaching registradas desde CH5S4.
 - Los jugadores del Excel de coaching autorizaron mostrar su nombre y resultado.
 
@@ -29,8 +29,7 @@ Mercado Pago (Argentina) · dLocal Go (Pix y resto de LATAM) · PayPal (exterior
 | Clase 1 a 1 (60 min) | 40 · pack de 4: 140 |
 | Plan de juego personalizado | 120 |
 | Coaching de torneo (dúo/trío) | 150 por equipo |
-| Academia Tallami | 15 por mes |
-| Temporada Pro | 200 por jugador + 6% de premios (por aplicación) |
+| Temporada Pro | 2500 por equipo, toda la temporada (por aplicación) |
 
 ## Cómo trabajar en este proyecto
 1. Antes de construir, usá el flujo de Superpowers: brainstorming → plan → ejecución por subagentes → tests.

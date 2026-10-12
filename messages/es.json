@@ -1,7 +1,7 @@
 {
   "Metadata": {
     "title": "Tallami Coaching · Coaching de Fortnite competitivo",
-    "description": "Coaching de Fortnite competitivo con Tallami, el coach freelance detrás de {count} títulos de FNCS. VOD reviews, clases 1 a 1, planes de juego y coaching de torneo."
+    "description": "Coaching de Fortnite competitivo con Tallami, el coach detrás de {count} títulos de FNCS. VOD reviews, clases 1 a 1, planes de juego y coaching de torneo."
   },
   "Common": {
     "skipLink": "Saltar al contenido"
@@ -17,14 +17,11 @@
   },
   "Hero": {
     "imageAlt": "Tallami sonriendo con auriculares en el escenario de un torneo",
-    "summaryLabel": "Resumen de resultados como coach",
-    "titlesLabel": "títulos de FNCS",
-    "firstPlacesLabel": "primeros puestos",
     "title": "Entrená con el coach detrás de {count} títulos de FNCS",
     "lede": "Reviso tus partidas como en una final: dónde rotaste tarde, qué pelea no tenías que tomar y qué hacer distinto la próxima. Coaching de Fortnite competitivo desde Argentina para toda Latinoamérica.",
     "ctaServices": "Ver servicios y precios",
     "ctaResults": "Ver resultados",
-    "role": "Coach freelance de Fortnite competitivo, Argentina"
+    "role": "Coach de Fortnite competitivo, Argentina"
   },
   "Results": {
     "title": "Resultados como coach",
@@ -62,21 +59,15 @@
         "name": "Coaching de torneo",
         "description": "Acompaño a tu dúo o trío durante el torneo. El precio es por dúo o trío.",
         "cta": "Reservar para mi dúo o trío"
-      },
-      "academy": {
-        "name": "Academia Tallami",
-        "description": "Entrenamiento continuo con pago mensual.",
-        "cta": "Unirme a la Academia"
       }
     },
     "units": {
-      "perTeam": "por dúo o trío",
-      "perMonth": "por mes"
+      "perTeam": "por dúo o trío"
     },
     "pro": {
       "name": "Temporada Pro",
-      "unit": "por jugador + {percent}% de premios",
-      "description": "Coaching durante toda la temporada. Se entra por aplicación.",
+      "unit": "por equipo, toda la temporada",
+      "description": "Coaching para tu dúo o trío durante toda la temporada. Se entra por aplicación.",
       "cta": "Aplicar a Temporada Pro"
     }
   },
@@ -118,7 +109,7 @@
       },
       "pro": {
         "question": "¿Cómo entro a la Temporada Pro?",
-        "answer": "Mandás una aplicación. Si quedás, el precio es {price} por jugador más el {percent}% de los premios."
+        "answer": "Mandás una aplicación. Si quedás, son {price} por equipo por toda la temporada."
       }
     }
   },

@@ -2,12 +2,12 @@ import Image from "next/image";
 import { getTranslations } from "next-intl/server";
 import heroPhoto from "@/assets/tallami-wide-1920.jpg";
 import { Button } from "@/components/ui/button";
-import { FIRST_PLACES, FNCS_TITLES } from "@/content/results";
+import { FNCS_TITLES } from "@/content/results";
 import styles from "./hero.module.css";
 
 const COACH_NAME = "Tomás “Tallami” Allami";
 
-/** Portada: foto de escenario, marcador de resultados, título y zócalo de nombre. */
+/** Portada: foto de escenario, título, botones y zócalo de nombre. */
 export async function Hero() {
   const t = await getTranslations("Hero");
 
@@ -22,22 +22,6 @@ export async function Hero() {
         className={styles.photo}
       />
       <div className={`${styles.inner} mx-auto w-full max-w-wrap px-gutter`}>
-        <div className={styles.bug}>
-          <div
-            className={styles.bugBox}
-            role="group"
-            aria-label={t("summaryLabel")}
-          >
-            <div>
-              <strong>{FNCS_TITLES}</strong>
-              <span>{t("titlesLabel")}</span>
-            </div>
-            <div>
-              <strong>{FIRST_PLACES}</strong>
-              <span>{t("firstPlacesLabel")}</span>
-            </div>
-          </div>
-        </div>
         <h1 id="hero-title" className={styles.title}>
           {t("title", { count: FNCS_TITLES })}
         </h1>

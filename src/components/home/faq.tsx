@@ -10,10 +10,7 @@ export async function Faq() {
   const t = await getTranslations("Faq");
   const locale = await getLocale();
 
-  const answerArguments = {
-    price: formatUsd(PRO_SEASON.priceUsd, locale),
-    percent: PRO_SEASON.prizeSharePercent,
-  };
+  const answerArguments = { price: formatUsd(PRO_SEASON.priceUsd, locale) };
 
   return (
     <section id="faq" className="paper" aria-labelledby="faq-title">

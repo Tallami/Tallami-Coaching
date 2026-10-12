@@ -6,10 +6,9 @@ export type ServiceId =
   | "vodLive"
   | "lesson"
   | "gamePlan"
-  | "tournament"
-  | "academy";
+  | "tournament";
 
-export type PriceUnit = "perTeam" | "perMonth";
+export type PriceUnit = "perTeam";
 
 export type Service = {
   id: ServiceId;
@@ -25,12 +24,12 @@ export const SERVICES: readonly Service[] = [
   { id: "lesson", priceUsd: LESSON_PRICE_USD },
   { id: "gamePlan", priceUsd: 120 },
   { id: "tournament", priceUsd: 150, unit: "perTeam" },
-  { id: "academy", priceUsd: 15, unit: "perMonth" },
 ];
 
 export const LESSON_PACK = { sessions: 4, priceUsd: 140 } as const;
 
-export const PRO_SEASON = { priceUsd: 200, prizeSharePercent: 6 } as const;
+/** Temporada Pro: un precio fijo por equipo para toda la temporada. */
+export const PRO_SEASON = { priceUsd: 2500 } as const;
 
 /** Lo que se ahorra comprando el pack de clases en vez de clases sueltas. */
 export function lessonPackSavingsUsd(): number {

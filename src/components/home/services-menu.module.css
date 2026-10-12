@@ -79,6 +79,7 @@
   line-height: 1;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  text-align: right;
 }
 
 .amt small {

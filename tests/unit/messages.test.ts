@@ -77,10 +77,29 @@ describe("messages", () => {
       "savings",
       "sessions",
     ]);
-    expect(spanish.get("Services.pro.unit")).toEqual(["percent"]);
-    expect(spanish.get("Faq.items.pro.answer")).toEqual(["percent", "price"]);
+    expect(spanish.get("Services.pro.unit")).toEqual([]);
+    expect(spanish.get("Faq.items.pro.answer")).toEqual(["price"]);
     expect(spanish.get("Footer.legal")).toEqual(["year"]);
   });
+
+  test.each(catalogs)("no message says freelance in %s", (_locale, messages) => {
+    for (const [path, value] of flattenMessages(messages)) {
+      expect(String(value), path).not.toMatch(/freelanc/i);
+    }
+  });
+
+  test.each(catalogs)(
+    "no message keeps the hero counters, Academia or monthly unit in %s",
+    (_locale, messages) => {
+      const paths = flattenMessages(messages).map(([path]) => path);
+
+      expect(paths).not.toContain("Hero.summaryLabel");
+      expect(paths).not.toContain("Hero.titlesLabel");
+      expect(paths).not.toContain("Hero.firstPlacesLabel");
+      expect(paths).not.toContain("Services.items.academy.name");
+      expect(paths).not.toContain("Services.units.perMonth");
+    },
+  );
 
   test.each(catalogs)("no price is written in %s messages", (_locale, messages) => {
     for (const [path, value] of flattenMessages(messages)) {

@@ -1,6 +1,6 @@
 // Resultados de coaching de Tallami. Los datos salen del CLAUDE.md: no agregar
 // ni redondear nada que no esté ahí. Los nombres de torneo van completos
-// ("Reload Elite Series", "Esports World Cup"), no con las siglas del CLAUDE.md.
+// ("Reload Elite Series", "Esports World Cup"), igual que en el CLAUDE.md.
 
 export type Win = {
   event: "FNCS" | "Reload Elite Series" | "Second Chance";
@@ -36,4 +36,3 @@ export const LAN_RESULTS: readonly LanResult[] = [
 ];
 
 export const FNCS_TITLES = WINS.filter((win) => win.event === "FNCS").length;
-export const FIRST_PLACES = WINS.length;

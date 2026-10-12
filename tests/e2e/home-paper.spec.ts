@@ -6,41 +6,51 @@ const GOLD = "rgb(255, 201, 60)";
 const ZONE = "rgb(36, 87, 197)";
 
 /** Precios del CLAUDE.md en el orden del menú; Temporada Pro va última. */
-const PRICE_STARTS = [
+const SERVICE_PRICE_STARTS = [
   /^USD 30\b/,
   /^USD 45\b/,
   /^USD 40\b/,
   /^USD 120\b/,
   /^USD 150\b/,
-  /^USD 15\b/,
-  /^USD 200\b/,
 ];
 
-const BOOKING_LINK_NAME =
-  /^(Reservar|Pedir mi plan|Unirme a la Academia|Aplicar a Temporada Pro)/;
+/** Temporada Pro: precio fijo por equipo; el separador de miles cambia en inglés. */
+const PRO_PRICE_START = {
+  es: /^USD 2\.500\b/,
+  pt: /^USD 2\.500\b/,
+  en: /^USD 2,500\b/,
+} as const;
+
+function priceStarts(locale: keyof typeof PRO_PRICE_START): RegExp[] {
+  return [...SERVICE_PRICE_STARTS, PRO_PRICE_START[locale]];
+}
+
+const BOOKING_LINK_NAME = /^(Reservar|Pedir mi plan|Aplicar a Temporada Pro)/;
 
 const LOCALIZED_SERVICES = [
   {
     path: "/pt",
+    locale: "pt",
     texts: [
       "por dupla ou trio",
-      "por mês",
-      "por jogador + 6% dos prêmios",
+      "por equipe, toda a temporada",
       "Pacote de 4 aulas: USD 140, você economiza USD 20.",
       "Tem menos de 18 anos?",
     ],
   },
   {
     path: "/en",
+    locale: "en",
     texts: [
       "per duo or trio",
-      "per month",
-      "per player + 6% of prizes",
+      "per team, for the whole season",
       "Pack of 4 lessons: USD 140, you save USD 20.",
       "Under 18?",
     ],
   },
 ] as const;
+
+const LOCALE_PATHS = ["/es", "/pt", "/en"] as const;
 
 const EPIC_NOTICES = [
   ["/es", "No afiliado ni respaldado por Epic Games."],
@@ -57,13 +67,31 @@ function columnCount(gridTemplateColumns: string): number {
 }
 
 test.describe("services menu", () => {
-  test("services show every CLAUDE.md price in order", async ({ page }) => {
+  test("services list five prices and the pro season last", async ({
+    page,
+  }) => {
     await page.goto("/es");
 
+    const prices = page.locator("#services [data-testid=price]");
+
+    await expect(prices).toHaveText(priceStarts("es"));
+    await expect(prices).toHaveCount(6);
+    // Sin porcentaje de premios en ninguna parte de la pizarra.
+    await expect(page.locator("#services")).not.toContainText("%");
+
+    await page.goto("/en");
     await expect(
-      page.locator("#services [data-testid=price]"),
-    ).toHaveText(PRICE_STARTS);
+      page.locator("#services [data-testid=price]").last(),
+    ).toHaveText(/^USD 2,500\b/);
   });
+
+  for (const path of LOCALE_PATHS) {
+    test(`no page offers Academia Tallami at ${path}`, async ({ page }) => {
+      await page.goto(path);
+
+      await expect(page.locator("body")).not.toContainText("Academia Tallami");
+    });
+  }
 
   test("price units and lesson pack are shown", async ({ page }) => {
     await page.goto("/es");
@@ -72,12 +100,32 @@ test.describe("services menu", () => {
 
     for (const text of [
       "por dúo o trío",
-      "por mes",
-      "por jugador + 6% de premios",
+      "por equipo, toda la temporada",
       "Pack de 4 clases: USD 140, ahorrás USD 20.",
     ]) {
       await expect(services).toContainText(text);
     }
+  });
+
+  test("pro season shows the team unit and the faq answer", async ({ page }) => {
+    await page.goto("/es");
+
+    const card = page.locator("#services .stage");
+
+    await expect(card).toContainText("por equipo, toda la temporada");
+    await expect(card).toContainText(
+      "Coaching para tu dúo o trío durante toda la temporada. Se entra por aplicación.",
+    );
+
+    await page
+      .locator("#faq summary", { hasText: "¿Cómo entro a la Temporada Pro?" })
+      .click();
+    await expect(
+      page.getByText(
+        "Mandás una aplicación. Si quedás, son USD 2.500 por equipo por toda la temporada.",
+        { exact: true },
+      ),
+    ).toBeVisible();
   });
 
   test("minors note sits next to prices", async ({ page }) => {
@@ -97,7 +145,7 @@ test.describe("services menu", () => {
       .locator("#services")
       .getByRole("link", { name: BOOKING_LINK_NAME });
 
-    await expect(links).toHaveCount(7);
+    await expect(links).toHaveCount(6);
     const hrefs = await links.evaluateAll((anchors) =>
       anchors.map((anchor) => anchor.getAttribute("href")),
     );
@@ -116,10 +164,12 @@ test.describe("services menu", () => {
     await expect(card.getByRole("heading", { level: 3 })).toHaveText(
       "Temporada Pro",
     );
-    await expect(card.locator("[data-testid=price]")).toHaveText(/^USD 200\b/);
+    await expect(card.locator("[data-testid=price]")).toHaveText(
+      PRO_PRICE_START.es,
+    );
     await expect(
       page.locator("#services [data-testid=price]").last(),
-    ).toHaveText(/^USD 200\b/);
+    ).toHaveText(PRO_PRICE_START.es);
   });
 
   test("service buttons show their focus ring at once, blue on paper and gold on the Pro card", async ({
@@ -141,7 +191,7 @@ test.describe("services menu", () => {
     expect(await ringRightAfterFocus("#services .stage a")).toBe(GOLD);
   });
 
-  for (const { path, texts } of LOCALIZED_SERVICES) {
+  for (const { path, locale, texts } of LOCALIZED_SERVICES) {
     test(`units, pack and minors note are localized at ${path}`, async ({
       page,
     }) => {
@@ -152,7 +202,7 @@ test.describe("services menu", () => {
       }
       await expect(
         page.locator("#services [data-testid=price]"),
-      ).toHaveText(PRICE_STARTS);
+      ).toHaveText(priceStarts(locale));
     });
   }
 
@@ -237,7 +287,7 @@ test.describe("faq", () => {
     await expect(page.locator("#faq details[open]")).toHaveCount(0);
   });
 
-  test("Temporada Pro answer takes price and percentage from the data", async ({
+  test("Temporada Pro answer takes the price from the data", async ({
     page,
   }) => {
     await page.goto("/en");
@@ -249,7 +299,7 @@ test.describe("faq", () => {
     await summary.click();
     await expect(
       page.getByText(
-        "If you're accepted, the price is USD 200 per player plus 6% of prizes.",
+        "If you're accepted, it's USD 2,500 per team for the whole season.",
       ),
     ).toBeVisible();
   });

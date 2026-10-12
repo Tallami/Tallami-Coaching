@@ -15,6 +15,8 @@ const LOCALES = [
   { path: "/en", messages: en, ogLocale: "en_US" },
 ] as const;
 
+const FREELANCE = /freelanc/i;
+
 /** La descripción lleva `{count}`: el número sale de `src/content/results.ts`. */
 function metaDescription(message: string): string {
   return message.replace("{count}", String(FNCS_TITLES));
@@ -62,6 +64,23 @@ test.describe("localized metadata", () => {
         "content",
         ogLocale,
       );
+    });
+  }
+
+  for (const { path } of LOCALES) {
+    test(`no text or metadata says freelance at ${path}`, async ({ page }) => {
+      await page.goto(path);
+
+      const bodyText = await page.locator("body").innerText();
+      const description = await page
+        .locator("meta[name=description]")
+        .getAttribute("content");
+
+      expect(bodyText).not.toMatch(FREELANCE);
+      expect(description ?? "").not.toMatch(FREELANCE);
+      await expect(
+        page.locator("meta[property='og:description']"),
+      ).not.toHaveAttribute("content", FREELANCE);
     });
   }
 

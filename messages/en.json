@@ -1,7 +1,7 @@
 {
   "Metadata": {
     "title": "Tallami Coaching · Competitive Fortnite coaching",
-    "description": "Competitive Fortnite coaching with Tallami, the freelance coach behind {count} FNCS titles. VOD reviews, 1-on-1 lessons, game plans and tournament coaching."
+    "description": "Competitive Fortnite coaching with Tallami, the coach behind {count} FNCS titles. VOD reviews, 1-on-1 lessons, game plans and tournament coaching."
   },
   "Common": {
     "skipLink": "Skip to content"
@@ -17,14 +17,11 @@
   },
   "Hero": {
     "imageAlt": "Tallami smiling with headphones on a tournament stage",
-    "summaryLabel": "Summary of results as a coach",
-    "titlesLabel": "FNCS titles",
-    "firstPlacesLabel": "first places",
     "title": "Train with the coach behind {count} FNCS titles",
     "lede": "I review your games like a final: where you rotated late, which fight you shouldn't have taken, and what to do differently next time. Competitive Fortnite coaching from Argentina for all of Latin America.",
     "ctaServices": "See services and prices",
     "ctaResults": "See results",
-    "role": "Freelance competitive Fortnite coach, Argentina"
+    "role": "Competitive Fortnite coach, Argentina"
   },
   "Results": {
     "title": "Results as a coach",
@@ -62,21 +59,15 @@
         "name": "Tournament coaching",
         "description": "I'm with your duo or trio during the tournament. The price is per duo or trio.",
         "cta": "Book for my duo or trio"
-      },
-      "academy": {
-        "name": "Academia Tallami",
-        "description": "Ongoing training with monthly payment.",
-        "cta": "Join Academia Tallami"
       }
     },
     "units": {
-      "perTeam": "per duo or trio",
-      "perMonth": "per month"
+      "perTeam": "per duo or trio"
     },
     "pro": {
       "name": "Temporada Pro",
-      "unit": "per player + {percent}% of prizes",
-      "description": "Coaching for the whole season. Entry is by application.",
+      "unit": "per team, for the whole season",
+      "description": "Coaching for your duo or trio for the whole season. Entry is by application.",
       "cta": "Apply to Temporada Pro"
     }
   },
@@ -118,7 +109,7 @@
       },
       "pro": {
         "question": "How do I join Temporada Pro?",
-        "answer": "You send in an application. If you're accepted, the price is {price} per player plus {percent}% of prizes."
+        "answer": "You send in an application. If you're accepted, it's {price} per team for the whole season."
       }
     }
   },

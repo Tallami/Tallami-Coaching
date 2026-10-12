@@ -54,14 +54,16 @@ describe("services", () => {
       { id: "lesson", priceUsd: 40 },
       { id: "gamePlan", priceUsd: 120 },
       { id: "tournament", priceUsd: 150, unit: "perTeam" },
-      { id: "academy", priceUsd: 15, unit: "perMonth" },
     ]);
   });
 
-  test("lesson pack and pro season", () => {
+  test("lesson pack savings", () => {
     expect(LESSON_PACK).toEqual({ sessions: 4, priceUsd: 140 });
     expect(lessonPackSavingsUsd()).toBe(20);
-    expect(PRO_SEASON).toEqual({ priceUsd: 200, prizeSharePercent: 6 });
+  });
+
+  test("pro season is a flat team price", () => {
+    expect(PRO_SEASON).toEqual({ priceUsd: 2500 });
   });
 
   test("bookingHref points every service and the pro season to #services", () => {

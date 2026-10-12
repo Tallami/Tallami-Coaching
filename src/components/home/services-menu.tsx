@@ -14,7 +14,7 @@ import styles from "./services-menu.module.css";
 interface PriceRowProps {
   name: string;
   price: string;
-  /** Aclaración debajo del precio: "por mes", "por dúo o trío"… */
+  /** Aclaración junto al precio: "por dúo o trío", "por equipo, toda la temporada". */
   unit?: string;
 }
 
@@ -76,7 +76,7 @@ async function ProSeasonCard() {
       <PriceRow
         name={t("pro.name")}
         price={formatUsd(PRO_SEASON.priceUsd, locale)}
-        unit={t("pro.unit", { percent: PRO_SEASON.prizeSharePercent })}
+        unit={t("pro.unit")}
       />
       <p>{t("pro.description")}</p>
       <Button asChild>
