@@ -19,18 +19,21 @@ const NOT_FOUND_PAGES = [
     title: "No encontramos esta página",
     back: "Volver al inicio",
     home: "/es",
+    lang: "es",
   },
   {
     path: "/pt/nao-existe",
     title: "Não encontramos esta página",
     back: "Voltar ao início",
     home: "/pt",
+    lang: "pt-BR",
   },
   {
     path: "/en/missing",
     title: "We couldn't find this page",
     back: "Back to home",
     home: "/en",
+    lang: "en",
   },
 ] as const;
 
@@ -70,6 +73,29 @@ for (const { path, title, back, home } of NOT_FOUND_PAGES) {
     );
   });
 }
+
+test.describe("localized 404 without JavaScript", () => {
+  test.use({ javaScriptEnabled: false });
+
+  // `notFound()` desde una página deja el cuerpo vacío en el HTML del servidor
+  // (Next 16.4): el 404 localizado sale de `src/app/global-not-found.tsx`.
+  for (const { path, title, back, home, lang } of NOT_FOUND_PAGES) {
+    test(`${path} is rendered by the server`, async ({ page }) => {
+      const response = await page.goto(path);
+
+      expect(response?.status()).toBe(404);
+      await expect(page.locator("html")).toHaveAttribute("lang", lang);
+      await expect(page).toHaveTitle(title);
+      await expect(
+        page.getByRole("heading", { level: 1, name: title }),
+      ).toBeVisible();
+      await expect(page.getByRole("link", { name: back })).toHaveAttribute(
+        "href",
+        home,
+      );
+    });
+  }
+});
 
 test.describe("unsupported locale prefix", () => {
   test.use({ locale: "fr-FR" });

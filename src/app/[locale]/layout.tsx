@@ -1,24 +1,17 @@
 import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
-import { Saira } from "next/font/google";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getTranslations } from "next-intl/server";
 import heroPhoto from "@/assets/tallami-wide-1920.jpg";
 import { getHomeLanguageAlternates, getHomePath } from "@/i18n/alternates";
 import { HTML_LANG, INTL_TAG, routing } from "@/i18n/routing";
+import { saira } from "@/lib/fonts";
 import { SITE_URL } from "@/lib/site-url";
 import "../globals.css";
 
 const SITE_NAME = "Tallami Coaching";
 /** Mismo azul que el escenario (`--color-stage`): barra del navegador en celular. */
 const THEME_COLOR = "#0B1433";
-
-const saira = Saira({
-  axes: ["wdth"],
-  subsets: ["latin"],
-  variable: "--font-saira",
-  display: "swap",
-});
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
