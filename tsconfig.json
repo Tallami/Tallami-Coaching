@@ -30,5 +30,12 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "propuestas", ".claude", "docs", ".superpowers"]
+  "exclude": [
+    "node_modules",
+    "propuestas",
+    "assets",
+    ".claude",
+    "docs",
+    ".superpowers"
+  ]
 }

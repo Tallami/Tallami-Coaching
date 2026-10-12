@@ -14,6 +14,7 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Fuera del código de la web:
     "propuestas/**",
+    "assets/**",
     ".claude/**",
     "docs/**",
     ".superpowers/**",
