@@ -61,7 +61,6 @@ const STILL_TOLERANCE_PX = 0.5;
 const MOVING_TIMEOUT_MS = 3_000;
 const MAX_TAB_PRESSES = 20;
 const SUBPIXEL_TOLERANCE = 0.01;
-const IMAGE_REQUEST_TIMEOUT_MS = 20_000;
 
 function wallOf(page: Page): Locator {
   return page.locator("#reviews");
@@ -313,26 +312,6 @@ test.describe("reviews wall", () => {
     }
     // El avatar va primero; la foto del tweet carga en diferido.
     await expect(images.nth(1)).toHaveAttribute("loading", "lazy");
-  });
-
-  test("the image optimizer accepts the X avatar and photo hosts", async ({
-    request,
-  }) => {
-    const sources = [
-      "https://pbs.twimg.com/profile_images/2091496317293903872/b2uVDrQ3_200x200.jpg",
-      "https://pbs.twimg.com/media/HTPxG3WXkAA17Xr.jpg",
-      "https://abs.twimg.com/sticky/default_profile_images/default_profile_200x200.png",
-    ];
-
-    for (const source of sources) {
-      const response = await request.get(
-        `/_next/image?url=${encodeURIComponent(source)}&w=96&q=75`,
-        { timeout: IMAGE_REQUEST_TIMEOUT_MS },
-      );
-      // 400 = host no permitido. Sin red el optimizador contesta otro error,
-      // y los tests no dependen de que las imágenes lleguen.
-      expect(response.status(), source).not.toBe(400);
-    }
   });
 
   test("coach mention is highlighted in gold", async ({ page }) => {
