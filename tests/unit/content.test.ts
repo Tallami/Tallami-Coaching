@@ -1,12 +1,5 @@
 import { describe, expect, test } from "vitest";
-import {
-  COACHING_EARNINGS_USD,
-  EARNINGS_SINCE,
-  FIRST_PLACES,
-  FNCS_TITLES,
-  OTHER_RESULTS,
-  WINS,
-} from "@/content/results";
+import { FNCS_TITLES, LAN_RESULTS, WINS } from "@/content/results";
 import {
   LESSON_PACK,
   PRO_SEASON,
@@ -22,32 +15,35 @@ describe("results", () => {
       { event: "FNCS", season: "CH6S1", players: ["K1ng", "Fazer", "Phzin"] },
       { event: "FNCS", season: "CH5S3", players: ["K1ng", "Fazer"] },
       { event: "FNCS", season: "CH5S2", players: ["Randu", "Lewa"] },
-      { event: "Reload Elite", players: ["Phzin", "Edson"] },
-      { event: "Reload Elite", players: ["Romero", "Lewa"] },
+      { event: "Reload Elite Series", players: ["Phzin", "Edson"] },
+      { event: "Reload Elite Series", players: ["Romero", "Lewa"] },
       { event: "Second Chance", players: ["K1ng", "Fazer"] },
     ]);
   });
 
-  test("hero counters derive from wins", () => {
+  test("online wins use the full Reload Elite Series name", () =>
+    expect(WINS.map((w) => w.event)).toEqual([
+      "FNCS",
+      "FNCS",
+      "FNCS",
+      "Reload Elite Series",
+      "Reload Elite Series",
+      "Second Chance",
+    ]));
+
+  test("FNCS titles derive from wins", () => {
     expect(FNCS_TITLES).toBe(3);
-    expect(FIRST_PLACES).toBe(6);
   });
 
-  test("other results match CLAUDE.md", () => {
-    expect(OTHER_RESULTS).toEqual([
-      { place: 5, event: "EWC Reload" },
-      { place: 9, event: "EWC ESL" },
-      { place: 11, event: "Globals", season: "2025" },
-      { place: 12, event: "Globals", season: "2025" },
-      { place: 14, event: "Globals", season: "2026" },
-      { place: 22, event: "Globals", season: "2024" },
-    ]);
-  });
-
-  test("earnings", () => {
-    expect(COACHING_EARNINGS_USD).toBe(45300);
-    expect(EARNINGS_SINCE).toBe("CH5S4");
-  });
+  test("in-person results match CLAUDE.md, ordered by place", () =>
+    expect(LAN_RESULTS).toEqual([
+      { place: 5, event: "Esports World Cup", label: "Reload" },
+      { place: 9, event: "Esports World Cup", label: "ESL" },
+      { place: 11, event: "FNCS Globals", label: "2025" },
+      { place: 12, event: "FNCS Globals", label: "2025" },
+      { place: 14, event: "FNCS Globals", label: "2026" },
+      { place: 22, event: "FNCS Globals", label: "2024" },
+    ]));
 });
 
 describe("services", () => {

@@ -9,47 +9,42 @@ const HERO_TITLES = [
   ["/en", "Train with the coach behind 3 FNCS titles"],
 ] as const;
 
-const FIRST_WIN_ROWS = [
+const LAN_TITLE = "Campeonatos presenciales";
+
+const LAN_ITEMS_ES = [
+  "5º Esports World Cup Reload",
+  "9º Esports World Cup ESL",
+  "11º FNCS Globals 2025",
+  "12º FNCS Globals 2025",
+  "14º FNCS Globals 2026",
+  "22º FNCS Globals 2024",
+];
+
+const ONLINE_LISTS = [
   {
     path: "/es",
-    cells: ["1º", "FNCS", "CH6S1", "K1ng, Fazer y Phzin"],
+    title: "Campeonatos online",
+    first: ["1º", "FNCS", "CH6S1", "K1ng, Fazer y Phzin"],
+    fourth: ["1º", "Reload Elite Series", "Phzin y Edson"],
   },
   {
     path: "/pt",
-    cells: ["1º", "FNCS", "CH6S1", "K1ng, Fazer e Phzin"],
+    title: "Campeonatos online",
+    first: ["1º", "FNCS", "CH6S1", "K1ng, Fazer e Phzin"],
+    fourth: ["1º", "Reload Elite Series", "Phzin e Edson"],
   },
   {
     path: "/en",
-    cells: ["1st", "FNCS", "CH6S1", "K1ng, Fazer, and Phzin"],
+    title: "Online championships",
+    first: ["1st", "FNCS", "CH6S1", "K1ng, Fazer, and Phzin"],
+    fourth: ["1st", "Reload Elite Series", "Phzin and Edson"],
   },
 ] as const;
 
-const OTHER_RESULTS_AND_EARNINGS = [
-  {
-    path: "/es",
-    place: "22º",
-    amount: "USD 45.300",
-    sentence: "en ganancias de coaching registradas desde CH5S4",
-    firstOther: "5º EWC Reload",
-    thirdOther: "11º Globals 2025",
-  },
-  {
-    path: "/pt",
-    place: "22º",
-    amount: "USD 45.300",
-    sentence: "em ganhos de coaching registrados desde CH5S4",
-    firstOther: "5º EWC Reload",
-    thirdOther: "11º Globals 2025",
-  },
-  {
-    path: "/en",
-    place: "22nd",
-    amount: "USD 45,300",
-    sentence: "in recorded coaching earnings since CH5S4",
-    firstOther: "5th EWC Reload",
-    thirdOther: "11th Globals 2025",
-  },
-] as const;
+const EARNINGS_TEXTS = ["45.300", "45,300", "CH5S4"] as const;
+const LOCALE_PATHS = ["/es", "/pt", "/en"] as const;
+const PHONE_VIEWPORT = { width: 375, height: 812 };
+const DESKTOP_VIEWPORT = { width: 1440, height: 900 };
 
 test.describe("hero", () => {
   for (const [path, title] of HERO_TITLES) {
@@ -102,78 +97,88 @@ test.describe("hero", () => {
 });
 
 test.describe("results board", () => {
-  for (const { path, cells } of FIRST_WIN_ROWS) {
-    test(`lists six first places with players joined for ${path}`, async ({
-      page,
-    }) => {
-      await page.goto(path);
-
-      const rows = page.locator("#results table tbody tr");
-
-      await expect(rows).toHaveCount(6);
-      for (const cell of cells) {
-        await expect(rows.first()).toContainText(cell);
-      }
-    });
-  }
-
-  test("table has three column headers on desktop", async ({ page }) => {
+  test("in-person championships list comes first, ordered by place", async ({
+    page,
+  }) => {
     await page.goto("/es");
 
+    const results = page.locator("#results");
+    const lan = results.getByRole("list", { name: LAN_TITLE });
+
+    await expect(results.locator("h3").first()).toHaveText(LAN_TITLE);
+    // Con el espacio entre puesto y torneo: un lector no debería oír "5ºEsports".
+    await expect(lan.getByRole("listitem")).toHaveText(LAN_ITEMS_ES);
+
+    await page.goto("/en");
+
     await expect(
-      page.locator("#results").getByRole("columnheader"),
-    ).toHaveText(["Puesto", "Torneo", "Jugadores"]);
+      page.locator("#results").getByRole("heading", {
+        level: 3,
+        name: "In-person championships",
+      }),
+    ).toBeVisible();
+    await expect(
+      page
+        .locator("#results")
+        .getByRole("list", { name: "In-person championships" })
+        .getByRole("listitem")
+        .first(),
+    ).toHaveText("5th Esports World Cup Reload");
   });
 
-  for (const { path, place, amount, sentence } of OTHER_RESULTS_AND_EARNINGS) {
-    test(`other results and earnings are formatted for ${path}`, async ({
-      page,
-    }) => {
-      await page.goto(path);
-
-      const results = page.locator("#results");
-      const others = results.getByRole("list");
-
-      await expect(others.getByRole("listitem")).toHaveCount(6);
-      await expect(others).toContainText(place);
-      await expect(others).toContainText("Globals");
-      await expect(results.locator("strong", { hasText: "USD" })).toHaveText(
-        amount,
-      );
-      await expect(results).toContainText(sentence);
-    });
-  }
-
-  for (const { path, firstOther, thirdOther } of OTHER_RESULTS_AND_EARNINGS) {
-    test(`other results read as place, event and season for ${path}`, async ({
+  for (const { path, title, first, fourth } of ONLINE_LISTS) {
+    test(`online championships list shows the six wins with players at ${path}`, async ({
       page,
     }) => {
       await page.goto(path);
 
       const items = page
         .locator("#results")
-        .getByRole("list")
+        .getByRole("list", { name: title })
         .getByRole("listitem");
 
-      // Un lector de pantalla leería "5ºEWC Reload" si faltara el espacio.
-      await expect(items.first()).toHaveText(firstOther);
-      await expect(items.nth(2)).toHaveText(thirdOther);
+      await expect(items).toHaveCount(6);
+      for (const text of first) {
+        await expect(items.first()).toContainText(text);
+      }
+      for (const text of fourth) {
+        await expect(items.nth(3)).toContainText(text);
+      }
     });
   }
 
-  test("player, event and season names opt out of page translation", async ({
+  for (const path of LOCALE_PATHS) {
+    test(`results no longer show the earnings box at ${path}`, async ({
+      page,
+    }) => {
+      await page.goto(path);
+
+      for (const text of EARNINGS_TEXTS) {
+        await expect(page.locator("#results")).not.toContainText(text);
+      }
+    });
+  }
+
+  test("player, event and label names opt out of page translation", async ({
     page,
   }) => {
     await page.goto("/es");
 
-    const firstWin = page.locator("#results table tbody tr").first();
-    const thirdOther = page
-      .locator("#results")
-      .getByRole("list")
+    const results = page.locator("#results");
+    const firstLan = results
+      .getByRole("list", { name: LAN_TITLE })
       .getByRole("listitem")
-      .nth(2);
+      .first();
+    const firstWin = results
+      .getByRole("list", { name: "Campeonatos online" })
+      .getByRole("listitem")
+      .first();
 
     // El "y" que une a los jugadores sí se traduce; los nombres no.
+    await expect(firstLan.locator("[translate=no]")).toHaveText([
+      "Esports World Cup",
+      "Reload",
+    ]);
     await expect(firstWin.locator("[translate=no]")).toHaveText([
       "FNCS",
       "CH6S1",
@@ -181,20 +186,51 @@ test.describe("results board", () => {
       "Fazer",
       "Phzin",
     ]);
-    await expect(thirdOther.locator("[translate=no]")).toHaveText([
-      "Globals",
-      "2025",
-    ]);
   });
 
-  test("results table stacks into a grid on phone width", async ({ page }) => {
-    await page.setViewportSize({ width: 375, height: 812 });
+  test("in-person list sits before the online list on phones", async ({
+    page,
+  }) => {
+    await page.setViewportSize(PHONE_VIEWPORT);
     await page.goto("/es");
 
-    const firstRow = page.locator("#results table tbody tr").first();
+    const results = page.locator("#results");
+    const lanBox = await results
+      .getByRole("list", { name: LAN_TITLE })
+      .boundingBox();
+    const onlineBox = await results
+      .getByRole("list", { name: "Campeonatos online" })
+      .boundingBox();
 
-    await expect(firstRow).toHaveCSS("display", "grid");
-    await expect(page.locator("#results table thead")).toBeHidden();
+    expect(lanBox).not.toBeNull();
+    expect(onlineBox).not.toBeNull();
+    if (!lanBox || !onlineBox) return;
+
+    // Una sola columna: presenciales arriba, online debajo.
+    expect(lanBox.y).toBeLessThan(onlineBox.y);
+    expect(lanBox.x).toBeCloseTo(onlineBox.x, 0);
+  });
+
+  test("lists sit side by side on desktop", async ({ page }) => {
+    await page.setViewportSize(DESKTOP_VIEWPORT);
+    await page.goto("/es");
+
+    const results = page.locator("#results");
+    const lanBox = await results
+      .getByRole("list", { name: LAN_TITLE })
+      .boundingBox();
+    const onlineBox = await results
+      .getByRole("list", { name: "Campeonatos online" })
+      .boundingBox();
+
+    expect(lanBox).not.toBeNull();
+    expect(onlineBox).not.toBeNull();
+    if (!lanBox || !onlineBox) return;
+
+    // Dos columnas: presenciales a la izquierda (más ancha), online a la derecha.
+    expect(lanBox.x).toBeLessThan(onlineBox.x);
+    expect(lanBox.y).toBeCloseTo(onlineBox.y, 0);
+    expect(lanBox.width).toBeGreaterThan(onlineBox.width);
   });
 });
 

@@ -1,15 +1,13 @@
-import { Fragment } from "react";
+import { Fragment, type ReactNode } from "react";
 import { getLocale, getTranslations } from "next-intl/server";
 import {
-  COACHING_EARNINGS_USD,
-  EARNINGS_SINCE,
-  OTHER_RESULTS,
+  LAN_RESULTS,
   WINS,
-  type OtherResult,
+  type LanResult,
   type Win,
 } from "@/content/results";
 import type { Locale } from "@/i18n/routing";
-import { formatListParts, formatPlace, formatUsd } from "@/lib/format";
+import { formatListParts, formatPlace } from "@/lib/format";
 import styles from "./results-board.module.css";
 
 const FIRST_PLACE = 1;
@@ -22,14 +20,14 @@ function Name({ children }: { children: string }) {
   return <span translate="no">{children}</span>;
 }
 
-/** " 2025" / " CH6S1" en gris, o nada si el resultado no tiene temporada. */
-function Season({ value }: { value?: string }) {
+/** " 2025" / " CH6S1" tras el torneo, o nada si el resultado no lo tiene. */
+function Detail({ value, className }: { value?: string; className?: string }) {
   if (!value) return null;
 
   return (
     <>
       {" "}
-      <span className={styles.season} translate="no">
+      <span className={className} translate="no">
         {value}
       </span>
     </>
@@ -55,40 +53,63 @@ function Players({
   );
 }
 
-function WinRow({ win, locale }: { win: Win; locale: Locale }) {
+/*
+ * Los espacios `{" "}` entre puesto y torneo no se ven (el flex los ignora),
+ * pero sin ellos un lector de pantalla leería "5ºEsports World Cup".
+ */
+function LanItem({ result, locale }: { result: LanResult; locale: Locale }) {
   return (
-    <tr role="row" className={styles.win}>
-      <td role="cell" className={styles.place}>
-        {formatPlace(FIRST_PLACE, locale)}
-      </td>
-      <td role="cell" className={styles.event}>
-        <Name>{win.event}</Name>
-        <Season value={win.season} />
-      </td>
-      <td role="cell" className={styles.players}>
-        <Players players={win.players} locale={locale} />
-      </td>
-    </tr>
-  );
-}
-
-function OtherResultItem({
-  result,
-  locale,
-}: {
-  result: OtherResult;
-  locale: Locale;
-}) {
-  return (
-    <li>
+    <li className={styles.lan}>
       <span className={styles.place}>{formatPlace(result.place, locale)}</span>{" "}
-      <Name>{result.event}</Name>
-      <Season value={result.season} />
+      <span>
+        <span className={styles.event}>
+          <Name>{result.event}</Name>
+        </span>
+        <Detail value={result.label} className={styles.muted} />
+      </span>
     </li>
   );
 }
 
-/** Tabla de posiciones: primeros puestos, otros resultados y ganancias. */
+function WinItem({ win, locale }: { win: Win; locale: Locale }) {
+  return (
+    <li className={styles.win}>
+      <span className={styles.place}>{formatPlace(FIRST_PLACE, locale)}</span>{" "}
+      <span>
+        <Name>{win.event}</Name>
+        <Detail value={win.season} />{" "}
+        <span className={styles.players}>
+          <Players players={win.players} locale={locale} />
+        </span>
+      </span>
+    </li>
+  );
+}
+
+/** Una columna: título en dorado y su lista, nombrada por ese título. */
+function Group({
+  id,
+  title,
+  children,
+}: {
+  id: string;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <div>
+      <h3 id={id} className={styles.groupTitle}>
+        {title}
+      </h3>
+      {/* `role="list"` porque Safari quita la semántica a las listas sin viñetas. */}
+      <ul className={styles.list} role="list" aria-labelledby={id}>
+        {children}
+      </ul>
+    </div>
+  );
+}
+
+/** Resultados en dos columnas: campeonatos presenciales y campeonatos online. */
 export async function ResultsBoard() {
   const t = await getTranslations("Results");
   const locale = await getLocale();
@@ -104,46 +125,26 @@ export async function ResultsBoard() {
           <h2 id="res-title">{t("title")}</h2>
           <p>{t("intro")}</p>
         </div>
-        {/* Los roles repiten los nativos a propósito: ≤640 px la tabla pasa a
-            display block/grid y algunos navegadores le quitan la semántica. */}
-        <table role="table" className={styles.board}>
-          <caption>{t("caption")}</caption>
-          <thead role="rowgroup">
-            <tr role="row">
-              <th role="columnheader" scope="col">
-                {t("columnPlace")}
-              </th>
-              <th role="columnheader" scope="col">
-                {t("columnEvent")}
-              </th>
-              <th role="columnheader" scope="col">
-                {t("columnPlayers")}
-              </th>
-            </tr>
-          </thead>
-          <tbody role="rowgroup">
+        {/* Presenciales primero: en celular es la columna de arriba. */}
+        <div className={styles.columns}>
+          <Group id="res-lan-title" title={t("lanTitle")}>
+            {LAN_RESULTS.map((result) => (
+              <LanItem
+                key={`${result.event}-${result.label}-${result.place}`}
+                result={result}
+                locale={locale}
+              />
+            ))}
+          </Group>
+          <Group id="res-online-title" title={t("onlineTitle")}>
             {WINS.map((win) => (
-              <WinRow
+              <WinItem
                 key={`${win.event}-${win.season ?? ""}-${win.players.join("-")}`}
                 win={win}
                 locale={locale}
               />
             ))}
-          </tbody>
-        </table>
-        <h3 className={styles.othersTitle}>{t("othersTitle")}</h3>
-        <ul className={styles.others} role="list">
-          {OTHER_RESULTS.map((result) => (
-            <OtherResultItem
-              key={`${result.event}-${result.season ?? ""}-${result.place}`}
-              result={result}
-              locale={locale}
-            />
-          ))}
-        </ul>
-        <div className={styles.earnings}>
-          <strong>{formatUsd(COACHING_EARNINGS_USD, locale)}</strong>
-          <span>{t("earnings", { since: EARNINGS_SINCE })}</span>
+          </Group>
         </div>
       </div>
     </section>

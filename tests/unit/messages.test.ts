@@ -72,7 +72,6 @@ describe("messages", () => {
 
     expect(spanish.get("Metadata.description")).toEqual(["count"]);
     expect(spanish.get("Hero.title")).toEqual(["count"]);
-    expect(spanish.get("Results.earnings")).toEqual(["since"]);
     expect(spanish.get("Services.items.lesson.description")).toEqual([
       "packPrice",
       "savings",

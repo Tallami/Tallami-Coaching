@@ -13,7 +13,6 @@ const AXE_WIDTHS = [375, 1440] as const;
 const AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"];
 const BLOCKING_IMPACTS = ["serious", "critical"];
 const VIEWPORT_HEIGHT = 900;
-const SMALL_PHONE_WIDTH = 320;
 const PHONE_WIDTH = 375;
 const MAX_TAB_PRESSES = 12;
 const SUBPIXEL_TOLERANCE = 0.01;
@@ -87,63 +86,6 @@ test.describe("responsive layout", () => {
       });
     }
   }
-
-  for (const locale of LOCALES) {
-    test(`results table stacks on small phones at /${locale}`, async ({
-      page,
-    }) => {
-      await openHome(page, locale, SMALL_PHONE_WIDTH);
-
-      await expect(page.locator("#results table thead")).toBeHidden();
-
-      const rowEdges = await page
-        .locator("#results table tbody tr")
-        .evaluateAll((rows) =>
-          rows.map((row) => {
-            const { left, right } = row.getBoundingClientRect();
-            return { left, right };
-          }),
-        );
-
-      expect(rowEdges).toHaveLength(6);
-      for (const { left, right } of rowEdges) {
-        expect(left).toBeGreaterThanOrEqual(0);
-        expect(right).toBeLessThanOrEqual(SMALL_PHONE_WIDTH);
-      }
-    });
-  }
-
-  test("stacked results table keeps its table semantics", async ({ page }) => {
-    await openHome(page, "es", SMALL_PHONE_WIDTH);
-
-    const table = page.locator("#results").getByRole("table");
-    const bodyRows = table
-      .getByRole("row")
-      .filter({ has: page.getByRole("cell") });
-
-    await expect(table).toHaveCount(1);
-    await expect(table).toHaveAccessibleName(
-      "Primeros puestos de jugadores que entrené.",
-    );
-    await expect(bodyRows).toHaveCount(6);
-    await expect(table.getByRole("cell")).toHaveCount(18);
-  });
-
-  test("table elements carry explicit roles so CSS display cannot strip them", async ({
-    page,
-  }) => {
-    await openHome(page, "es", PHONE_WIDTH);
-
-    const table = page.locator("#results table");
-
-    await expect(table).toHaveAttribute("role", "table");
-    await expect(table.locator("thead, tbody")).toHaveCount(2);
-    await expect(table.locator("[role=rowgroup]")).toHaveCount(2);
-    await expect(table.locator("tr")).toHaveCount(7);
-    await expect(table.locator("tr[role=row]")).toHaveCount(7);
-    await expect(table.locator("th[role=columnheader]")).toHaveCount(3);
-    await expect(table.locator("td[role=cell]")).toHaveCount(18);
-  });
 });
 
 test.describe("accessibility", () => {

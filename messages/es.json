@@ -28,13 +28,9 @@
   },
   "Results": {
     "title": "Resultados como coach",
-    "intro": "Resultados de jugadores que entrené como coach freelance. Autorizaron mostrar su nombre y resultado.",
-    "caption": "Primeros puestos de jugadores que entrené.",
-    "columnPlace": "Puesto",
-    "columnEvent": "Torneo",
-    "columnPlayers": "Jugadores",
-    "othersTitle": "Otros resultados",
-    "earnings": "en ganancias de coaching registradas desde {since}"
+    "intro": "Resultados de jugadores que entrené. Autorizaron mostrar su nombre y resultado.",
+    "lanTitle": "Campeonatos presenciales",
+    "onlineTitle": "Campeonatos online"
   },
   "Services": {
     "title": "Servicios y precios",

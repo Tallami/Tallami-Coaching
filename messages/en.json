@@ -28,13 +28,9 @@
   },
   "Results": {
     "title": "Results as a coach",
-    "intro": "Results from players I coached as a freelance coach. They authorized showing their name and result.",
-    "caption": "First places by players I coached.",
-    "columnPlace": "Place",
-    "columnEvent": "Tournament",
-    "columnPlayers": "Players",
-    "othersTitle": "Other results",
-    "earnings": "in recorded coaching earnings since {since}"
+    "intro": "Results from players I coached. They authorized showing their name and result.",
+    "lanTitle": "In-person championships",
+    "onlineTitle": "Online championships"
   },
   "Services": {
     "title": "Services and prices",
