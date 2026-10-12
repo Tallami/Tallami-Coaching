@@ -1,0 +1,185 @@
+/* Portada. Port de c-analisis.html (líneas 76-98 y 177-205). */
+
+.hero {
+  position: relative;
+  min-height: min(100svh, 860px);
+  display: grid;
+  align-items: end;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.photo {
+  object-fit: cover;
+  object-position: 70% 30%;
+  z-index: -2;
+}
+
+.hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(11, 20, 51, 0.96) 0%,
+      rgba(11, 20, 51, 0.82) 38%,
+      rgba(11, 20, 51, 0.12) 70%,
+      rgba(11, 20, 51, 0.3) 100%
+    ),
+    linear-gradient(0deg, var(--color-stage) 0%, rgba(11, 20, 51, 0) 35%);
+}
+
+.inner {
+  padding-top: 128px;
+  padding-bottom: clamp(32px, 6vw, 64px);
+}
+
+.title {
+  font-stretch: 70%;
+  font-weight: 800;
+  line-height: 0.92;
+  font-size: clamp(3rem, 8.2vw, 6.5rem);
+  margin: 0 0 20px;
+  max-width: 11ch;
+}
+
+.lede {
+  max-width: 48ch;
+  color: #d9dfef;
+  font-size: clamp(1.0625rem, 1.6vw, 1.25rem);
+  margin: 0 0 28px;
+}
+
+.ctas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 40px;
+}
+
+/* Marcador de resultados */
+.bug {
+  position: absolute;
+  right: var(--spacing-gutter);
+  top: 104px;
+}
+
+.bugBox {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 1px;
+  background: var(--color-stage-line);
+  border-radius: 4px;
+  overflow: hidden;
+  font-stretch: 85%;
+}
+
+.bugBox > div {
+  background: rgba(11, 20, 51, 0.86);
+  padding: 10px 16px;
+}
+
+.bugBox strong {
+  display: block;
+  font-size: 1.6rem;
+  line-height: 1;
+  font-weight: 800;
+  color: var(--color-gold);
+}
+
+.bugBox span {
+  font-size: 0.9rem;
+  color: var(--color-on-stage-2);
+}
+
+/* Zócalo de nombre */
+.lowerThird {
+  display: inline-grid;
+  max-width: 100%;
+}
+
+.ltName {
+  background: var(--color-on-stage);
+  color: var(--color-stage);
+  padding: 10px 22px 8px 18px;
+  font-stretch: 80%;
+  font-weight: 800;
+  font-size: clamp(1.25rem, 2.6vw, 1.75rem);
+  line-height: 1.1;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
+  border-left: 8px solid var(--color-gold);
+}
+
+.ltRole {
+  background: var(--color-beam);
+  color: #fff;
+  padding: 7px 22px 7px 26px;
+  font-weight: 500;
+  font-size: 0.98rem;
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 100%, 0 100%);
+  justify-self: start;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ltName {
+    animation: wipe 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) 0.2s both;
+  }
+
+  .ltRole {
+    animation: wipe 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) 0.4s both;
+  }
+
+  @keyframes wipe {
+    from {
+      clip-path: polygon(0 0, 0 0, 0 100%, 0 100%);
+    }
+  }
+}
+
+@media (max-width: 900px) {
+  .inner {
+    padding-top: 132px;
+  }
+
+  .bug {
+    position: relative;
+    top: auto;
+    right: auto;
+    display: inline-block;
+    margin: 0 0 32px;
+  }
+}
+
+@media (max-width: 640px) {
+  .photo {
+    object-position: 72% 0%;
+  }
+
+  .hero::after {
+    background: linear-gradient(
+      180deg,
+      rgba(11, 20, 51, 0.1) 0%,
+      rgba(11, 20, 51, 0.35) 24%,
+      rgba(11, 20, 51, 0.94) 46%,
+      var(--color-stage) 100%
+    );
+  }
+
+  .inner {
+    padding-top: 30svh;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .inner .bug {
+    order: 5;
+    margin: 0 0 32px;
+  }
+
+  .inner .lowerThird {
+    order: 6;
+  }
+}

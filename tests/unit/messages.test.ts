@@ -20,6 +20,27 @@ function flattenKeys(messages: Messages): string[] {
     .sort();
 }
 
+/**
+ * Nombres de los argumentos ICU de un mensaje: `{count}` y también
+ * `{count, plural, ...}`. Ignora el texto de las ramas (`one {# item}`).
+ */
+function placeholderNames(message: string): string[] {
+  const names = new Set<string>();
+  for (const match of message.matchAll(/\{\s*([A-Za-z_]\w*)\s*(?=[,}])/g)) {
+    names.add(match[1]);
+  }
+  return [...names].sort();
+}
+
+function placeholdersByKey(messages: Messages): Map<string, string[]> {
+  return new Map(
+    flattenMessages(messages).map(([path, value]) => [
+      path,
+      placeholderNames(String(value)),
+    ]),
+  );
+}
+
 const catalogs: [string, Messages][] = [
   ["es", es],
   ["pt", pt],
@@ -30,6 +51,27 @@ describe("messages", () => {
   test("pt and en define exactly the same message keys as es", () => {
     expect(flattenKeys(pt)).toEqual(flattenKeys(es));
     expect(flattenKeys(en)).toEqual(flattenKeys(es));
+  });
+
+  test("pt and en use the same ICU placeholders as es for every key", () => {
+    const spanish = placeholdersByKey(es);
+
+    for (const [locale, messages] of [
+      ["pt", pt],
+      ["en", en],
+    ] as const) {
+      const translated = placeholdersByKey(messages);
+      for (const [path, names] of spanish) {
+        expect(translated.get(path), `${locale}: ${path}`).toEqual(names);
+      }
+    }
+  });
+
+  test("home messages declare the ICU arguments the page passes", () => {
+    const spanish = placeholdersByKey(es);
+
+    expect(spanish.get("Hero.title")).toEqual(["count"]);
+    expect(spanish.get("Results.earnings")).toEqual(["since"]);
   });
 
   test.each(catalogs)("no message is empty in %s", (_locale, messages) => {

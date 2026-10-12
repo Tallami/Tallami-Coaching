@@ -1,11 +1,15 @@
-import { getTranslations } from "next-intl/server";
+import { Hero } from "@/components/home/hero";
+import { ResultsBoard } from "@/components/home/results-board";
+import { SiteHeader } from "@/components/home/site-header";
 
-export default async function HomePage() {
-  const t = await getTranslations("Metadata");
-
+export default function HomePage() {
   return (
-    <main id="contenido" className="mx-auto max-w-wrap px-gutter py-16">
-      <h1 className="text-4xl font-extrabold">{t("title")}</h1>
-    </main>
+    <>
+      <SiteHeader />
+      <main id="contenido">
+        <Hero />
+        <ResultsBoard />
+      </main>
+    </>
   );
 }

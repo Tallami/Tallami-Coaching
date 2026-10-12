@@ -6,6 +6,36 @@
   "Common": {
     "skipLink": "Ir para o conteúdo"
   },
+  "Header": {
+    "languageLabel": "Idioma",
+    "mainNavLabel": "Principal",
+    "results": "Resultados",
+    "services": "Serviços",
+    "howItWorks": "Como funciona",
+    "faq": "Perguntas",
+    "book": "Reservar"
+  },
+  "Hero": {
+    "imageAlt": "Tallami sorrindo com fones de ouvido no palco de um torneio",
+    "summaryLabel": "Resumo dos resultados como coach",
+    "titlesLabel": "títulos da FNCS",
+    "firstPlacesLabel": "primeiros lugares",
+    "title": "Treine com o coach por trás de {count} títulos da FNCS",
+    "lede": "Eu reviso suas partidas como numa final: onde você rotacionou tarde, que luta você não precisava ter pego e o que fazer diferente na próxima. Coaching de Fortnite competitivo da Argentina para toda a América Latina.",
+    "ctaServices": "Ver serviços e preços",
+    "ctaResults": "Ver resultados",
+    "role": "Coach freelancer de Fortnite competitivo, Argentina"
+  },
+  "Results": {
+    "title": "Resultados como coach",
+    "intro": "Resultados de jogadores que eu treinei como coach freelancer. Eles autorizaram a exibição do nome e do resultado.",
+    "caption": "Primeiros lugares de jogadores que eu treinei.",
+    "columnPlace": "Posição",
+    "columnEvent": "Torneio",
+    "columnPlayers": "Jogadores",
+    "othersTitle": "Outros resultados",
+    "earnings": "em ganhos de coaching registrados desde {since}"
+  },
   "NotFound": {
     "title": "Não encontramos esta página",
     "body": "Talvez o link esteja errado ou a página não exista mais.",

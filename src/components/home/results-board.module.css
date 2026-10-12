@@ -1,0 +1,186 @@
+/* Resultados: tabla de posiciones. Port de c-analisis.html (líneas 100-121 y 183-199). */
+
+.results {
+  padding-top: clamp(56px, 8vw, 104px);
+  padding-bottom: clamp(56px, 8vw, 104px);
+}
+
+.sectionHead {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: end;
+  gap: 16px 32px;
+  margin-bottom: 36px;
+}
+
+.sectionHead p {
+  margin: 0;
+  max-width: 52ch;
+  color: var(--color-on-stage-2);
+}
+
+.board {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.board caption {
+  text-align: left;
+  color: var(--color-on-stage-2);
+  padding-bottom: 12px;
+  font-size: 0.95rem;
+}
+
+.board th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--color-on-stage-2);
+  font-size: 0.9rem;
+  padding: 0 16px 10px;
+  border-bottom: 1px solid var(--color-stage-line);
+}
+
+.board td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--color-stage-line);
+  vertical-align: middle;
+}
+
+.board tbody tr {
+  background: linear-gradient(90deg, rgba(61, 91, 219, 0.12), rgba(61, 91, 219, 0) 60%);
+}
+
+.place {
+  font-stretch: 70%;
+  font-weight: 800;
+  font-size: 1.9rem;
+  line-height: 1;
+  width: 4.5rem;
+}
+
+.win .place {
+  color: var(--color-gold);
+}
+
+.event {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.season {
+  color: var(--color-on-stage-2);
+  font-weight: 500;
+  margin-left: 6px;
+  white-space: nowrap;
+}
+
+.players {
+  color: #dde3f2;
+}
+
+.othersTitle {
+  margin: 40px 0 8px;
+  font-size: 1.15rem;
+  font-stretch: 85%;
+  color: var(--color-on-stage-2);
+  font-weight: 700;
+}
+
+.others {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: 32px;
+}
+
+.others li {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-stage-line);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.others .place {
+  width: 3rem;
+  font-size: 1.5rem;
+}
+
+.earnings {
+  margin-top: 28px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 16px;
+  padding: 18px 20px;
+  border: 1px solid var(--color-stage-line);
+  border-left: 6px solid var(--color-gold);
+  border-radius: 4px;
+}
+
+.earnings strong {
+  font-stretch: 75%;
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.earnings span {
+  color: var(--color-on-stage-2);
+}
+
+@media (max-width: 900px) {
+  .others {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 16px;
+  }
+
+  .others .place {
+    width: 2.6rem;
+    font-size: 1.3rem;
+  }
+}
+
+@media (max-width: 380px) {
+  .others {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Celular: la tabla se apila en una grilla de puesto + dos líneas. */
+@media (max-width: 640px) {
+  .board thead {
+    display: none;
+  }
+
+  .board,
+  .board tbody,
+  .board tr,
+  .board td,
+  .board caption {
+    display: block;
+  }
+
+  .board tr {
+    display: grid;
+    grid-template-columns: 3.5rem 1fr;
+    column-gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--color-stage-line);
+  }
+
+  .board td {
+    padding: 0;
+    border: 0;
+  }
+
+  .board .place {
+    grid-row: span 2;
+  }
+}

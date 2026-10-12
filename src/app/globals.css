@@ -2,7 +2,11 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@theme {
+/* Corte de la propuesta (c-analisis.html): ≤900 px, inclusivo. */
+@custom-variant narrow (@media (max-width: 900px));
+
+/* `static`: los módulos CSS (hero, resultados, …) leen estos tokens con var(). */
+@theme static {
   --color-stage: #0b1433;
   --color-stage-2: #13214f;
   --color-beam: #3d5bdb;
@@ -96,14 +100,51 @@
     line-height: 1.55;
   }
 
+  a,
+  button,
+  summary {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
   :focus-visible {
     outline: 3px solid var(--color-zone);
     outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  section[id] {
+    scroll-margin-top: 16px;
   }
 
   h1,
   h2,
   h3 {
     text-wrap: balance;
+  }
+
+  h2 {
+    font-stretch: 72%;
+    font-weight: 800;
+    font-size: clamp(2.25rem, 5vw, 3.5rem);
+    line-height: 1;
+    margin: 0;
+  }
+}
+
+/*
+ * Superficie de escenario (oscura). Cualquier bloque oscuro lleva la clase
+ * `stage`: el encabezado, la portada, los resultados, el pie y la tarjeta de
+ * Temporada Pro. Pone fondo y texto del escenario y cambia el foco a dorado.
+ */
+@layer components {
+  .stage {
+    background-color: var(--color-stage);
+    color: var(--color-on-stage);
+    color-scheme: dark;
+  }
+
+  .stage :focus-visible {
+    outline-color: var(--color-gold);
   }
 }

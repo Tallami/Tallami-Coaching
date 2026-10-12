@@ -15,7 +15,7 @@ const buttonVariants = cva(
           "border-ink text-ink hover:bg-ink hover:text-paper",
       },
       size: {
-        default: "min-h-12 px-[22px]",
+        default: "min-h-12 px-[22px] text-[1rem]",
         sm: "min-h-11 px-4 text-[.95rem]",
       },
     },
