@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { FNCS_TITLES } from "../../src/content/results";
 import en from "../../messages/en.json" with { type: "json" };
 import es from "../../messages/es.json" with { type: "json" };
 import pt from "../../messages/pt.json" with { type: "json" };
@@ -13,6 +14,11 @@ const LOCALES = [
   { path: "/pt", messages: pt, ogLocale: "pt_BR" },
   { path: "/en", messages: en, ogLocale: "en_US" },
 ] as const;
+
+/** La descripción lleva `{count}`: el número sale de `src/content/results.ts`. */
+function metaDescription(message: string): string {
+  return message.replace("{count}", String(FNCS_TITLES));
+}
 
 /** hreflang → final de la URL; el idioma por defecto es `es`. */
 const HREFLANG_ALTERNATES = [
@@ -50,7 +56,7 @@ test.describe("localized metadata", () => {
       await expect(page).toHaveTitle(messages.Metadata.title);
       await expect(page.locator("meta[name=description]")).toHaveAttribute(
         "content",
-        messages.Metadata.description,
+        metaDescription(messages.Metadata.description),
       );
       await expect(page.locator("meta[property='og:locale']")).toHaveAttribute(
         "content",
@@ -94,7 +100,7 @@ test.describe("localized metadata", () => {
     await expect(og("og:title")).toHaveAttribute("content", en.Metadata.title);
     await expect(og("og:description")).toHaveAttribute(
       "content",
-      en.Metadata.description,
+      metaDescription(en.Metadata.description),
     );
     await expect(og("og:image:width")).toHaveAttribute(
       "content",

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getTranslations } from "next-intl/server";
 import heroPhoto from "@/assets/tallami-wide-1920.jpg";
+import { FNCS_TITLES } from "@/content/results";
 import { getHomeLanguageAlternates, getHomePath } from "@/i18n/alternates";
 import { HTML_LANG, INTL_TAG, routing } from "@/i18n/routing";
 import { saira } from "@/lib/fonts";
@@ -34,7 +35,7 @@ export async function generateMetadata(
   return {
     metadataBase: new URL(SITE_URL),
     title: t("title"),
-    description: t("description"),
+    description: t("description", { count: FNCS_TITLES }),
     alternates: {
       canonical: getHomePath(locale),
       languages: getHomeLanguageAlternates(),

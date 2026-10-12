@@ -70,6 +70,7 @@ describe("messages", () => {
   test("home messages declare the ICU arguments the page passes", () => {
     const spanish = placeholdersByKey(es);
 
+    expect(spanish.get("Metadata.description")).toEqual(["count"]);
     expect(spanish.get("Hero.title")).toEqual(["count"]);
     expect(spanish.get("Results.earnings")).toEqual(["since"]);
     expect(spanish.get("Services.items.lesson.description")).toEqual([
