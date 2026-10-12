@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="es" style="color-scheme: dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tallami Coaching · Propuesta A: Transmisión</title>
+<meta name="description" content="Coaching de Fortnite competitivo con Tallami, el coach detrás de 3 títulos de FNCS. VOD reviews, clases 1 a 1, planes de juego y coaching de torneo.">
+<meta name="theme-color" content="#0B1433">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --stage: #0B1433;
+    --stage-2: #13214F;
+    --beam: #3D5BDB;
+    --paper: #F3F5FA;
+    --muted: #AEB8D6;
+    --gold: #FFC93C;
+    --line: rgba(174, 184, 214, .22);
+    --radius: 4px;
+    --wrap: 1180px;
+    --gutter: clamp(16px, 4vw, 40px);
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--stage);
+    color: var(--paper);
+    font-family: "Saira", system-ui, sans-serif;
+    font-stretch: 100%;
+    font-size: 1.0625rem;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  img { max-width: 100%; height: auto; display: block; }
+  a { color: inherit; }
+  :focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; border-radius: 2px; }
+  .wrap { max-width: var(--wrap); margin: 0 auto; padding: 0 var(--gutter); }
+  .skip { position: absolute; left: -9999px; top: 8px; background: var(--gold); color: var(--stage); padding: 10px 14px; font-weight: 700; z-index: 20; }
+  .skip:focus { left: 8px; }
+
+  /* Header */
+  .top {
+    position: absolute; inset: 0 0 auto 0; z-index: 10;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 18px var(--gutter);
+  }
+  .brand { font-stretch: 75%; font-weight: 800; font-size: 1.5rem; letter-spacing: .01em; text-decoration: none; }
+  .brand span { color: var(--gold); }
+  .top nav ul { list-style: none; display: flex; gap: 28px; margin: 0; padding: 0; }
+  .top nav a { text-decoration: none; font-weight: 500; color: var(--muted); padding: 10px 0; }
+  .top nav a:hover { color: var(--paper); }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; min-height: 48px;
+    padding: 0 22px; border-radius: var(--radius); font-weight: 700; font-size: 1rem;
+    text-decoration: none; cursor: pointer; border: 2px solid transparent;
+    transition: background-color .15s ease, color .15s ease, border-color .15s ease;
+  }
+  .btn-primary { background: var(--gold); color: var(--stage); }
+  .btn-primary:hover { background: #FFD766; }
+  .btn-ghost { border-color: #7F8BB5; color: var(--paper); }
+  .btn-ghost:hover { border-color: var(--paper); }
+  .btn-sm { min-height: 44px; padding: 0 16px; }
+
+  /* Hero: a broadcast frame */
+  .hero { position: relative; min-height: min(100svh, 860px); display: grid; align-items: end; overflow: hidden; isolation: isolate; }
+  .hero picture, .hero picture img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 70% 30%; z-index: -2; }
+  .hero::after {
+    content: ""; position: absolute; inset: 0; z-index: -1;
+    background:
+      linear-gradient(90deg, rgba(11,20,51,.96) 0%, rgba(11,20,51,.82) 38%, rgba(11,20,51,.15) 70%, rgba(11,20,51,.35) 100%),
+      linear-gradient(0deg, rgba(11,20,51,1) 0%, rgba(11,20,51,0) 35%);
+  }
+  .hero-inner { width: 100%; padding-top: 120px; padding-bottom: clamp(32px, 6vw, 64px); }
+  .hero h1 {
+    font-stretch: 70%; font-weight: 800; line-height: .92; letter-spacing: -.005em;
+    font-size: clamp(3rem, 8.4vw, 6.75rem); margin: 0 0 20px; max-width: 11ch; text-wrap: balance;
+  }
+  .hero .lede { max-width: 46ch; color: #D9DFEF; font-size: clamp(1.0625rem, 1.6vw, 1.25rem); margin: 0 0 28px; }
+  .hero .ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 40px; }
+
+  /* Lower third */
+  .lower-third { display: inline-grid; grid-template-columns: auto; max-width: 100%; }
+  .lt-name {
+    background: var(--paper); color: var(--stage); padding: 10px 22px 8px 18px;
+    font-stretch: 80%; font-weight: 800; font-size: clamp(1.25rem, 2.6vw, 1.75rem); line-height: 1.1;
+    clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
+    border-left: 8px solid var(--gold);
+  }
+  .lt-role {
+    background: var(--beam); color: #fff; padding: 7px 22px 7px 26px; font-weight: 500; font-size: .98rem;
+    clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 100%, 0 100%); justify-self: start;
+  }
+  .lt-name, .lt-role { transform-origin: left center; }
+  @media (prefers-reduced-motion: no-preference) {
+    .lt-name { animation: wipe .55s cubic-bezier(.2,.8,.2,1) .25s both; }
+    .lt-role { animation: wipe .5s cubic-bezier(.2,.8,.2,1) .45s both; }
+    @keyframes wipe { from { clip-path: polygon(0 0, 0 0, 0 100%, 0 100%); } }
+  }
+
+  /* Score bug */
+  .bug {
+    position: absolute; right: var(--gutter); top: 96px; display: grid; grid-template-columns: auto auto; gap: 1px;
+    background: var(--line); border-radius: var(--radius); overflow: hidden; font-stretch: 85%;
+  }
+  .bug div { background: rgba(11,20,51,.86); padding: 10px 16px; backdrop-filter: blur(6px); }
+  .bug strong { display: block; font-size: 1.6rem; line-height: 1; font-weight: 800; color: var(--gold); }
+  .bug span { font-size: .85rem; color: var(--muted); }
+
+  /* Sections */
+  section { padding: clamp(64px, 9vw, 112px) 0; }
+  .section-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 16px 32px; margin-bottom: 36px; }
+  h2 { font-stretch: 72%; font-weight: 800; font-size: clamp(2.25rem, 5vw, 3.5rem); line-height: 1; margin: 0; }
+  .section-head p { margin: 0; color: var(--muted); max-width: 52ch; }
+
+  /* Leaderboard */
+  .board { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  .board caption { text-align: left; color: var(--muted); padding-bottom: 12px; font-size: .95rem; }
+  .board th { text-align: left; font-weight: 500; color: var(--muted); font-size: .9rem; padding: 0 16px 10px; border-bottom: 1px solid var(--line); }
+  .board td { padding: 14px 16px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  .board tbody tr { background: linear-gradient(90deg, rgba(61,91,219,.12), rgba(61,91,219,0) 60%); }
+  .place { font-stretch: 70%; font-weight: 800; font-size: 1.9rem; line-height: 1; width: 4.5rem; }
+  .is-win .place { color: var(--gold); }
+  .event { font-weight: 700; font-size: 1.1rem; }
+  .season { color: var(--muted); white-space: nowrap; }
+  .team { color: #DDE3F2; }
+  .earnings {
+    margin-top: 28px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px;
+    padding: 18px 20px; border: 1px solid var(--line); border-left: 6px solid var(--gold); border-radius: var(--radius);
+  }
+  .earnings strong { font-stretch: 75%; font-size: 2rem; font-weight: 800; line-height: 1; }
+  .earnings span { color: var(--muted); }
+
+  /* Services */
+  .services { background: var(--stage-2); }
+  .svc-group + .svc-group { margin-top: 48px; }
+  .svc-group h3 { font-stretch: 85%; font-weight: 700; font-size: 1.15rem; color: var(--muted); margin: 0 0 8px; }
+  .svc {
+    display: grid; grid-template-columns: 1fr auto auto; gap: 8px 28px; align-items: center;
+    padding: 20px 0; border-top: 1px solid var(--line);
+  }
+  .svc:last-child { border-bottom: 1px solid var(--line); }
+  .svc > div:first-child { min-width: 0; }
+  .svc h4 { overflow-wrap: anywhere; margin: 0; font-size: 1.3rem; font-weight: 700; font-stretch: 90%; }
+  .svc p { margin: 2px 0 0; color: var(--muted); max-width: 54ch; }
+  .price { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .price strong { font-stretch: 72%; font-weight: 800; font-size: 2.1rem; line-height: 1; }
+  .price small { display: block; color: var(--muted); font-size: .88rem; }
+  .svc-pro {
+    margin-top: 48px; display: grid; grid-template-columns: 1.3fr 1fr; gap: 24px 40px; align-items: center;
+    padding: clamp(24px, 4vw, 40px); border-radius: var(--radius);
+    background: linear-gradient(120deg, var(--beam), #2A3FA0);
+  }
+  .svc-pro h3 { font-stretch: 72%; font-weight: 800; font-size: clamp(2rem, 4vw, 2.75rem); line-height: 1; margin: 0 0 10px; }
+  .svc-pro p { margin: 0; color: #E4E9FA; max-width: 48ch; }
+  .svc-pro .price { text-align: left; }
+  .svc-pro .price strong { font-size: 2.75rem; }
+  .svc-pro .price small { color: #E4E9FA; }
+  .svc-pro .btn { margin-top: 16px; }
+  .minor-note { margin-top: 28px; color: var(--muted); font-size: .95rem; max-width: 70ch; }
+
+  /* Steps */
+  .steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border-radius: var(--radius); overflow: hidden; counter-reset: s; }
+  .steps li { background: var(--stage); padding: 24px 22px 28px; counter-increment: s; }
+  .steps li::before { content: counter(s); display: block; font-stretch: 70%; font-weight: 800; font-size: 2.25rem; line-height: 1; color: var(--beam); margin-bottom: 14px; }
+  .steps h3 { margin: 0 0 6px; font-size: 1.15rem; }
+  .steps p { margin: 0; color: var(--muted); font-size: .98rem; }
+
+  /* Footer */
+  footer { border-top: 1px solid var(--line); padding: 48px 0 56px; }
+  .foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 24px; align-items: center; }
+  .social { list-style: none; display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 0; padding: 0; }
+  .social a { display: inline-block; padding: 10px 0; color: var(--muted); text-decoration: none; font-weight: 500; }
+  .social a:hover { color: var(--paper); }
+  footer small { color: var(--muted); }
+
+  @media (max-width: 900px) {
+    .top nav { display: none; }
+    .bug { top: auto; bottom: auto; position: static; margin: 0 0 24px; display: inline-grid; }
+    .hero-inner { padding-top: 96px; }
+    .steps { grid-template-columns: 1fr 1fr; }
+    .svc-pro { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 640px) {
+    .board thead { display: none; }
+    .board, .board tbody, .board tr, .board td { display: block; }
+    .board tr { display: grid; grid-template-columns: 3.5rem 1fr; column-gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+    .board td { padding: 0; border: 0; }
+    .board caption { display: block; }
+    .board .na { display: none; }
+    .board .place { grid-row: span 3; }
+    .svc { grid-template-columns: 1fr auto; }
+    .svc .btn { grid-column: 1 / -1; justify-self: start; }
+    .steps { grid-template-columns: 1fr; }
+    .hero picture img { object-position: 72% 0%; }
+    .hero::after { background: linear-gradient(180deg, rgba(11,20,51,.1) 0%, rgba(11,20,51,.35) 26%, rgba(11,20,51,.94) 48%, rgba(11,20,51,1) 100%); }
+    .hero-inner { padding-top: 34svh; }
+  }
+  @media (max-width: 360px) {
+    .svc { grid-template-columns: 1fr; }
+    .svc .price { text-align: left; }
+  }
+
+  section[id] { scroll-margin-top: 16px; }
+  a, button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  h2 { text-wrap: balance; }
+  .top nav.lang, .lang { display: flex !important; gap: 2px; margin-left: auto; }
+  .lang a { display: inline-grid; place-items: center; min-width: 40px; min-height: 44px; padding: 0 6px; text-decoration: none; font-weight: 600; font-size: .9rem; border-radius: 4px; opacity: .72; }
+  .lang a[aria-current] { opacity: 1; text-decoration: underline; text-underline-offset: 4px; }
+  .lang a:hover { opacity: 1; }
+  @media (max-width: 900px) {
+    .top { flex-wrap: wrap; row-gap: 0; }
+    .top nav:not(.lang) { display: block !important; order: 3; flex: 1 1 calc(100% - 130px); min-width: 0; }
+    .top nav:not(.lang) ul { gap: 18px; overflow-x: auto; scrollbar-width: none; }
+    .top nav:not(.lang) a { white-space: nowrap; }
+    .top nav.lang { order: 4; margin-left: 8px; }
+    .lang a { min-width: 34px; }
+    .top .brand { margin-right: auto; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#contenido">Saltar al contenido</a>
+
+<header class="top">
+  <a class="brand" href="#" translate="no">Tallami<span>.</span></a>
+  <nav class="lang" aria-label="Idioma"><a href="#" aria-current="page" lang="es">ES</a><a href="#" lang="pt-BR">PT</a><a href="#" lang="en">EN</a></nav>
+  <nav aria-label="Principal">
+    <ul>
+      <li><a href="#resultados">Resultados</a></li>
+      <li><a href="#servicios">Servicios</a></li>
+      <li><a href="#como-funciona">Cómo funciona</a></li>
+    </ul>
+  </nav>
+  <a class="btn btn-primary btn-sm" href="#servicios">Reservar</a>
+</header>
+
+<main id="contenido">
+  <section class="hero" aria-labelledby="hero-title" style="padding:0">
+    <picture>
+      <source type="image/webp" srcset="img/tallami-wide-960.webp 960w, img/tallami-wide-1920.webp 1920w" sizes="100vw">
+      <img src="img/tallami-wide-1920.jpg" srcset="img/tallami-wide-960.jpg 960w, img/tallami-wide-1920.jpg 1920w" sizes="100vw" width="1920" height="1201" alt="Tallami sonriendo con auriculares en el escenario de un torneo" fetchpriority="high">
+    </picture>
+    <div class="wrap hero-inner">
+      <div class="bug" role="group" aria-label="Resumen de resultados">
+        <div><strong>3</strong><span>títulos de FNCS</span></div>
+        <div><strong>6</strong><span>primeros puestos</span></div>
+      </div>
+      <h1 id="hero-title">Entrená con el coach detrás de 3 títulos de FNCS</h1>
+      <p class="lede">Reviso tus partidas, te armo un plan y acompaño a tu equipo en torneo. Coaching de Fortnite competitivo desde Argentina para toda Latinoamérica.</p>
+      <div class="ctas">
+        <a class="btn btn-primary" href="#servicios">Ver servicios y precios</a>
+        <a class="btn btn-ghost" href="#resultados">Ver resultados</a>
+      </div>
+      <div class="lower-third">
+        <div class="lt-name">Tomás “Tallami” Allami</div>
+        <div class="lt-role">Coach de Fortnite competitivo, Argentina</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="resultados" aria-labelledby="res-title">
+    <div class="wrap">
+      <div class="section-head">
+        <h2 id="res-title">Resultados como coach</h2>
+        <p>Torneos donde entrené al equipo. Los jugadores autorizaron mostrar su nombre y resultado.</p>
+      </div>
+      <table class="board">
+        <caption>Ordenado por puesto. Los primeros puestos están en dorado.</caption>
+        <thead>
+          <tr><th scope="col">Puesto</th><th scope="col">Torneo</th><th scope="col">Temporada</th><th scope="col">Equipo</th></tr>
+        </thead>
+        <tbody>
+          <tr class="is-win"><td class="place">1º</td><td class="event">FNCS</td><td class="season">CH6S1</td><td class="team">K1ng, Fazer y Phzin</td></tr>
+          <tr class="is-win"><td class="place">1º</td><td class="event">FNCS</td><td class="season">CH5S3</td><td class="team">K1ng y Fazer</td></tr>
+          <tr class="is-win"><td class="place">1º</td><td class="event">FNCS</td><td class="season">CH5S2</td><td class="team">Randu y Lewa</td></tr>
+          <tr class="is-win"><td class="place">1º</td><td class="event">Reload Elite</td><td class="season na">—</td><td class="team">Phzin y Edson</td></tr>
+          <tr class="is-win"><td class="place">1º</td><td class="event">Reload Elite</td><td class="season na">—</td><td class="team">Romero y Lewa</td></tr>
+          <tr class="is-win"><td class="place">1º</td><td class="event">Second Chance</td><td class="season na">—</td><td class="team">K1ng y Fazer</td></tr>
+          <tr><td class="place">5º</td><td class="event">EWC Reload</td><td class="season na">—</td><td class="team na">—</td></tr>
+          <tr><td class="place">9º</td><td class="event">EWC ESL</td><td class="season na">—</td><td class="team na">—</td></tr>
+          <tr><td class="place">11º</td><td class="event">FNCS Global Championship</td><td class="season">2025</td><td class="team na">—</td></tr>
+          <tr><td class="place">12º</td><td class="event">FNCS Global Championship</td><td class="season">2025</td><td class="team na">—</td></tr>
+          <tr><td class="place">14º</td><td class="event">FNCS Global Championship</td><td class="season">2026</td><td class="team na">—</td></tr>
+          <tr><td class="place">22º</td><td class="event">FNCS Global Championship</td><td class="season">2024</td><td class="team na">—</td></tr>
+        </tbody>
+      </table>
+      <div class="earnings">
+        <strong>USD 45.300</strong>
+        <span>en ganancias de coaching registradas desde CH5S4</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="servicios" class="services" aria-labelledby="svc-title">
+    <div class="wrap">
+      <div class="section-head">
+        <h2 id="svc-title">Servicios y precios</h2>
+        <p>Precios en dólares. Pagás con Mercado Pago, Pix, PayPal o cripto, según tu país.</p>
+      </div>
+
+      <div class="svc-group">
+        <h3>Revisión de partidas</h3>
+        <div class="svc">
+          <div><h4>VOD review grabado</h4><p>Me mandás una partida y te devuelvo el análisis en video en 72 horas.</p></div>
+          <div class="price"><strong>USD 30</strong></div>
+          <a class="btn btn-ghost btn-sm" href="#">Reservar VOD grabado</a>
+        </div>
+        <div class="svc">
+          <div><h4>VOD review en vivo</h4><p>Vemos tu partida juntos durante 60 minutos y te corrijo en el momento.</p></div>
+          <div class="price"><strong>USD 45</strong></div>
+          <a class="btn btn-ghost btn-sm" href="#">Reservar VOD en vivo</a>
+        </div>
+      </div>
+
+      <div class="svc-group">
+        <h3>Clases y plan</h3>
+        <div class="svc">
+          <div><h4>Clase 1 a 1</h4><p>60 minutos sobre lo que más te cuesta. Con el pack de 4 clases ahorrás USD 20.</p></div>
+          <div class="price"><strong>USD 40</strong><small>Pack de 4: USD 140</small></div>
+          <a class="btn btn-ghost btn-sm" href="#">Reservar clase</a>
+        </div>
+        <div class="svc">
+          <div><h4>Plan de juego personalizado</h4><p>Un plan armado para tu forma de jugar y tus próximos torneos.</p></div>
+          <div class="price"><strong>USD 120</strong></div>
+          <a class="btn btn-ghost btn-sm" href="#">Pedir mi plan</a>
+        </div>
+        <div class="svc">
+          <div><h4>Academia Tallami</h4><p>Entrenamiento continuo con pago mensual.</p></div>
+          <div class="price"><strong>USD 15</strong><small>por mes</small></div>
+          <a class="btn btn-ghost btn-sm" href="#">Unirme a la Academia</a>
+        </div>
+      </div>
+
+      <div class="svc-group">
+        <h3>Para equipos</h3>
+        <div class="svc">
+          <div><h4>Coaching de torneo</h4><p>Acompaño a tu dúo o trío durante el torneo.</p></div>
+          <div class="price"><strong>USD 150</strong><small>por equipo</small></div>
+          <a class="btn btn-ghost btn-sm" href="#">Reservar para mi equipo</a>
+        </div>
+      </div>
+
+      <div class="svc-pro">
+        <div>
+          <h3>Temporada Pro</h3>
+          <p>Coaching durante toda la temporada para jugadores que van por la final. Se entra por aplicación.</p>
+        </div>
+        <div class="price">
+          <strong>USD 200</strong>
+          <small>por jugador, más el 6% de los premios</small>
+          <a class="btn btn-primary" href="#">Aplicar a Temporada Pro</a>
+        </div>
+      </div>
+
+      <p class="minor-note">¿Tenés menos de 18 años? Podés entrenar igual: el pago lo hace un adulto responsable.</p>
+    </div>
+  </section>
+
+  <section id="como-funciona" aria-labelledby="how-title">
+    <div class="wrap">
+      <div class="section-head">
+        <h2 id="how-title">Cómo funciona</h2>
+      </div>
+      <ol class="steps">
+        <li><h3>Elegís el servicio</h3><p>Según lo que necesites mejorar, solo o con tu equipo.</p></li>
+        <li><h3>Pagás</h3><p>Con el medio de pago de tu país. Te llega la confirmación por email.</p></li>
+        <li><h3>Agendás</h3><p>Elegís día y hora con el link que te llega, y recibís tu rol en Discord.</p></li>
+        <li><h3>Entrenás</h3><p>La sesión o la entrega te queda guardada en tu portal.</p></li>
+      </ol>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <a class="brand" href="#">Tallami<span>.</span></a>
+    <ul class="social" aria-label="Redes">
+      <li><a href="https://x.com/tallami1">X</a></li>
+      <li><a href="https://twitch.tv/tallami">Twitch</a></li>
+      <li><a href="https://youtube.com/@tallami1">YouTube</a></li>
+      <li><a href="https://instagram.com/tallami1">Instagram</a></li>
+      <li><a href="https://tiktok.com/@tallami">TikTok</a></li>
+    </ul>
+    <small>© 2026 Tallami Coaching</small>
+  </div>
+</footer>
+</body>
+</html>
