@@ -1,7 +1,7 @@
 # Kit de skills y agentes — Tallami Coaching
 
 ## Instalación
-Este kit vive en el repo `Tallami/tallami-coaching`. Clonalo (o sincronizá tu carpeta con él) y abrilo con Claude Code. Cuando te pregunte si confiás en la carpeta, respondé que sí y se instalan solos los plugins y servidores de abajo.
+Este kit vive en el repo `Tallami/tallami-coaching`. Clonalo (o sincronizá tu carpeta con él) y abrilo con Claude Code. Cuando te pregunte si confiás en la carpeta, respondé que sí: las skills y agentes se cargan solos y los servidores MCP se activan.
 
 ## Qué hay instalado
 
@@ -16,14 +16,15 @@ Este kit vive en el repo `Tallami/tallami-coaching`. Clonalo (o sincronizá tu c
 | copywriting, cro, offers, pricing, launch, referrals | coreyhaines31/marketingskills | Textos de venta, conversión, precios y lanzamiento |
 | seo-audit, schema, site-architecture | coreyhaines31/marketingskills | SEO técnico, datos estructurados y estructura del sitio |
 
-### Plugins (se instalan solos al confiar en la carpeta, definidos en `.claude/settings.json`)
-| Plugin | Repo | Para qué |
+### Skills de plugins, copiadas también en `.claude/skills/`
+Antes se instalaban como plugins; ahora viven en el repo para que funcionen igual en tu PC y en la nube.
+| Skills | Repo | Para qué |
 | --- | --- | --- |
-| superpowers | obra/superpowers | Metodología: brainstorming, plan, subagentes, tests |
-| ui-ux-pro-max | nextlevelbuilder/ui-ux-pro-max-skill | Sistema de diseño: paletas, tipografías, estilos |
-| web-quality-skills | addyosmani/web-quality-skills | Auditorías de velocidad, accesibilidad y SEO |
+| brainstorming, writing-plans, executing-plans, subagent-driven-development, test-driven-development, systematic-debugging, verification-before-completion y el resto de Superpowers | obra/superpowers | Metodología: brainstorming, plan, subagentes, tests |
+| ui-ux-pro-max | nextlevelbuilder/ui-ux-pro-max-skill | Sistema de diseño: paletas, tipografías, estilos (requiere Python 3) |
+| web-quality-audit, performance, core-web-vitals, accessibility, seo, best-practices | addyosmani/web-quality-skills | Auditorías de velocidad, accesibilidad y SEO |
 
-Si alguno no se instala solo, en Claude Code escribí `/plugin` y elegí "Browse and install plugins".
+Para actualizarlas, pedile a Claude que las vuelva a copiar desde esos repos.
 
 ### Servidores MCP (`.mcp.json`)
 - **context7**: documentación actualizada de Next.js, Supabase, Mercado Pago, etc. Usa el servidor remoto (HTTP), así que no necesita Node.

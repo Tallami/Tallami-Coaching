@@ -35,8 +35,9 @@ Mercado Pago (Argentina) · dLocal Go (Pix y resto de LATAM) · PayPal (exterior
 ## Cómo trabajar en este proyecto
 1. Antes de construir, usá el flujo de Superpowers: brainstorming → plan → ejecución por subagentes → tests.
 2. UI: aplicá `frontend-design` y la skill `ui-ux-pro-max`; revisá con `web-design-guidelines` y `react-best-practices`.
-3. Documentación de librerías: consultala con el MCP `context7`, nunca de memoria.
-4. Probá cada flujo de compra con el MCP `playwright` antes de dar algo por terminado.
+3. Documentación de librerías: consultala con el MCP `context7`, nunca de memoria. Si context7 no está disponible (por ejemplo en la nube), usá la documentación oficial vía búsqueda web.
+4. Probá cada flujo de compra con el MCP `playwright` (o, en la nube, con la skill `webapp-testing`) antes de dar algo por terminado.
 5. Antes de cada deploy: `web-quality-audit` (velocidad, accesibilidad, SEO).
 6. Textos de venta: `copywriting`, `cro`, `offers`; nunca inventar testimonios ni resultados.
-7. Subagentes disponibles en `.claude/agents/`: nextjs-developer, frontend-developer, fullstack-developer, ui-designer, payment-integration, seo-specialist, security-auditor, qa-expert, accessibility-tester, performance-engineer, content-marketer.
+7. Todas las skills (incluidas Superpowers, ui-ux-pro-max y web-quality-skills) viven en `.claude/skills/`.
+8. Subagentes disponibles en `.claude/agents/`: nextjs-developer, frontend-developer, fullstack-developer, ui-designer, payment-integration, seo-specialist, security-auditor, qa-expert, accessibility-tester, performance-engineer, content-marketer.
