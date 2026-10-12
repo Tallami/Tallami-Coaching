@@ -61,6 +61,10 @@ const STILL_TOLERANCE_PX = 0.5;
 const MOVING_TIMEOUT_MS = 3_000;
 const MAX_TAB_PRESSES = 20;
 const SUBPIXEL_TOLERANCE = 0.01;
+/** Ancho en que el contenido de la página queda centrado y con márgenes laterales. */
+const WIDE_VIEWPORT = { width: 1440, height: 900 };
+/** Redondeo de Chrome al ubicar el contenido centrado. */
+const ALIGNMENT_TOLERANCE_PX = 1;
 
 function wallOf(page: Page): Locator {
   return page.locator("#reviews");
@@ -443,6 +447,33 @@ test.describe("reviews wall", () => {
       expect(
         await rowOf(page, row).evaluate((node) => getComputedStyle(node).maskImage),
       ).toBe("none");
+    });
+  }
+
+  for (const viewport of [
+    { width: PHONE_VIEWPORT.width, height: PHONE_VIEWPORT.height },
+    WIDE_VIEWPORT,
+  ]) {
+    test(`reduced motion starts each row where the heading starts at ${viewport.width}px`, async ({
+      page,
+    }) => {
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await page.setViewportSize(viewport);
+      await page.goto("/es");
+
+      const headingLeft = await wallOf(page)
+        .locator("h2")
+        .evaluate((node) => node.getBoundingClientRect().left);
+
+      for (const direction of ["left", "right"] as const) {
+        const firstCardLeft = await cardsOf(page, direction)
+          .first()
+          .evaluate((node) => node.getBoundingClientRect().left);
+
+        expect(Math.abs(firstCardLeft - headingLeft)).toBeLessThanOrEqual(
+          ALIGNMENT_TOLERANCE_PX,
+        );
+      }
     });
   }
 

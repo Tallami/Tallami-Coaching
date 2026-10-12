@@ -3,6 +3,7 @@
 /* Superficie de la banda: entre `stage` y `stage-2` (#0E1A42 en la maqueta). */
 .strip {
   --marquee-gap: 28px;
+  --marquee-inset: var(--spacing-gutter);
   --band-surface: color-mix(in srgb, var(--color-stage), var(--color-stage-2));
   padding-top: 8px;
 }

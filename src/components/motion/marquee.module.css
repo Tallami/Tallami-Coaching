@@ -112,6 +112,12 @@
 /*
  * "Reducir movimiento": nada se mueve y la fila se desliza a mano. Sin
  * movimiento no hacen falta el botón ni la copia del loop.
+ *
+ * Quieta, la fila arranca donde empieza el contenido de la página: el que usa
+ * el componente define `--marquee-inset` (el margen lateral) y la copia lo usa
+ * de relleno a los dos lados. Sin él queda la mitad de la separación, como en
+ * movimiento. `scroll-padding`: con el teclado, el elemento enfocado también
+ * queda a esa distancia del borde.
  */
 @media (prefers-reduced-motion: reduce) {
   .toggle {
@@ -125,8 +131,13 @@
   .row {
     overflow-x: auto;
     overscroll-behavior-x: contain;
+    scroll-padding-inline: var(--marquee-inset, 0px);
     scrollbar-width: thin;
     scrollbar-color: var(--color-stage-line) transparent;
+  }
+
+  .copy {
+    padding-inline: var(--marquee-inset, calc(var(--marquee-gap, 28px) / 2));
   }
 
   .copy[inert] {

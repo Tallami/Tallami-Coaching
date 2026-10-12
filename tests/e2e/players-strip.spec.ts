@@ -26,6 +26,10 @@ const PLAYER_NAMES = [
 ];
 
 const PHONE_VIEWPORT = { width: 375, height: 812 };
+/** Ancho en que el contenido de la página queda centrado y con márgenes laterales. */
+const WIDE_VIEWPORT = { width: 1440, height: 900 };
+/** Redondeo de Chrome al ubicar el contenido centrado. */
+const ALIGNMENT_TOLERANCE_PX = 1;
 const MIN_TARGET_SIZE = 44;
 /** Intervalo corto y acotado para comprobar que la fila no se mueve. */
 const STILL_INTERVAL_MS = 500;
@@ -335,6 +339,31 @@ test.describe("players strip", () => {
       expect(
         await rowOf(page).evaluate((node) => getComputedStyle(node).maskImage),
       ).toBe("none");
+    });
+  }
+
+  for (const viewport of [
+    { width: PHONE_VIEWPORT.width, height: PHONE_VIEWPORT.height },
+    WIDE_VIEWPORT,
+  ]) {
+    test(`reduced motion starts the strip where its label starts at ${viewport.width}px`, async ({
+      page,
+    }) => {
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await page.setViewportSize(viewport);
+      await page.goto("/es");
+
+      const labelLeft = await stripOf(page)
+        .getByText(LABEL_ES, { exact: true })
+        .evaluate((node) => node.getBoundingClientRect().left);
+      const firstPlayerLeft = await playerListOf(page)
+        .getByRole("listitem")
+        .first()
+        .evaluate((node) => node.getBoundingClientRect().left);
+
+      expect(Math.abs(firstPlayerLeft - labelLeft)).toBeLessThanOrEqual(
+        ALIGNMENT_TOLERANCE_PX,
+      );
     });
   }
 

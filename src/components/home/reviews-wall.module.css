@@ -2,6 +2,7 @@
 
 .reviews {
   --marquee-gap: 14px;
+  --marquee-inset: var(--spacing-gutter);
   padding-top: clamp(48px, 6vw, 80px);
   padding-bottom: clamp(56px, 8vw, 104px);
   /* Resultados también es de escenario: una línea fina marca dónde cambia la sección. */
