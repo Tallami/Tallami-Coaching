@@ -1,0 +1,186 @@
+{
+  "__typename": "Tweet",
+  "favorite_count": 520,
+  "lang": "it",
+  "possibly_sensitive": false,
+  "created_at": "2026-03-14T23:55:52.000Z",
+  "display_text_range": [
+    0,
+    54
+  ],
+  "entities": {
+    "media": [
+      {
+        "display_url": "pic.x.com/LFTt7PydvB",
+        "expanded_url": "https://x.com/LewaFn/status/2032968988515271075/photo/1",
+        "indices": [
+          55,
+          78
+        ],
+        "url": "https://t.co/LFTt7PydvB"
+      }
+    ],
+    "user_mentions": [
+      {
+        "id_str": "1142852199103549440",
+        "indices": [
+          33,
+          44
+        ],
+        "name": "RomeroFDP",
+        "screen_name": "romerofdps"
+      },
+      {
+        "id_str": "2239450173",
+        "indices": [
+          45,
+          54
+        ],
+        "name": "Tallami",
+        "screen_name": "tallami1"
+      }
+    ]
+  },
+  "id_str": "2032968988515271075",
+  "text": "1st ($3000) rompimo la maldicion @romerofdps @tallami1 https://t.co/LFTt7PydvB",
+  "user": {
+    "id_str": "1191760432433905664",
+    "name": "Lewa",
+    "screen_name": "LewaFn",
+    "is_blue_verified": true,
+    "profile_image_shape": "Circle",
+    "verified": false,
+    "profile_image_url_https": "https://pbs.twimg.com/profile_images/2091496317293903872/b2uVDrQ3_normal.jpg"
+  },
+  "edit_control": {
+    "edit_tweet_ids": [
+      "2032968988515271075"
+    ],
+    "editable_until_msecs": "1773536152000",
+    "edits_remaining": "5",
+    "is_edit_eligible": true
+  },
+  "mediaDetails": [
+    {
+      "display_url": "pic.x.com/LFTt7PydvB",
+      "expanded_url": "https://x.com/LewaFn/status/2032968988515271075/photo/1",
+      "ext_media_availability": {
+        "status": "Available"
+      },
+      "indices": [
+        55,
+        78
+      ],
+      "media_url_https": "https://pbs.twimg.com/media/HDaOZRdWQAQ0q75.jpg",
+      "original_info": {
+        "focus_rects": [
+          {
+            "h": 1075,
+            "w": 1919,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 1079,
+            "w": 1079,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 1079,
+            "w": 946,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 1079,
+            "w": 540,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 1079,
+            "w": 1919,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "height": 1079,
+        "width": 1919
+      },
+      "sizes": {
+        "large": {
+          "h": 1079,
+          "resize": "fit",
+          "w": 1919
+        },
+        "medium": {
+          "h": 675,
+          "resize": "fit",
+          "w": 1200
+        },
+        "small": {
+          "h": 382,
+          "resize": "fit",
+          "w": 680
+        },
+        "thumb": {
+          "h": 150,
+          "resize": "crop",
+          "w": 150
+        }
+      },
+      "type": "photo",
+      "url": "https://t.co/LFTt7PydvB"
+    }
+  ],
+  "photos": [
+    {
+      "backgroundColor": {
+        "red": 204,
+        "green": 214,
+        "blue": 221
+      },
+      "cropCandidates": [
+        {
+          "h": 1075,
+          "w": 1919,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 1079,
+          "w": 1079,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 1079,
+          "w": 946,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 1079,
+          "w": 540,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 1079,
+          "w": 1919,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "expandedUrl": "https://x.com/LewaFn/status/2032968988515271075/photo/1",
+      "url": "https://pbs.twimg.com/media/HDaOZRdWQAQ0q75.jpg",
+      "width": 1919,
+      "height": 1079
+    }
+  ],
+  "conversation_count": 26,
+  "news_action_type": "conversation",
+  "isEdited": false,
+  "isStaleEdit": false
+}

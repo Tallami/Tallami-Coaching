@@ -1,0 +1,195 @@
+{
+  "__typename": "Tweet",
+  "favorite_count": 5121,
+  "lang": "en",
+  "possibly_sensitive": false,
+  "created_at": "2025-09-07T19:57:30.000Z",
+  "display_text_range": [
+    0,
+    63
+  ],
+  "entities": {
+    "media": [
+      {
+        "display_url": "pic.x.com/VCkroz30A1",
+        "expanded_url": "https://x.com/Tiscofn/status/1964780083618685407/photo/1",
+        "indices": [
+          62,
+          85
+        ],
+        "url": "https://t.co/VCkroz30A1"
+      }
+    ],
+    "user_mentions": [
+      {
+        "id_str": "1086799648302551041",
+        "indices": [
+          31,
+          39
+        ],
+        "name": "cadu",
+        "screen_name": "CaduFN1"
+      },
+      {
+        "id_str": "1197680541182627840",
+        "indices": [
+          40,
+          51
+        ],
+        "name": "GRÊMIO Stryker",
+        "screen_name": "StrykerFN1"
+      },
+      {
+        "id_str": "2239450173",
+        "indices": [
+          52,
+          61
+        ],
+        "name": "Tallami",
+        "screen_name": "tallami1"
+      }
+    ]
+  },
+  "id_str": "1964780083618685407",
+  "text": "12th FNCS Globals ($30.000)🇦🇷\n\n@CaduFN1 @StrykerFN1 @tallami1 https://t.co/VCkroz30A1",
+  "user": {
+    "id_str": "1195483430039031808",
+    "name": "Tisco",
+    "screen_name": "Tiscofn",
+    "is_blue_verified": true,
+    "profile_image_shape": "Circle",
+    "verified": false,
+    "profile_image_url_https": "https://pbs.twimg.com/profile_images/1968051726658727936/SqxMNbx9_normal.jpg"
+  },
+  "edit_control": {
+    "edit_tweet_ids": [
+      "1964780083618685407"
+    ],
+    "editable_until_msecs": "1757278650000",
+    "edits_remaining": "5",
+    "is_edit_eligible": true
+  },
+  "mediaDetails": [
+    {
+      "display_url": "pic.x.com/VCkroz30A1",
+      "expanded_url": "https://x.com/Tiscofn/status/1964780083618685407/photo/1",
+      "ext_media_availability": {
+        "status": "Available"
+      },
+      "indices": [
+        62,
+        85
+      ],
+      "media_url_https": "https://pbs.twimg.com/media/G0RNEjwXYAAU67E.jpg",
+      "original_info": {
+        "focus_rects": [
+          {
+            "h": 896,
+            "w": 1600,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 900,
+            "w": 900,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 900,
+            "w": 789,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 900,
+            "w": 450,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 900,
+            "w": 1600,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "height": 900,
+        "width": 1600
+      },
+      "sizes": {
+        "large": {
+          "h": 900,
+          "resize": "fit",
+          "w": 1600
+        },
+        "medium": {
+          "h": 675,
+          "resize": "fit",
+          "w": 1200
+        },
+        "small": {
+          "h": 383,
+          "resize": "fit",
+          "w": 680
+        },
+        "thumb": {
+          "h": 150,
+          "resize": "crop",
+          "w": 150
+        }
+      },
+      "type": "photo",
+      "url": "https://t.co/VCkroz30A1"
+    }
+  ],
+  "photos": [
+    {
+      "backgroundColor": {
+        "red": 204,
+        "green": 214,
+        "blue": 221
+      },
+      "cropCandidates": [
+        {
+          "h": 896,
+          "w": 1600,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 900,
+          "w": 900,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 900,
+          "w": 789,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 900,
+          "w": 450,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 900,
+          "w": 1600,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "expandedUrl": "https://x.com/Tiscofn/status/1964780083618685407/photo/1",
+      "url": "https://pbs.twimg.com/media/G0RNEjwXYAAU67E.jpg",
+      "width": 1600,
+      "height": 900
+    }
+  ],
+  "conversation_count": 197,
+  "news_action_type": "conversation",
+  "isEdited": false,
+  "isStaleEdit": false
+}

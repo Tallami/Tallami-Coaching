@@ -1,0 +1,186 @@
+{
+  "__typename": "Tweet",
+  "favorite_count": 3270,
+  "lang": "en",
+  "possibly_sensitive": false,
+  "created_at": "2026-09-27T19:22:19.000Z",
+  "display_text_range": [
+    0,
+    53
+  ],
+  "entities": {
+    "media": [
+      {
+        "display_url": "pic.x.com/pGU8cjNGL8",
+        "expanded_url": "https://x.com/LewaFn/status/2104290558906868129/photo/1",
+        "indices": [
+          53,
+          76
+        ],
+        "url": "https://t.co/pGU8cjNGL8"
+      }
+    ],
+    "user_mentions": [
+      {
+        "id_str": "1142852199103549440",
+        "indices": [
+          31,
+          42
+        ],
+        "name": "RomeroFDP",
+        "screen_name": "romerofdps"
+      },
+      {
+        "id_str": "2239450173",
+        "indices": [
+          43,
+          52
+        ],
+        "name": "Tallami",
+        "screen_name": "tallami1"
+      }
+    ]
+  },
+  "id_str": "2104290558906868129",
+  "text": "Top 14 ($32000) conned 12/12 🥲\n@romerofdps @tallami1 https://t.co/pGU8cjNGL8",
+  "user": {
+    "id_str": "1191760432433905664",
+    "name": "Lewa",
+    "screen_name": "LewaFn",
+    "is_blue_verified": true,
+    "profile_image_shape": "Circle",
+    "verified": false,
+    "profile_image_url_https": "https://pbs.twimg.com/profile_images/2091496317293903872/b2uVDrQ3_normal.jpg"
+  },
+  "edit_control": {
+    "edit_tweet_ids": [
+      "2104290558906868129"
+    ],
+    "editable_until_msecs": "1790540539000",
+    "edits_remaining": "5",
+    "is_edit_eligible": true
+  },
+  "mediaDetails": [
+    {
+      "display_url": "pic.x.com/pGU8cjNGL8",
+      "expanded_url": "https://x.com/LewaFn/status/2104290558906868129/photo/1",
+      "ext_media_availability": {
+        "status": "Available"
+      },
+      "indices": [
+        53,
+        76
+      ],
+      "media_url_https": "https://pbs.twimg.com/media/HTPxG3WXkAA17Xr.jpg",
+      "original_info": {
+        "focus_rects": [
+          {
+            "h": 896,
+            "w": 1600,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 900,
+            "w": 900,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 900,
+            "w": 789,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 900,
+            "w": 450,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 900,
+            "w": 1600,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "height": 900,
+        "width": 1600
+      },
+      "sizes": {
+        "large": {
+          "h": 900,
+          "resize": "fit",
+          "w": 1600
+        },
+        "medium": {
+          "h": 675,
+          "resize": "fit",
+          "w": 1200
+        },
+        "small": {
+          "h": 383,
+          "resize": "fit",
+          "w": 680
+        },
+        "thumb": {
+          "h": 150,
+          "resize": "crop",
+          "w": 150
+        }
+      },
+      "type": "photo",
+      "url": "https://t.co/pGU8cjNGL8"
+    }
+  ],
+  "photos": [
+    {
+      "backgroundColor": {
+        "red": 204,
+        "green": 214,
+        "blue": 221
+      },
+      "cropCandidates": [
+        {
+          "h": 896,
+          "w": 1600,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 900,
+          "w": 900,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 900,
+          "w": 789,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 900,
+          "w": 450,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 900,
+          "w": 1600,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "expandedUrl": "https://x.com/LewaFn/status/2104290558906868129/photo/1",
+      "url": "https://pbs.twimg.com/media/HTPxG3WXkAA17Xr.jpg",
+      "width": 1600,
+      "height": 900
+    }
+  ],
+  "conversation_count": 146,
+  "news_action_type": "conversation",
+  "isEdited": false,
+  "isStaleEdit": false
+}

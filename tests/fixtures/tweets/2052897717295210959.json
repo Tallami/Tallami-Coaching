@@ -1,0 +1,186 @@
+{
+  "__typename": "Tweet",
+  "favorite_count": 1066,
+  "lang": "en",
+  "possibly_sensitive": false,
+  "created_at": "2026-05-08T23:45:31.000Z",
+  "display_text_range": [
+    0,
+    39
+  ],
+  "entities": {
+    "media": [
+      {
+        "display_url": "pic.x.com/f6SQh9pDsG",
+        "expanded_url": "https://x.com/randuimmm/status/2052897717295210959/photo/1",
+        "indices": [
+          39,
+          62
+        ],
+        "url": "https://t.co/f6SQh9pDsG"
+      }
+    ],
+    "user_mentions": [
+      {
+        "id_str": "1399098296149458957",
+        "indices": [
+          19,
+          26
+        ],
+        "name": "T6 grx",
+        "screen_name": "Grxlrr"
+      },
+      {
+        "id_str": "2239450173",
+        "indices": [
+          27,
+          36
+        ],
+        "name": "Tallami",
+        "screen_name": "tallami1"
+      }
+    ]
+  },
+  "id_str": "2052897717295210959",
+  "text": "TOP 1 EWC PLAY-INS @Grxlrr @tallami1 🫡 https://t.co/f6SQh9pDsG",
+  "user": {
+    "id_str": "1235337844429905927",
+    "name": "Randu",
+    "screen_name": "randuimmm",
+    "is_blue_verified": true,
+    "profile_image_shape": "Circle",
+    "verified": false,
+    "profile_image_url_https": "https://pbs.twimg.com/profile_images/2065945986887741440/Q_1-diYA_normal.jpg"
+  },
+  "edit_control": {
+    "edit_tweet_ids": [
+      "2052897717295210959"
+    ],
+    "editable_until_msecs": "1778287531000",
+    "edits_remaining": "5",
+    "is_edit_eligible": true
+  },
+  "mediaDetails": [
+    {
+      "display_url": "pic.x.com/f6SQh9pDsG",
+      "expanded_url": "https://x.com/randuimmm/status/2052897717295210959/photo/1",
+      "ext_media_availability": {
+        "status": "Available"
+      },
+      "indices": [
+        39,
+        62
+      ],
+      "media_url_https": "https://pbs.twimg.com/media/HH1bVTHXQAIX0C0.jpg",
+      "original_info": {
+        "focus_rects": [
+          {
+            "h": 1075,
+            "w": 1919,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 1079,
+            "w": 1079,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 1079,
+            "w": 946,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 1079,
+            "w": 540,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 1079,
+            "w": 1919,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "height": 1079,
+        "width": 1919
+      },
+      "sizes": {
+        "large": {
+          "h": 1079,
+          "resize": "fit",
+          "w": 1919
+        },
+        "medium": {
+          "h": 675,
+          "resize": "fit",
+          "w": 1200
+        },
+        "small": {
+          "h": 382,
+          "resize": "fit",
+          "w": 680
+        },
+        "thumb": {
+          "h": 150,
+          "resize": "crop",
+          "w": 150
+        }
+      },
+      "type": "photo",
+      "url": "https://t.co/f6SQh9pDsG"
+    }
+  ],
+  "photos": [
+    {
+      "backgroundColor": {
+        "red": 204,
+        "green": 214,
+        "blue": 221
+      },
+      "cropCandidates": [
+        {
+          "h": 1075,
+          "w": 1919,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 1079,
+          "w": 1079,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 1079,
+          "w": 946,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 1079,
+          "w": 540,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 1079,
+          "w": 1919,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "expandedUrl": "https://x.com/randuimmm/status/2052897717295210959/photo/1",
+      "url": "https://pbs.twimg.com/media/HH1bVTHXQAIX0C0.jpg",
+      "width": 1919,
+      "height": 1079
+    }
+  ],
+  "conversation_count": 30,
+  "news_action_type": "conversation",
+  "isEdited": false,
+  "isStaleEdit": false
+}

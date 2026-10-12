@@ -1,0 +1,222 @@
+{
+  "__typename": "Tweet",
+  "favorite_count": 7737,
+  "lang": "pt",
+  "possibly_sensitive": false,
+  "created_at": "2025-09-07T19:52:41.000Z",
+  "display_text_range": [
+    0,
+    94
+  ],
+  "entities": {
+    "media": [
+      {
+        "display_url": "pic.x.com/SIN2Nto1iw",
+        "expanded_url": "https://x.com/Phzinfps1/status/1964778870126878727/photo/1",
+        "indices": [
+          91,
+          114
+        ],
+        "url": "https://t.co/SIN2Nto1iw"
+      }
+    ],
+    "user_mentions": [
+      {
+        "id_str": "1042485377578283008",
+        "indices": [
+          15,
+          20
+        ],
+        "name": "k1ng",
+        "screen_name": "k1ng"
+      },
+      {
+        "id_str": "1117562920148307968",
+        "indices": [
+          21,
+          29
+        ],
+        "name": "fazer",
+        "screen_name": "fazerfn"
+      },
+      {
+        "id_str": "2239450173",
+        "indices": [
+          30,
+          39
+        ],
+        "name": "Tallami",
+        "screen_name": "tallami1"
+      },
+      {
+        "id_str": "1181381680923381760",
+        "indices": [
+          58,
+          69
+        ],
+        "name": "Gabzera",
+        "screen_name": "gabzeraftn"
+      },
+      {
+        "id_str": "3920701407",
+        "indices": [
+          70,
+          80
+        ],
+        "name": "Scarpa",
+        "screen_name": "Scarpa444"
+      },
+      {
+        "id_str": "1001909307074588672",
+        "indices": [
+          81,
+          87
+        ],
+        "name": "wey",
+        "screen_name": "weyfn"
+      }
+    ]
+  },
+  "id_str": "1964778870126878727",
+  "text": "11th ($33.000) @k1ng @fazerfn @tallami1 \n\njogaram muito🤣🤣 @gabzeraftn @Scarpa444 @weyfn 🤣🤣 https://t.co/SIN2Nto1iw",
+  "user": {
+    "id_str": "1175467374797033472",
+    "name": "FUT phzin",
+    "screen_name": "Phzinfps1",
+    "is_blue_verified": true,
+    "profile_image_shape": "Circle",
+    "verified": false,
+    "profile_image_url_https": "https://pbs.twimg.com/profile_images/2096518427766816768/tN0TxYC3_normal.jpg"
+  },
+  "edit_control": {
+    "edit_tweet_ids": [
+      "1964778870126878727"
+    ],
+    "editable_until_msecs": "1757278361000",
+    "edits_remaining": "5",
+    "is_edit_eligible": true
+  },
+  "mediaDetails": [
+    {
+      "display_url": "pic.x.com/SIN2Nto1iw",
+      "expanded_url": "https://x.com/Phzinfps1/status/1964778870126878727/photo/1",
+      "ext_media_availability": {
+        "status": "Available"
+      },
+      "indices": [
+        91,
+        114
+      ],
+      "media_url_https": "https://pbs.twimg.com/media/G0RL9v9XEAAgLqV.jpg",
+      "original_info": {
+        "focus_rects": [
+          {
+            "h": 896,
+            "w": 1600,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 899,
+            "w": 899,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 899,
+            "w": 789,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 899,
+            "w": 450,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 899,
+            "w": 1600,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "height": 899,
+        "width": 1600
+      },
+      "sizes": {
+        "large": {
+          "h": 899,
+          "resize": "fit",
+          "w": 1600
+        },
+        "medium": {
+          "h": 674,
+          "resize": "fit",
+          "w": 1200
+        },
+        "small": {
+          "h": 382,
+          "resize": "fit",
+          "w": 680
+        },
+        "thumb": {
+          "h": 150,
+          "resize": "crop",
+          "w": 150
+        }
+      },
+      "type": "photo",
+      "url": "https://t.co/SIN2Nto1iw"
+    }
+  ],
+  "photos": [
+    {
+      "backgroundColor": {
+        "red": 204,
+        "green": 214,
+        "blue": 221
+      },
+      "cropCandidates": [
+        {
+          "h": 896,
+          "w": 1600,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 899,
+          "w": 899,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 899,
+          "w": 789,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 899,
+          "w": 450,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 899,
+          "w": 1600,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "expandedUrl": "https://x.com/Phzinfps1/status/1964778870126878727/photo/1",
+      "url": "https://pbs.twimg.com/media/G0RL9v9XEAAgLqV.jpg",
+      "width": 1600,
+      "height": 899
+    }
+  ],
+  "conversation_count": 329,
+  "news_action_type": "conversation",
+  "isEdited": false,
+  "isStaleEdit": false
+}

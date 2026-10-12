@@ -1,0 +1,186 @@
+{
+  "__typename": "Tweet",
+  "favorite_count": 4403,
+  "lang": "en",
+  "possibly_sensitive": false,
+  "created_at": "2026-03-02T00:19:13.000Z",
+  "display_text_range": [
+    0,
+    81
+  ],
+  "entities": {
+    "media": [
+      {
+        "display_url": "pic.x.com/WY0pHO9u7q",
+        "expanded_url": "https://x.com/Phzinfps1/status/2028263824235610348/photo/1",
+        "indices": [
+          79,
+          102
+        ],
+        "url": "https://t.co/WY0pHO9u7q"
+      }
+    ],
+    "user_mentions": [
+      {
+        "id_str": "1194394508777152515",
+        "indices": [
+          32,
+          44
+        ],
+        "name": "FUT edson",
+        "screen_name": "edsonmalado"
+      },
+      {
+        "id_str": "2239450173",
+        "indices": [
+          45,
+          54
+        ],
+        "name": "Tallami",
+        "screen_name": "tallami1"
+      }
+    ]
+  },
+  "id_str": "2028263824235610348",
+  "text": "1st Reload Elite Series (6000$) @edsonmalado @tallami1 \n\nQualed saudi 🇸🇦 F/A 😎 https://t.co/WY0pHO9u7q",
+  "user": {
+    "id_str": "1175467374797033472",
+    "name": "FUT phzin",
+    "screen_name": "Phzinfps1",
+    "is_blue_verified": true,
+    "profile_image_shape": "Circle",
+    "verified": false,
+    "profile_image_url_https": "https://pbs.twimg.com/profile_images/2096518427766816768/tN0TxYC3_normal.jpg"
+  },
+  "edit_control": {
+    "edit_tweet_ids": [
+      "2028263824235610348"
+    ],
+    "editable_until_msecs": "1772414353000",
+    "edits_remaining": "5",
+    "is_edit_eligible": true
+  },
+  "mediaDetails": [
+    {
+      "display_url": "pic.x.com/WY0pHO9u7q",
+      "expanded_url": "https://x.com/Phzinfps1/status/2028263824235610348/photo/1",
+      "ext_media_availability": {
+        "status": "Available"
+      },
+      "indices": [
+        79,
+        102
+      ],
+      "media_url_https": "https://pbs.twimg.com/media/HCXW-ViXMAEtvBg.jpg",
+      "original_info": {
+        "focus_rects": [
+          {
+            "h": 1075,
+            "w": 1919,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 1079,
+            "w": 1079,
+            "x": 840,
+            "y": 0
+          },
+          {
+            "h": 1079,
+            "w": 946,
+            "x": 973,
+            "y": 0
+          },
+          {
+            "h": 1079,
+            "w": 540,
+            "x": 1379,
+            "y": 0
+          },
+          {
+            "h": 1079,
+            "w": 1919,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "height": 1079,
+        "width": 1919
+      },
+      "sizes": {
+        "large": {
+          "h": 1079,
+          "resize": "fit",
+          "w": 1919
+        },
+        "medium": {
+          "h": 675,
+          "resize": "fit",
+          "w": 1200
+        },
+        "small": {
+          "h": 382,
+          "resize": "fit",
+          "w": 680
+        },
+        "thumb": {
+          "h": 150,
+          "resize": "crop",
+          "w": 150
+        }
+      },
+      "type": "photo",
+      "url": "https://t.co/WY0pHO9u7q"
+    }
+  ],
+  "photos": [
+    {
+      "backgroundColor": {
+        "red": 204,
+        "green": 214,
+        "blue": 221
+      },
+      "cropCandidates": [
+        {
+          "h": 1075,
+          "w": 1919,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 1079,
+          "w": 1079,
+          "x": 840,
+          "y": 0
+        },
+        {
+          "h": 1079,
+          "w": 946,
+          "x": 973,
+          "y": 0
+        },
+        {
+          "h": 1079,
+          "w": 540,
+          "x": 1379,
+          "y": 0
+        },
+        {
+          "h": 1079,
+          "w": 1919,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "expandedUrl": "https://x.com/Phzinfps1/status/2028263824235610348/photo/1",
+      "url": "https://pbs.twimg.com/media/HCXW-ViXMAEtvBg.jpg",
+      "width": 1919,
+      "height": 1079
+    }
+  ],
+  "conversation_count": 255,
+  "news_action_type": "conversation",
+  "isEdited": false,
+  "isStaleEdit": false
+}

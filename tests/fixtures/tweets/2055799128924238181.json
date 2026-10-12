@@ -1,0 +1,186 @@
+{
+  "__typename": "Tweet",
+  "favorite_count": 482,
+  "lang": "en",
+  "possibly_sensitive": false,
+  "created_at": "2026-05-16T23:54:41.000Z",
+  "display_text_range": [
+    0,
+    43
+  ],
+  "entities": {
+    "media": [
+      {
+        "display_url": "pic.x.com/VJS4N0ydzS",
+        "expanded_url": "https://x.com/Tiscofn/status/2055799128924238181/photo/1",
+        "indices": [
+          43,
+          66
+        ],
+        "url": "https://t.co/VJS4N0ydzS"
+      }
+    ],
+    "user_mentions": [
+      {
+        "id_str": "1312086694150238209",
+        "indices": [
+          22,
+          31
+        ],
+        "name": "EVO nickzrr",
+        "screen_name": "1nickzrr"
+      },
+      {
+        "id_str": "2239450173",
+        "indices": [
+          33,
+          42
+        ],
+        "name": "Tallami",
+        "screen_name": "tallami1"
+      }
+    ]
+  },
+  "id_str": "2055799128924238181",
+  "text": "2nd Div Cup ($2000)🙄\n\n@1nickzrr  @tallami1 https://t.co/VJS4N0ydzS",
+  "user": {
+    "id_str": "1195483430039031808",
+    "name": "Tisco",
+    "screen_name": "Tiscofn",
+    "is_blue_verified": true,
+    "profile_image_shape": "Circle",
+    "verified": false,
+    "profile_image_url_https": "https://pbs.twimg.com/profile_images/1968051726658727936/SqxMNbx9_normal.jpg"
+  },
+  "edit_control": {
+    "edit_tweet_ids": [
+      "2055799128924238181"
+    ],
+    "editable_until_msecs": "1778979281000",
+    "edits_remaining": "5",
+    "is_edit_eligible": true
+  },
+  "mediaDetails": [
+    {
+      "display_url": "pic.x.com/VJS4N0ydzS",
+      "expanded_url": "https://x.com/Tiscofn/status/2055799128924238181/photo/1",
+      "ext_media_availability": {
+        "status": "Available"
+      },
+      "indices": [
+        43,
+        66
+      ],
+      "media_url_https": "https://pbs.twimg.com/media/HIeqDgbXEAEZnyw.jpg",
+      "original_info": {
+        "focus_rects": [
+          {
+            "h": 1075,
+            "w": 1919,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 1079,
+            "w": 1079,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 1079,
+            "w": 946,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 1079,
+            "w": 540,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 1079,
+            "w": 1919,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "height": 1079,
+        "width": 1919
+      },
+      "sizes": {
+        "large": {
+          "h": 1079,
+          "resize": "fit",
+          "w": 1919
+        },
+        "medium": {
+          "h": 675,
+          "resize": "fit",
+          "w": 1200
+        },
+        "small": {
+          "h": 382,
+          "resize": "fit",
+          "w": 680
+        },
+        "thumb": {
+          "h": 150,
+          "resize": "crop",
+          "w": 150
+        }
+      },
+      "type": "photo",
+      "url": "https://t.co/VJS4N0ydzS"
+    }
+  ],
+  "photos": [
+    {
+      "backgroundColor": {
+        "red": 204,
+        "green": 214,
+        "blue": 221
+      },
+      "cropCandidates": [
+        {
+          "h": 1075,
+          "w": 1919,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 1079,
+          "w": 1079,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 1079,
+          "w": 946,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 1079,
+          "w": 540,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 1079,
+          "w": 1919,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "expandedUrl": "https://x.com/Tiscofn/status/2055799128924238181/photo/1",
+      "url": "https://pbs.twimg.com/media/HIeqDgbXEAEZnyw.jpg",
+      "width": 1919,
+      "height": 1079
+    }
+  ],
+  "conversation_count": 12,
+  "news_action_type": "conversation",
+  "isEdited": false,
+  "isStaleEdit": false
+}

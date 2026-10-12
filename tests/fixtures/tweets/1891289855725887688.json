@@ -1,0 +1,195 @@
+{
+  "__typename": "Tweet",
+  "favorite_count": 5861,
+  "lang": "en",
+  "possibly_sensitive": false,
+  "created_at": "2025-02-17T00:53:34.000Z",
+  "display_text_range": [
+    0,
+    125
+  ],
+  "entities": {
+    "media": [
+      {
+        "display_url": "pic.x.com/rF6EWiXIQl",
+        "expanded_url": "https://x.com/Phzinfps1/status/1891289855725887688/photo/1",
+        "indices": [
+          123,
+          146
+        ],
+        "url": "https://t.co/rF6EWiXIQl"
+      }
+    ],
+    "user_mentions": [
+      {
+        "id_str": "1117562920148307968",
+        "indices": [
+          20,
+          28
+        ],
+        "name": "fazer",
+        "screen_name": "fazerfn"
+      },
+      {
+        "id_str": "1042485377578283008",
+        "indices": [
+          29,
+          34
+        ],
+        "name": "k1ng",
+        "screen_name": "k1ng"
+      },
+      {
+        "id_str": "2239450173",
+        "indices": [
+          35,
+          44
+        ],
+        "name": "Tallami",
+        "screen_name": "tallami1"
+      }
+    ]
+  },
+  "id_str": "1891289855725887688",
+  "text": "6x FNCS CHAMPION w/ @fazerfn @k1ng @tallami1 \n\ntomei disconnect no inicio do ultimo lobby🙃\n\n🏆 Qualed globals 📷\n@w7mesports https://t.co/rF6EWiXIQl",
+  "user": {
+    "id_str": "1175467374797033472",
+    "name": "FUT phzin",
+    "screen_name": "Phzinfps1",
+    "is_blue_verified": true,
+    "profile_image_shape": "Circle",
+    "verified": false,
+    "profile_image_url_https": "https://pbs.twimg.com/profile_images/2096518427766816768/tN0TxYC3_normal.jpg"
+  },
+  "edit_control": {
+    "edit_tweet_ids": [
+      "1891289855725887688"
+    ],
+    "editable_until_msecs": "1739757214000",
+    "edits_remaining": "5",
+    "is_edit_eligible": true
+  },
+  "mediaDetails": [
+    {
+      "display_url": "pic.x.com/rF6EWiXIQl",
+      "expanded_url": "https://x.com/Phzinfps1/status/1891289855725887688/photo/1",
+      "ext_media_availability": {
+        "status": "Available"
+      },
+      "indices": [
+        123,
+        146
+      ],
+      "media_url_https": "https://pbs.twimg.com/media/Gj82E-LWoAANvwv.jpg",
+      "original_info": {
+        "focus_rects": [
+          {
+            "h": 1070,
+            "w": 1911,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 1070,
+            "w": 1070,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 1070,
+            "w": 939,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 1070,
+            "w": 535,
+            "x": 68,
+            "y": 0
+          },
+          {
+            "h": 1070,
+            "w": 1919,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "height": 1070,
+        "width": 1919
+      },
+      "sizes": {
+        "large": {
+          "h": 1070,
+          "resize": "fit",
+          "w": 1919
+        },
+        "medium": {
+          "h": 669,
+          "resize": "fit",
+          "w": 1200
+        },
+        "small": {
+          "h": 379,
+          "resize": "fit",
+          "w": 680
+        },
+        "thumb": {
+          "h": 150,
+          "resize": "crop",
+          "w": 150
+        }
+      },
+      "type": "photo",
+      "url": "https://t.co/rF6EWiXIQl"
+    }
+  ],
+  "photos": [
+    {
+      "backgroundColor": {
+        "red": 204,
+        "green": 214,
+        "blue": 221
+      },
+      "cropCandidates": [
+        {
+          "h": 1070,
+          "w": 1911,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 1070,
+          "w": 1070,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 1070,
+          "w": 939,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 1070,
+          "w": 535,
+          "x": 68,
+          "y": 0
+        },
+        {
+          "h": 1070,
+          "w": 1919,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "expandedUrl": "https://x.com/Phzinfps1/status/1891289855725887688/photo/1",
+      "url": "https://pbs.twimg.com/media/Gj82E-LWoAANvwv.jpg",
+      "width": 1919,
+      "height": 1070
+    }
+  ],
+  "conversation_count": 305,
+  "news_action_type": "conversation",
+  "isEdited": false,
+  "isStaleEdit": false
+}
