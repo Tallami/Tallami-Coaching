@@ -1,0 +1,83 @@
+<link href="https://fonts.googleapis.com/css2?family=Saira:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<style>
+  .tl { font-family: "Saira", system-ui, sans-serif; background: #0B1433; color: #F3F5FA; border-radius: 6px; padding: 28px; line-height: 1.45; }
+  .tl * { box-sizing: border-box; }
+  .tl .h2, .pp .h2 { font-stretch: 72%; font-weight: 800; font-size: 38px; line-height: 1; margin: 0 0 6px; }
+  .tl .lede { color: #AEB8D6; font-size: 14px; margin: 0 0 22px; max-width: 60ch; }
+  .tl .kicker { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: #FFC93C; font-weight: 700; margin: 0 0 10px; }
+  .tl .muted { color: #AEB8D6; }
+  .tl .place { font-stretch: 68%; font-weight: 800; color: #FFC93C; line-height: .9; }
+  .tl .ev { font-weight: 700; font-stretch: 90%; }
+  .b-cols { display: grid; grid-template-columns: 1.1fr .9fr; gap: 28px; }
+  .b-row { display: flex; align-items: baseline; gap: 14px; padding: 9px 0; border-bottom: 1px solid rgba(174,184,214,.22); }
+  .b-row .place { font-size: 40px; width: 64px; }
+  .b-win { display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid rgba(174,184,214,.22); font-size: 14px; }
+  .b-win .place { font-size: 22px; width: 30px; }
+
+  .pp { font-family: "Saira", system-ui, sans-serif; background: #EEF1EC; color: #17202A; border-radius: 6px; padding: 28px; line-height: 1.45; background-image: radial-gradient(circle at 1px 1px, rgba(23,32,42,.07) 1px, transparent 0); background-size: 24px 24px; border-top: 6px solid #FFC93C; }
+  .pp .row { display: flex; align-items: baseline; gap: 12px; padding: 12px 0; border-bottom: 1px solid #C9D0C6; }
+  .pp .row h4 { margin: 0; font-size: 17px; font-stretch: 90%; }
+  .pp .leader { flex: 1; border-bottom: 2px dotted #9AA39A; transform: translateY(-5px); }
+  .pp .amt { font-stretch: 80%; font-weight: 800; font-size: 22px; white-space: nowrap; text-align: right; }
+  .pp .amt small { display: block; font-size: 12px; font-weight: 500; font-stretch: 100%; color: #4A5563; }
+  .pp .gone { opacity: .45; text-decoration: line-through; }
+  .pp .pro { margin-top: 18px; background: #0B1433; color: #F3F5FA; border-radius: 4px; padding: 20px; }
+  .pp .pro .row { border: 0; }
+  .pp .pro h4 { font-size: 26px; font-stretch: 72%; font-weight: 800; }
+  .pp .pro .amt { color: #FFC93C; font-size: 30px; }
+  .pp .pro .amt small { color: #AEB8D6; }
+  .pp .pro .leader { border-color: rgba(174,184,214,.3); }
+  .note { font-size: 13px; color: var(--text-secondary); margin: 8px 0 0; }
+</style>
+
+<h2>Así quedarían los resultados y los servicios</h2>
+<p class="subtitle">Resultados con la opción B y tus títulos. En celular, "Campeonatos presenciales" queda arriba.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Resultados (opción B)</div>
+  <div class="mockup-body">
+    <div class="tl">
+      <div class="h2">Resultados como coach</div>
+      <p class="lede">Resultados de jugadores que entrené. Autorizaron mostrar su nombre y resultado.</p>
+      <div class="b-cols">
+        <div>
+          <p class="kicker">Campeonatos presenciales</p>
+          <div class="b-row"><span class="place">5º</span><span><span class="ev">Esports World Cup</span> <span class="muted">Reload</span></span></div>
+          <div class="b-row"><span class="place">9º</span><span><span class="ev">Esports World Cup</span> <span class="muted">ESL</span></span></div>
+          <div class="b-row"><span class="place">11º</span><span><span class="ev">FNCS Globals</span> <span class="muted">2025</span></span></div>
+          <div class="b-row"><span class="place">12º</span><span><span class="ev">FNCS Globals</span> <span class="muted">2025</span></span></div>
+          <div class="b-row"><span class="place">14º</span><span><span class="ev">FNCS Globals</span> <span class="muted">2026</span></span></div>
+          <div class="b-row"><span class="place">22º</span><span><span class="ev">FNCS Globals</span> <span class="muted">2024</span></span></div>
+        </div>
+        <div>
+          <p class="kicker">Campeonatos online</p>
+          <div class="b-win"><span class="place">1º</span><span>FNCS CH6S1<br><span class="muted">K1ng, Fazer y Phzin</span></span></div>
+          <div class="b-win"><span class="place">1º</span><span>FNCS CH5S3<br><span class="muted">K1ng y Fazer</span></span></div>
+          <div class="b-win"><span class="place">1º</span><span>FNCS CH5S2<br><span class="muted">Randu y Lewa</span></span></div>
+          <div class="b-win"><span class="place">1º</span><span>Reload Elite Series<br><span class="muted">Phzin y Edson</span></span></div>
+          <div class="b-win"><span class="place">1º</span><span>Reload Elite Series<br><span class="muted">Romero y Lewa</span></span></div>
+          <div class="b-win"><span class="place">1º</span><span>Second Chance<br><span class="muted">K1ng y Fazer</span></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mockup" style="margin-top:20px">
+  <div class="mockup-header">Servicios: sin Academia y Temporada Pro a precio fijo</div>
+  <div class="mockup-body">
+    <div class="pp">
+      <div class="h2">Servicios y precios</div>
+      <div class="row"><h4>VOD review grabado</h4><span class="leader"></span><span class="amt">USD 30</span></div>
+      <div class="row"><h4>VOD review en vivo</h4><span class="leader"></span><span class="amt">USD 45</span></div>
+      <div class="row"><h4>Clase 1 a 1</h4><span class="leader"></span><span class="amt">USD 40</span></div>
+      <div class="row"><h4>Plan de juego personalizado</h4><span class="leader"></span><span class="amt">USD 120</span></div>
+      <div class="row"><h4>Coaching de torneo</h4><span class="leader"></span><span class="amt">USD 150<small>por dúo o trío</small></span></div>
+      <div class="row gone"><h4>Academia Tallami</h4><span class="leader"></span><span class="amt">USD 15<small>por mes</small></span></div>
+      <div class="pro">
+        <div class="row"><h4>Temporada Pro</h4><span class="leader"></span><span class="amt">USD 2.500<small>por jugador, toda la temporada</small></span></div>
+      </div>
+    </div>
+    <p class="note">Tachado = se saca. "Por jugador" es una suposición mía: si los USD 2.500 son por equipo o por otra cosa, decime.</p>
+  </div>
+</div>

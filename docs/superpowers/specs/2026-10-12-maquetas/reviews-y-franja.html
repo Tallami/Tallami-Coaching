@@ -1,0 +1,469 @@
+<link href="https://fonts.googleapis.com/css2?family=Saira:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<style>
+  .site { font-family: "Saira", system-ui, sans-serif; color: #F3F5FA; background: #0B1433; border-radius: 6px; padding: 26px; line-height: 1.45; overflow: hidden; }
+  .site * { box-sizing: border-box; }
+  .site .h2 { font-stretch: 72%; font-weight: 800; font-size: 36px; line-height: 1; margin: 0 0 6px; }
+  .site .lede { color: #AEB8D6; font-size: 14px; margin: 0 0 18px; max-width: 60ch; }
+  .site .kicker { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: #FFC93C; font-weight: 700; margin: 0 0 10px; }
+  .tw { display: flex; flex-direction: column; gap: 10px; background: #13214F; border: 1px solid rgba(174,184,214,.22); border-radius: 6px; padding: 14px; color: #F3F5FA; text-decoration: none; transition: border-color .15s, transform .15s; }
+  .tw:hover { border-color: #FFC93C; transform: translateY(-2px); }
+  .tw-head { display: flex; align-items: center; gap: 10px; }
+  .tw-av { border-radius: 50%; width: 40px; height: 40px; }
+  .tw-who { display: flex; flex-direction: column; line-height: 1.2; font-size: 14px; flex: 1; min-width: 0; }
+  .tw-who span { color: #AEB8D6; font-size: 13px; }
+  .tw-x { font-size: 18px; color: #AEB8D6; }
+  .tw-text { font-size: 15px; }
+  .tw-text .me { color: #FFC93C; font-weight: 700; }
+  .tw-text .at { color: #9DB2FF; }
+  .tw-img { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 4px; display: block; }
+  .tw-foot { display: flex; justify-content: space-between; font-size: 13px; color: #AEB8D6; margin-top: auto; }
+  .tw-go { color: #FFC93C; font-weight: 700; }
+
+  .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .more { display: inline-flex; margin-top: 16px; min-height: 44px; align-items: center; padding: 0 18px; border: 2px solid #7F8BB5; border-radius: 4px; font-weight: 700; }
+
+  .rail { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(250px, 31%); gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 10px; }
+  .rail .tw { scroll-snap-align: start; }
+  .rail-nav { display: flex; gap: 8px; justify-content: flex-end; margin: -46px 0 14px; }
+  .rail-nav span { display: grid; place-items: center; width: 40px; height: 40px; border: 2px solid #7F8BB5; border-radius: 4px; font-weight: 800; }
+
+  .wall { display: grid; gap: 14px; mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
+  .wall-row { display: flex; gap: 14px; width: max-content; animation: slide 60s linear infinite; }
+  .wall-row.rev { animation-direction: reverse; }
+  .wall .tw { width: 250px; flex: none; }
+  .wall:hover .wall-row { animation-play-state: paused; }
+  @keyframes slide { to { transform: translateX(-50%); } }
+
+  .players { margin: 0 -26px 22px; padding: 14px 0; border-block: 1px solid rgba(174,184,214,.22); background: #0E1A42; overflow: hidden; mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); }
+  .players-row { display: flex; gap: 28px; width: max-content; animation: slide 40s linear infinite; padding-left: 26px; }
+  .pl { display: inline-flex; align-items: center; gap: 10px; font-weight: 700; font-stretch: 85%; font-size: 18px; white-space: nowrap; }
+  .pl img, .pl-ini { width: 34px; height: 34px; border-radius: 50%; }
+  .pl-ini { display: grid; place-items: center; background: #3D5BDB; font-size: 15px; }
+  .players-label { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: #FFC93C; font-weight: 700; margin: 0 0 10px; padding-left: 26px; }
+  @media (prefers-reduced-motion: reduce) { .wall-row, .players-row { animation: none; } }
+  .note { font-size: 13px; color: var(--text-secondary); margin: 8px 0 0; }
+  .option .content, .mockup-body { min-width: 0; }
+</style>
+
+<h2>Tweets de tus jugadores y franja de jugadores</h2>
+<p class="subtitle">Arriba, la franja de jugadores que propongo para justo debajo de la portada. Abajo, tres formas de mostrar los tweets: los pondría entre "Resultados" y "Servicios", como prueba antes de ver los precios. Todas las tarjetas se pueden clickear y abren el tweet en X. Probá pasar el mouse y hacer clic.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Franja de jugadores (debajo de la portada, se mueve sola y se frena con el mouse)</div>
+  <div class="mockup-body">
+    <div class="site" style="padding-top:18px;padding-bottom:4px">
+      <p class="players-label">Jugadores que entrené</p>
+      <div class="players"><div class="players-row"><span class="pl"><span class="pl-ini">K</span>K1ng</span><span class="pl"><img src="https://pbs.twimg.com/profile_images/1569205863448985603/KF3l-GFx_bigger.png" alt="" width="34" height="34">Fazer</span><span class="pl"><img src="https://pbs.twimg.com/profile_images/2096518427766816768/tN0TxYC3_bigger.jpg" alt="" width="34" height="34">Phzin</span><span class="pl"><img src="https://pbs.twimg.com/profile_images/2065945986887741440/Q_1-diYA_bigger.jpg" alt="" width="34" height="34">Randu</span><span class="pl"><img src="https://pbs.twimg.com/profile_images/2091496317293903872/b2uVDrQ3_bigger.jpg" alt="" width="34" height="34">Lewa</span><span class="pl"><img src="https://pbs.twimg.com/profile_images/2092424886702526464/Fqq5SWEb_bigger.jpg" alt="" width="34" height="34">Romero</span><span class="pl"><span class="pl-ini">E</span>Edson</span><span class="pl"><img src="https://pbs.twimg.com/profile_images/1968051726658727936/SqxMNbx9_bigger.jpg" alt="" width="34" height="34">Tisco</span><span class="pl"><span class="pl-ini">K</span>K1ng</span><span class="pl"><img src="https://pbs.twimg.com/profile_images/1569205863448985603/KF3l-GFx_bigger.png" alt="" width="34" height="34">Fazer</span><span class="pl"><img src="https://pbs.twimg.com/profile_images/2096518427766816768/tN0TxYC3_bigger.jpg" alt="" width="34" height="34">Phzin</span><span class="pl"><img src="https://pbs.twimg.com/profile_images/2065945986887741440/Q_1-diYA_bigger.jpg" alt="" width="34" height="34">Randu</span><span class="pl"><img src="https://pbs.twimg.com/profile_images/2091496317293903872/b2uVDrQ3_bigger.jpg" alt="" width="34" height="34">Lewa</span><span class="pl"><img src="https://pbs.twimg.com/profile_images/2092424886702526464/Fqq5SWEb_bigger.jpg" alt="" width="34" height="34">Romero</span><span class="pl"><span class="pl-ini">E</span>Edson</span><span class="pl"><img src="https://pbs.twimg.com/profile_images/1968051726658727936/SqxMNbx9_bigger.jpg" alt="" width="34" height="34">Tisco</span></div></div>
+    </div>
+    <p class="note">Usé los 8 jugadores que aparecen en tus resultados y tweets. K1ng y Edson no tienen foto porque no tengo un tweet de ellos; en la versión real podemos sumar la foto de perfil de X de cada uno.</p>
+  </div>
+</div>
+
+<div class="options" style="margin-top:20px">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Grilla con "Ver más"</h3>
+      <p>Se ven 6 tarjetas (3 en el celular) y un botón carga más. Lo más simple y claro; la página se alarga a medida que sumás tweets.</p>
+      <div class="site" style="margin-top:12px">
+        <p class="kicker">Mis jugadores en X</p>
+        <div class="h2">Lo que publican después de cada torneo</div>
+        <p class="lede">Tweets reales de jugadores que entrené. Tocá una tarjeta para verla en X.</p>
+        <div class="grid">
+  <a class="tw " href="https://x.com/LewaFn/status/2104290558906868129" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/2091496317293903872/b2uVDrQ3_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>Lewa</b><span>@LewaFn</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">Top 14 ($32000) conned 12/12 🥲<br><span class="at">@romerofdps</span> <b class="me">@tallami1</b></span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/HTPxG3WXkAA17Xr.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>27 de sept de 2026</span><span class="tw-go">Ver en X →</span></span>
+  </a>
+  <a class="tw " href="https://x.com/romerofdps/status/2091212984919961996" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/2092424886702526464/Fqq5SWEb_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>RomeroFDP</b><span>@romerofdps</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">5th EWC FINALS ($45000) <b class="me">@tallami1</b> <span class="at">@LewaFn</span> <span class="at">@LeviatanGG</span> <br><br>Gracias a todos los que están bancando ❤️</span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/HQV7IFjXMAAwKM1.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>22 de ago de 2026</span><span class="tw-go">Ver en X →</span></span>
+  </a>
+  <a class="tw " href="https://x.com/Tiscofn/status/2055799128924238181" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/1968051726658727936/SqxMNbx9_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>Tisco</b><span>@Tiscofn</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">2nd Div Cup ($2000)🙄<br><br><span class="at">@1nickzrr</span>  <b class="me">@tallami1</b></span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/HIeqDgbXEAEZnyw.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>16 de may de 2026</span><span class="tw-go">Ver en X →</span></span>
+  </a>
+  <a class="tw " href="https://x.com/randuimmm/status/2052897717295210959" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/2065945986887741440/Q_1-diYA_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>Randu</b><span>@randuimmm</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">TOP 1 EWC PLAY-INS <span class="at">@Grxlrr</span> <b class="me">@tallami1</b> 🫡</span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/HH1bVTHXQAIX0C0.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>8 de may de 2026</span><span class="tw-go">Ver en X →</span></span>
+  </a>
+  <a class="tw " href="https://x.com/LewaFn/status/2032968988515271075" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/2091496317293903872/b2uVDrQ3_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>Lewa</b><span>@LewaFn</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">1st ($3000) rompimo la maldicion <span class="at">@romerofdps</span> <b class="me">@tallami1</b></span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/HDaOZRdWQAQ0q75.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>14 de mar de 2026</span><span class="tw-go">Ver en X →</span></span>
+  </a>
+  <a class="tw " href="https://x.com/Phzinfps1/status/2028263824235610348" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/2096518427766816768/tN0TxYC3_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>FUT phzin</b><span>@Phzinfps1</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">1st Reload Elite Series (6000$) <span class="at">@edsonmalado</span> <b class="me">@tallami1</b> <br><br>Qualed saudi 🇸🇦 F/A 😎</span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/HCXW-ViXMAEtvBg.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>1 de mar de 2026</span><span class="tw-go">Ver en X →</span></span>
+  </a></div>
+        <span class="more">Ver más tweets</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Carrusel deslizable</h3>
+      <p>Una fila que se desliza con el dedo en el celular o con flechas en la compu. Entran todos los tweets que quieras sin alargar la página. Probá deslizarla.</p>
+      <div class="site" style="margin-top:12px">
+        <p class="kicker">Mis jugadores en X</p>
+        <div class="h2">Lo que publican después de cada torneo</div>
+        <p class="lede">Tweets reales de jugadores que entrené. Tocá una tarjeta para verla en X.</p>
+        <div class="rail-nav"><span>←</span><span>→</span></div>
+        <div class="rail">
+  <a class="tw " href="https://x.com/LewaFn/status/2104290558906868129" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/2091496317293903872/b2uVDrQ3_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>Lewa</b><span>@LewaFn</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">Top 14 ($32000) conned 12/12 🥲<br><span class="at">@romerofdps</span> <b class="me">@tallami1</b></span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/HTPxG3WXkAA17Xr.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>27 de sept de 2026</span><span class="tw-go">Ver en X →</span></span>
+  </a>
+  <a class="tw " href="https://x.com/romerofdps/status/2091212984919961996" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/2092424886702526464/Fqq5SWEb_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>RomeroFDP</b><span>@romerofdps</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">5th EWC FINALS ($45000) <b class="me">@tallami1</b> <span class="at">@LewaFn</span> <span class="at">@LeviatanGG</span> <br><br>Gracias a todos los que están bancando ❤️</span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/HQV7IFjXMAAwKM1.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>22 de ago de 2026</span><span class="tw-go">Ver en X →</span></span>
+  </a>
+  <a class="tw " href="https://x.com/Tiscofn/status/2055799128924238181" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/1968051726658727936/SqxMNbx9_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>Tisco</b><span>@Tiscofn</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">2nd Div Cup ($2000)🙄<br><br><span class="at">@1nickzrr</span>  <b class="me">@tallami1</b></span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/HIeqDgbXEAEZnyw.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>16 de may de 2026</span><span class="tw-go">Ver en X →</span></span>
+  </a>
+  <a class="tw " href="https://x.com/randuimmm/status/2052897717295210959" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/2065945986887741440/Q_1-diYA_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>Randu</b><span>@randuimmm</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">TOP 1 EWC PLAY-INS <span class="at">@Grxlrr</span> <b class="me">@tallami1</b> 🫡</span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/HH1bVTHXQAIX0C0.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>8 de may de 2026</span><span class="tw-go">Ver en X →</span></span>
+  </a>
+  <a class="tw " href="https://x.com/LewaFn/status/2032968988515271075" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/2091496317293903872/b2uVDrQ3_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>Lewa</b><span>@LewaFn</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">1st ($3000) rompimo la maldicion <span class="at">@romerofdps</span> <b class="me">@tallami1</b></span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/HDaOZRdWQAQ0q75.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>14 de mar de 2026</span><span class="tw-go">Ver en X →</span></span>
+  </a>
+  <a class="tw " href="https://x.com/Phzinfps1/status/2028263824235610348" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/2096518427766816768/tN0TxYC3_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>FUT phzin</b><span>@Phzinfps1</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">1st Reload Elite Series (6000$) <span class="at">@edsonmalado</span> <b class="me">@tallami1</b> <br><br>Qualed saudi 🇸🇦 F/A 😎</span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/HCXW-ViXMAEtvBg.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>1 de mar de 2026</span><span class="tw-go">Ver en X →</span></span>
+  </a>
+  <a class="tw " href="https://x.com/Tiscofn/status/1964780083618685407" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/1968051726658727936/SqxMNbx9_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>Tisco</b><span>@Tiscofn</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">12th FNCS Globals ($30.000)🇦🇷<br><br><span class="at">@CaduFN1</span> <span class="at">@StrykerFN1</span> <b class="me">@tallami1</b></span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/G0RNEjwXYAAU67E.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>7 de sept de 2025</span><span class="tw-go">Ver en X →</span></span>
+  </a>
+  <a class="tw " href="https://x.com/Phzinfps1/status/1964778870126878727" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/2096518427766816768/tN0TxYC3_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>FUT phzin</b><span>@Phzinfps1</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">11th ($33.000) <span class="at">@k1ng</span> <span class="at">@fazerfn</span> <b class="me">@tallami1</b> <br><br>jogaram muito🤣🤣 <span class="at">@gabzeraftn</span> <span class="at">@Scarpa444</span> <span class="at">@weyfn</span> 🤣🤣</span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/G0RL9v9XEAAgLqV.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>7 de sept de 2025</span><span class="tw-go">Ver en X →</span></span>
+  </a>
+  <a class="tw " href="https://x.com/fazerfn/status/1959441051686428791" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/1569205863448985603/KF3l-GFx_bigger.png" alt="" width="40" height="40">
+      <span class="tw-who"><b>fazer</b><span>@fazerfn</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">4th FNCS Warmup <span class="at">@Phzinfps1</span> <span class="at">@k1ng</span> <b class="me">@tallami1</b> ($3300) 🤒<br><br><span class="at">@ShindeNgg</span></span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/GzFU2mTW8AAcZye.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>23 de ago de 2025</span><span class="tw-go">Ver en X →</span></span>
+  </a>
+  <a class="tw " href="https://x.com/Phzinfps1/status/1891289855725887688" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/2096518427766816768/tN0TxYC3_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>FUT phzin</b><span>@Phzinfps1</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">6x FNCS CHAMPION w/ <span class="at">@fazerfn</span> <span class="at">@k1ng</span> <b class="me">@tallami1</b> <br><br>tomei disconnect no inicio do ultimo lobby🙃<br><br>🏆 Qualed globals 📷<br><span class="at">@w7mesports</span></span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/Gj82E-LWoAANvwv.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>16 de feb de 2025</span><span class="tw-go">Ver en X →</span></span>
+  </a></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Muro en movimiento</h3>
+      <p>Dos filas de tarjetas que pasan solas en sentidos opuestos y se frenan con el mouse. Da sensación de "son un montón"; es el que más llama la atención y el que menos se lee con calma.</p>
+      <div class="site" style="margin-top:12px">
+        <p class="kicker">Mis jugadores en X</p>
+        <div class="h2">Lo que publican después de cada torneo</div>
+        <p class="lede">Tweets reales de jugadores que entrené. Tocá una tarjeta para verla en X.</p>
+        <div class="wall">
+          <div class="wall-row">
+  <a class="tw " href="https://x.com/LewaFn/status/2104290558906868129" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/2091496317293903872/b2uVDrQ3_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>Lewa</b><span>@LewaFn</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">Top 14 ($32000) conned 12/12 🥲<br><span class="at">@romerofdps</span> <b class="me">@tallami1</b></span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/HTPxG3WXkAA17Xr.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>27 de sept de 2026</span><span class="tw-go">Ver en X →</span></span>
+  </a>
+  <a class="tw " href="https://x.com/romerofdps/status/2091212984919961996" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/2092424886702526464/Fqq5SWEb_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>RomeroFDP</b><span>@romerofdps</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">5th EWC FINALS ($45000) <b class="me">@tallami1</b> <span class="at">@LewaFn</span> <span class="at">@LeviatanGG</span> <br><br>Gracias a todos los que están bancando ❤️</span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/HQV7IFjXMAAwKM1.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>22 de ago de 2026</span><span class="tw-go">Ver en X →</span></span>
+  </a>
+  <a class="tw " href="https://x.com/Tiscofn/status/2055799128924238181" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/1968051726658727936/SqxMNbx9_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>Tisco</b><span>@Tiscofn</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">2nd Div Cup ($2000)🙄<br><br><span class="at">@1nickzrr</span>  <b class="me">@tallami1</b></span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/HIeqDgbXEAEZnyw.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>16 de may de 2026</span><span class="tw-go">Ver en X →</span></span>
+  </a>
+  <a class="tw " href="https://x.com/randuimmm/status/2052897717295210959" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/2065945986887741440/Q_1-diYA_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>Randu</b><span>@randuimmm</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">TOP 1 EWC PLAY-INS <span class="at">@Grxlrr</span> <b class="me">@tallami1</b> 🫡</span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/HH1bVTHXQAIX0C0.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>8 de may de 2026</span><span class="tw-go">Ver en X →</span></span>
+  </a>
+  <a class="tw " href="https://x.com/LewaFn/status/2032968988515271075" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/2091496317293903872/b2uVDrQ3_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>Lewa</b><span>@LewaFn</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">1st ($3000) rompimo la maldicion <span class="at">@romerofdps</span> <b class="me">@tallami1</b></span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/HDaOZRdWQAQ0q75.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>14 de mar de 2026</span><span class="tw-go">Ver en X →</span></span>
+  </a>
+  <a class="tw " href="https://x.com/LewaFn/status/2104290558906868129" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/2091496317293903872/b2uVDrQ3_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>Lewa</b><span>@LewaFn</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">Top 14 ($32000) conned 12/12 🥲<br><span class="at">@romerofdps</span> <b class="me">@tallami1</b></span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/HTPxG3WXkAA17Xr.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>27 de sept de 2026</span><span class="tw-go">Ver en X →</span></span>
+  </a>
+  <a class="tw " href="https://x.com/romerofdps/status/2091212984919961996" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/2092424886702526464/Fqq5SWEb_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>RomeroFDP</b><span>@romerofdps</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">5th EWC FINALS ($45000) <b class="me">@tallami1</b> <span class="at">@LewaFn</span> <span class="at">@LeviatanGG</span> <br><br>Gracias a todos los que están bancando ❤️</span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/HQV7IFjXMAAwKM1.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>22 de ago de 2026</span><span class="tw-go">Ver en X →</span></span>
+  </a>
+  <a class="tw " href="https://x.com/Tiscofn/status/2055799128924238181" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/1968051726658727936/SqxMNbx9_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>Tisco</b><span>@Tiscofn</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">2nd Div Cup ($2000)🙄<br><br><span class="at">@1nickzrr</span>  <b class="me">@tallami1</b></span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/HIeqDgbXEAEZnyw.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>16 de may de 2026</span><span class="tw-go">Ver en X →</span></span>
+  </a>
+  <a class="tw " href="https://x.com/randuimmm/status/2052897717295210959" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/2065945986887741440/Q_1-diYA_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>Randu</b><span>@randuimmm</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">TOP 1 EWC PLAY-INS <span class="at">@Grxlrr</span> <b class="me">@tallami1</b> 🫡</span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/HH1bVTHXQAIX0C0.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>8 de may de 2026</span><span class="tw-go">Ver en X →</span></span>
+  </a>
+  <a class="tw " href="https://x.com/LewaFn/status/2032968988515271075" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/2091496317293903872/b2uVDrQ3_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>Lewa</b><span>@LewaFn</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">1st ($3000) rompimo la maldicion <span class="at">@romerofdps</span> <b class="me">@tallami1</b></span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/HDaOZRdWQAQ0q75.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>14 de mar de 2026</span><span class="tw-go">Ver en X →</span></span>
+  </a></div>
+          <div class="wall-row rev">
+  <a class="tw " href="https://x.com/Phzinfps1/status/2028263824235610348" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/2096518427766816768/tN0TxYC3_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>FUT phzin</b><span>@Phzinfps1</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">1st Reload Elite Series (6000$) <span class="at">@edsonmalado</span> <b class="me">@tallami1</b> <br><br>Qualed saudi 🇸🇦 F/A 😎</span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/HCXW-ViXMAEtvBg.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>1 de mar de 2026</span><span class="tw-go">Ver en X →</span></span>
+  </a>
+  <a class="tw " href="https://x.com/Tiscofn/status/1964780083618685407" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/1968051726658727936/SqxMNbx9_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>Tisco</b><span>@Tiscofn</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">12th FNCS Globals ($30.000)🇦🇷<br><br><span class="at">@CaduFN1</span> <span class="at">@StrykerFN1</span> <b class="me">@tallami1</b></span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/G0RNEjwXYAAU67E.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>7 de sept de 2025</span><span class="tw-go">Ver en X →</span></span>
+  </a>
+  <a class="tw " href="https://x.com/Phzinfps1/status/1964778870126878727" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/2096518427766816768/tN0TxYC3_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>FUT phzin</b><span>@Phzinfps1</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">11th ($33.000) <span class="at">@k1ng</span> <span class="at">@fazerfn</span> <b class="me">@tallami1</b> <br><br>jogaram muito🤣🤣 <span class="at">@gabzeraftn</span> <span class="at">@Scarpa444</span> <span class="at">@weyfn</span> 🤣🤣</span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/G0RL9v9XEAAgLqV.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>7 de sept de 2025</span><span class="tw-go">Ver en X →</span></span>
+  </a>
+  <a class="tw " href="https://x.com/fazerfn/status/1959441051686428791" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/1569205863448985603/KF3l-GFx_bigger.png" alt="" width="40" height="40">
+      <span class="tw-who"><b>fazer</b><span>@fazerfn</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">4th FNCS Warmup <span class="at">@Phzinfps1</span> <span class="at">@k1ng</span> <b class="me">@tallami1</b> ($3300) 🤒<br><br><span class="at">@ShindeNgg</span></span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/GzFU2mTW8AAcZye.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>23 de ago de 2025</span><span class="tw-go">Ver en X →</span></span>
+  </a>
+  <a class="tw " href="https://x.com/Phzinfps1/status/1891289855725887688" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/2096518427766816768/tN0TxYC3_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>FUT phzin</b><span>@Phzinfps1</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">6x FNCS CHAMPION w/ <span class="at">@fazerfn</span> <span class="at">@k1ng</span> <b class="me">@tallami1</b> <br><br>tomei disconnect no inicio do ultimo lobby🙃<br><br>🏆 Qualed globals 📷<br><span class="at">@w7mesports</span></span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/Gj82E-LWoAANvwv.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>16 de feb de 2025</span><span class="tw-go">Ver en X →</span></span>
+  </a>
+  <a class="tw " href="https://x.com/Phzinfps1/status/2028263824235610348" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/2096518427766816768/tN0TxYC3_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>FUT phzin</b><span>@Phzinfps1</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">1st Reload Elite Series (6000$) <span class="at">@edsonmalado</span> <b class="me">@tallami1</b> <br><br>Qualed saudi 🇸🇦 F/A 😎</span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/HCXW-ViXMAEtvBg.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>1 de mar de 2026</span><span class="tw-go">Ver en X →</span></span>
+  </a>
+  <a class="tw " href="https://x.com/Tiscofn/status/1964780083618685407" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/1968051726658727936/SqxMNbx9_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>Tisco</b><span>@Tiscofn</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">12th FNCS Globals ($30.000)🇦🇷<br><br><span class="at">@CaduFN1</span> <span class="at">@StrykerFN1</span> <b class="me">@tallami1</b></span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/G0RNEjwXYAAU67E.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>7 de sept de 2025</span><span class="tw-go">Ver en X →</span></span>
+  </a>
+  <a class="tw " href="https://x.com/Phzinfps1/status/1964778870126878727" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/2096518427766816768/tN0TxYC3_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>FUT phzin</b><span>@Phzinfps1</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">11th ($33.000) <span class="at">@k1ng</span> <span class="at">@fazerfn</span> <b class="me">@tallami1</b> <br><br>jogaram muito🤣🤣 <span class="at">@gabzeraftn</span> <span class="at">@Scarpa444</span> <span class="at">@weyfn</span> 🤣🤣</span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/G0RL9v9XEAAgLqV.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>7 de sept de 2025</span><span class="tw-go">Ver en X →</span></span>
+  </a>
+  <a class="tw " href="https://x.com/fazerfn/status/1959441051686428791" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/1569205863448985603/KF3l-GFx_bigger.png" alt="" width="40" height="40">
+      <span class="tw-who"><b>fazer</b><span>@fazerfn</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">4th FNCS Warmup <span class="at">@Phzinfps1</span> <span class="at">@k1ng</span> <b class="me">@tallami1</b> ($3300) 🤒<br><br><span class="at">@ShindeNgg</span></span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/GzFU2mTW8AAcZye.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>23 de ago de 2025</span><span class="tw-go">Ver en X →</span></span>
+  </a>
+  <a class="tw " href="https://x.com/Phzinfps1/status/1891289855725887688" target="_blank" rel="noopener">
+    <span class="tw-head">
+      <img class="tw-av" src="https://pbs.twimg.com/profile_images/2096518427766816768/tN0TxYC3_bigger.jpg" alt="" width="40" height="40">
+      <span class="tw-who"><b>FUT phzin</b><span>@Phzinfps1</span></span>
+      <span class="tw-x" aria-hidden="true">𝕏</span>
+    </span>
+    <span class="tw-text">6x FNCS CHAMPION w/ <span class="at">@fazerfn</span> <span class="at">@k1ng</span> <b class="me">@tallami1</b> <br><br>tomei disconnect no inicio do ultimo lobby🙃<br><br>🏆 Qualed globals 📷<br><span class="at">@w7mesports</span></span>
+    <img class="tw-img" src="https://pbs.twimg.com/media/Gj82E-LWoAANvwv.jpg?name=small" alt="" loading="lazy">
+    <span class="tw-foot"><span>16 de feb de 2025</span><span class="tw-go">Ver en X →</span></span>
+  </a></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
