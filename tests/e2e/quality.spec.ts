@@ -69,6 +69,29 @@ async function expectOutlineInside(link: Locator, scroller: Locator) {
   );
 }
 
+/**
+ * Las verificaciones de abajo miran la página completa: este test asegura que
+ * la franja de jugadores y el muro de Reviews están en ella (sin tarjetas, el
+ * muro no existe y las verificaciones no lo cubrirían en silencio).
+ */
+test.describe("page under test", () => {
+  for (const locale of LOCALES) {
+    test(`includes the players strip and the reviews wall at /${locale}`, async ({
+      page,
+    }) => {
+      await openHome(page, locale, PHONE_WIDTH);
+
+      await expect(
+        page.locator("section[aria-labelledby='players-label']"),
+      ).toBeVisible();
+      await expect(page.locator("#reviews")).toBeVisible();
+      await expect(
+        page.locator("#reviews [data-direction]").first().getByRole("link").first(),
+      ).toBeAttached();
+    });
+  }
+});
+
 test.describe("responsive layout", () => {
   for (const locale of LOCALES) {
     for (const width of SCROLL_WIDTHS) {
