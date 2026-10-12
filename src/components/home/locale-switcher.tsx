@@ -12,14 +12,18 @@ interface LocaleSwitcherProps {
 /**
  * Lleva a la misma ruta en los otros idiomas. Es el único componente de
  * cliente del encabezado. En ≤900 px pasa a la primera fila, junto al botón
- * (`order-1`; el botón es `order-2` y la navegación principal `order-3`).
+ * (`order-1`; el botón es `order-2` y la navegación principal `order-3`). Va
+ * con `relative z-1` para quedar por encima del padding de esa navegación.
  */
 export function LocaleSwitcher({ label }: LocaleSwitcherProps) {
   const currentLocale = useLocale();
   const pathname = usePathname();
 
   return (
-    <nav aria-label={label} className="flex gap-0.5 narrow:order-1">
+    <nav
+      aria-label={label}
+      className="flex gap-0.5 narrow:relative narrow:z-1 narrow:order-1"
+    >
       {routing.locales.map((locale) => (
         <Link
           key={locale}

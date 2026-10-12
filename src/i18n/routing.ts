@@ -4,6 +4,10 @@ export const routing = defineRouting({
   locales: ["es", "pt", "en"],
   defaultLocale: "es",
   localePrefix: "always",
+  // Los hreflang salen de los metadatos y del sitemap (`src/i18n/alternates.ts`).
+  // El header `Link` del middleware repetiría los mismos idiomas con otros
+  // códigos (`pt`) y un `x-default` a `/`, que contradicen los de la página.
+  alternateLinks: false,
 });
 
 export type Locale = (typeof routing.locales)[number];

@@ -1,10 +1,17 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
 import { Saira } from "next/font/google";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getTranslations } from "next-intl/server";
-import { HTML_LANG, routing } from "@/i18n/routing";
+import heroPhoto from "@/assets/tallami-wide-1920.jpg";
+import { getHomeLanguageAlternates, getHomePath } from "@/i18n/alternates";
+import { HTML_LANG, INTL_TAG, routing } from "@/i18n/routing";
+import { SITE_URL } from "@/lib/site-url";
 import "../globals.css";
+
+const SITE_NAME = "Tallami Coaching";
+/** Mismo azul que el escenario (`--color-stage`): barra del navegador en celular. */
+const THEME_COLOR = "#0B1433";
 
 const saira = Saira({
   axes: ["wdth"],
@@ -26,9 +33,38 @@ export async function generateMetadata(
     notFound();
   }
 
-  const t = await getTranslations({ locale, namespace: "Metadata" });
+  const [t, hero] = await Promise.all([
+    getTranslations({ locale, namespace: "Metadata" }),
+    getTranslations({ locale, namespace: "Hero" }),
+  ]);
 
-  return { title: t("title"), description: t("description") };
+  return {
+    metadataBase: new URL(SITE_URL),
+    title: t("title"),
+    description: t("description"),
+    alternates: {
+      canonical: getHomePath(locale),
+      languages: getHomeLanguageAlternates(),
+    },
+    openGraph: {
+      type: "website",
+      siteName: SITE_NAME,
+      // `es_AR`, `pt_BR`, `en_US`: el formato de Open Graph usa guion bajo.
+      locale: INTL_TAG[locale].replace("-", "_"),
+      images: [
+        {
+          url: heroPhoto.src,
+          width: heroPhoto.width,
+          height: heroPhoto.height,
+          alt: hero("imageAlt"),
+        },
+      ],
+    },
+  };
+}
+
+export function generateViewport(): Viewport {
+  return { themeColor: THEME_COLOR };
 }
 
 export default async function LocaleLayout(props: LayoutProps<"/[locale]">) {

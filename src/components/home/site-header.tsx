@@ -19,7 +19,7 @@ export async function SiteHeader() {
       <Link
         href="/"
         translate="no"
-        className="mr-auto text-[1.5rem] font-extrabold font-stretch-75% no-underline"
+        className="mr-auto text-[1.5rem] font-extrabold font-stretch-75% no-underline narrow:relative narrow:z-1"
       >
         Tallami<span className="text-gold">.</span>
       </Link>
@@ -28,7 +28,13 @@ export async function SiteHeader() {
         aria-label={t("mainNavLabel")}
         className="narrow:order-3 narrow:min-w-0 narrow:flex-[1_1_100%]"
       >
-        <ul className="m-0 flex list-none gap-6 p-0 narrow:gap-[18px] narrow:overflow-x-auto narrow:[mask-image:linear-gradient(90deg,#000_85%,transparent)] narrow:[scrollbar-width:none]">
+        {/* ≤900 px la lista hace scroll y recorta lo que sobresale de su borde,
+            incluido el aro de foco (3 px + 3 px de separación). `p-1.5` deja
+            esos 6 px adentro y `-m-1.5` los compensa para que el diseño no cambie.
+            Ese margen negativo la monta sobre el borde de la fila de arriba: por
+            eso los controles de esa fila llevan `narrow:relative narrow:z-1`,
+            para quedar por encima y recibir los toques en su borde de abajo. */}
+        <ul className="m-0 flex list-none gap-6 p-0 narrow:-m-1.5 narrow:gap-[18px] narrow:overflow-x-auto narrow:p-1.5 narrow:[mask-image:linear-gradient(90deg,#000_85%,transparent)] narrow:[scrollbar-width:none]">
           {NAV_ITEMS.map(({ href, labelKey }) => (
             <li key={href}>
               <a
@@ -41,7 +47,11 @@ export async function SiteHeader() {
           ))}
         </ul>
       </nav>
-      <Button asChild size="sm" className="narrow:order-2">
+      <Button
+        asChild
+        size="sm"
+        className="narrow:relative narrow:z-1 narrow:order-2"
+      >
         <a href="#services">{t("book")}</a>
       </Button>
     </header>

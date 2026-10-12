@@ -27,13 +27,17 @@ function Season({ value }: { value?: string }) {
 
 function WinRow({ win, locale }: { win: Win; locale: Locale }) {
   return (
-    <tr className={styles.win}>
-      <td className={styles.place}>{formatPlace(FIRST_PLACE, locale)}</td>
-      <td className={styles.event}>
+    <tr role="row" className={styles.win}>
+      <td role="cell" className={styles.place}>
+        {formatPlace(FIRST_PLACE, locale)}
+      </td>
+      <td role="cell" className={styles.event}>
         {win.event}
         <Season value={win.season} />
       </td>
-      <td className={styles.players}>{formatList(win.players, locale)}</td>
+      <td role="cell" className={styles.players}>
+        {formatList(win.players, locale)}
+      </td>
     </tr>
   );
 }
@@ -70,16 +74,24 @@ export async function ResultsBoard() {
           <h2 id="res-title">{t("title")}</h2>
           <p>{t("intro")}</p>
         </div>
-        <table className={styles.board}>
+        {/* Los roles repiten los nativos a propósito: ≤640 px la tabla pasa a
+            display block/grid y algunos navegadores le quitan la semántica. */}
+        <table role="table" className={styles.board}>
           <caption>{t("caption")}</caption>
-          <thead>
-            <tr>
-              <th scope="col">{t("columnPlace")}</th>
-              <th scope="col">{t("columnEvent")}</th>
-              <th scope="col">{t("columnPlayers")}</th>
+          <thead role="rowgroup">
+            <tr role="row">
+              <th role="columnheader" scope="col">
+                {t("columnPlace")}
+              </th>
+              <th role="columnheader" scope="col">
+                {t("columnEvent")}
+              </th>
+              <th role="columnheader" scope="col">
+                {t("columnPlayers")}
+              </th>
             </tr>
           </thead>
-          <tbody>
+          <tbody role="rowgroup">
             {WINS.map((win) => (
               <WinRow
                 key={`${win.event}-${win.season ?? ""}-${win.players.join("-")}`}
