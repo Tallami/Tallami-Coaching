@@ -1,7 +1,13 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 const LOCALES = ["es", "pt", "en"] as const;
+/** Nombre accesible de la navegación principal en cada idioma. */
+const MAIN_NAV_LABELS = {
+  es: "Principal",
+  pt: "Principal",
+  en: "Main",
+} as const;
 const SCROLL_WIDTHS = [320, 375, 768, 1024, 1440] as const;
 const AXE_WIDTHS = [375, 1440] as const;
 const AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"];
@@ -11,6 +17,8 @@ const SMALL_PHONE_WIDTH = 320;
 const PHONE_WIDTH = 375;
 const MAX_TAB_PRESSES = 12;
 const SUBPIXEL_TOLERANCE = 0.01;
+/** Chrome redondea a píxel entero el final del scroll: el último link puede pasarse hasta 0,5 px. */
+const SCROLL_END_TOLERANCE = 0.5;
 /** Punto de toque dentro del link, lejos del borde, visible aun en el último. */
 const NAV_LINK_TAP_INSET = 8;
 
@@ -18,6 +26,48 @@ async function openHome(page: Page, locale: string, width: number) {
   await page.setViewportSize({ width, height: VIEWPORT_HEIGHT });
   await page.goto(`/${locale}`);
   await page.evaluate(() => document.fonts.ready);
+}
+
+/** Tab hasta que el foco cae en `target`; falla si no llega en el tope. */
+async function tabTo(page: Page, target: Locator) {
+  for (let press = 0; press < MAX_TAB_PRESSES; press += 1) {
+    if (await target.evaluate((node) => node === document.activeElement)) {
+      break;
+    }
+    await page.keyboard.press("Tab");
+  }
+  await expect(target).toBeFocused();
+}
+
+/**
+ * El aro de foco (ancho + separación) tiene que entrar entero en el contenedor
+ * con scroll, que recorta lo que sobresale de su borde.
+ */
+async function expectOutlineInside(link: Locator, scroller: Locator) {
+  const reach = await link.evaluate((node) => {
+    const { outlineWidth, outlineOffset } = getComputedStyle(node);
+    return parseFloat(outlineWidth) + parseFloat(outlineOffset);
+  });
+  const linkBox = await link.boundingBox();
+  const scrollerBox = await scroller.boundingBox();
+
+  expect(reach).toBeGreaterThan(0);
+  expect(linkBox).not.toBeNull();
+  expect(scrollerBox).not.toBeNull();
+  if (!linkBox || !scrollerBox) return;
+
+  expect(linkBox.x - reach).toBeGreaterThanOrEqual(
+    scrollerBox.x - SUBPIXEL_TOLERANCE,
+  );
+  expect(linkBox.y - reach).toBeGreaterThanOrEqual(
+    scrollerBox.y - SUBPIXEL_TOLERANCE,
+  );
+  expect(linkBox.x + linkBox.width + reach).toBeLessThanOrEqual(
+    scrollerBox.x + scrollerBox.width + SCROLL_END_TOLERANCE,
+  );
+  expect(linkBox.y + linkBox.height + reach).toBeLessThanOrEqual(
+    scrollerBox.y + scrollerBox.height + SUBPIXEL_TOLERANCE,
+  );
 }
 
 test.describe("responsive layout", () => {
@@ -150,44 +200,34 @@ test.describe("accessibility", () => {
     await openHome(page, "es", PHONE_WIDTH);
 
     const nav = page.getByRole("navigation", { name: "Principal" });
-    const scroller = nav.getByRole("list");
     const firstLink = nav.getByRole("link").first();
 
-    for (let press = 0; press < MAX_TAB_PRESSES; press += 1) {
-      if (await firstLink.evaluate((link) => link === document.activeElement)) {
-        break;
-      }
-      await page.keyboard.press("Tab");
-    }
-    await expect(firstLink).toBeFocused();
-
-    // El aro (ancho + separación) tiene que entrar entero en el contenedor
-    // con scroll, que recorta lo que sobresale de su borde.
-    const reach = await firstLink.evaluate((link) => {
-      const { outlineWidth, outlineOffset } = getComputedStyle(link);
-      return parseFloat(outlineWidth) + parseFloat(outlineOffset);
-    });
-    const linkBox = await firstLink.boundingBox();
-    const scrollerBox = await scroller.boundingBox();
-
-    expect(reach).toBeGreaterThan(0);
-    expect(linkBox).not.toBeNull();
-    expect(scrollerBox).not.toBeNull();
-    if (!linkBox || !scrollerBox) return;
-
-    expect(linkBox.x - reach).toBeGreaterThanOrEqual(
-      scrollerBox.x - SUBPIXEL_TOLERANCE,
-    );
-    expect(linkBox.y - reach).toBeGreaterThanOrEqual(
-      scrollerBox.y - SUBPIXEL_TOLERANCE,
-    );
-    expect(linkBox.x + linkBox.width + reach).toBeLessThanOrEqual(
-      scrollerBox.x + scrollerBox.width + SUBPIXEL_TOLERANCE,
-    );
-    expect(linkBox.y + linkBox.height + reach).toBeLessThanOrEqual(
-      scrollerBox.y + scrollerBox.height + SUBPIXEL_TOLERANCE,
-    );
+    await tabTo(page, firstLink);
+    await expectOutlineInside(firstLink, nav.getByRole("list"));
   });
+
+  for (const locale of LOCALES) {
+    test(`last mobile nav link shows its focus outline in full at /${locale}`, async ({
+      page,
+    }) => {
+      await openHome(page, locale, PHONE_WIDTH);
+
+      const nav = page.getByRole("navigation", {
+        name: MAIN_NAV_LABELS[locale],
+      });
+      const scroller = nav.getByRole("list");
+      const lastLink = nav.getByRole("link").last();
+
+      await tabTo(page, lastLink);
+
+      // El fundido del borde derecho tapa lo que queda debajo: mientras la
+      // lista tiene foco no puede haber máscara.
+      expect(
+        await scroller.evaluate((list) => getComputedStyle(list).maskImage),
+      ).toBe("none");
+      await expectOutlineInside(lastLink, scroller);
+    });
+  }
 
   test("header controls above the scrollable nav keep their bottom edge tappable", async ({
     page,

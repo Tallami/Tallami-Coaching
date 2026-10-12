@@ -1,5 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import { LocaleSwitcher } from "@/components/home/locale-switcher";
+import { NavList } from "@/components/home/nav-list";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 
@@ -33,8 +34,12 @@ export async function SiteHeader() {
             esos 6 px adentro y `-m-1.5` los compensa para que el diseño no cambie.
             Ese margen negativo la monta sobre el borde de la fila de arriba: por
             eso los controles de esa fila llevan `narrow:relative narrow:z-1`,
-            para quedar por encima y recibir los toques en su borde de abajo. */}
-        <ul className="m-0 flex list-none gap-6 p-0 narrow:-m-1.5 narrow:gap-[18px] narrow:overflow-x-auto narrow:p-1.5 narrow:[mask-image:linear-gradient(90deg,#000_85%,transparent)] narrow:[scrollbar-width:none]">
+            para quedar por encima y recibir los toques en su borde de abajo.
+            `scroll-px-1.5` deja esos 6 px libres al desplazar un link enfocado.
+            El fundido del borde derecho tapa el último link: con el foco del
+            teclado adentro se quita (`has-focus-visible`; un toque no lo quita)
+            y `NavList` desplaza el link enfocado hasta verse entero. */}
+        <NavList className="m-0 flex list-none gap-6 p-0 narrow:-m-1.5 narrow:gap-[18px] narrow:overflow-x-auto narrow:scroll-px-1.5 narrow:p-1.5 narrow:[mask-image:linear-gradient(90deg,#000_85%,transparent)] narrow:has-focus-visible:[mask-image:none] narrow:[scrollbar-width:none]">
           {NAV_ITEMS.map(({ href, labelKey }) => (
             <li key={href}>
               <a
@@ -45,7 +50,7 @@ export async function SiteHeader() {
               </a>
             </li>
           ))}
-        </ul>
+        </NavList>
       </nav>
       <Button
         asChild
