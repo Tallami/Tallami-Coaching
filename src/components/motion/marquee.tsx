@@ -66,8 +66,15 @@ function PlayIcon() {
 /**
  * Grupo de filas en movimiento con un único botón de pausa. Las filas se
  * frenan con el botón, mientras el puntero está sobre alguna y mientras el
- * foco del teclado está adentro del grupo (WCAG 2.2.2). El botón va primero:
- * con el teclado se llega a él antes que a lo que se mueve.
+ * foco del teclado está en un elemento de alguna fila (WCAG 2.2.2). El foco
+ * en el botón no las frena: si no, quien lo usa con el teclado no vería
+ * reanudarse el movimiento. El botón va primero: con el teclado se llega a él
+ * antes que a lo que se mueve.
+ *
+ * Sin `aria-pressed`, como el botón de reproducir/pausar de las guías de WAI:
+ * el texto ya dice la acción ("Pausar" o "Reanudar"). Con `aria-pressed` y un
+ * texto que cambia, el lector anunciaría "Reanudar, presionado", que se
+ * entiende al revés.
  */
 export function MarqueeGroup({
   pauseLabel,
@@ -87,7 +94,7 @@ export function MarqueeGroup({
       <button
         type="button"
         className={styles.toggle}
-        aria-pressed={paused}
+        data-paused={paused || undefined}
         onClick={() => setPaused((current) => !current)}
       >
         {paused ? <PlayIcon /> : <PauseIcon />}
@@ -101,7 +108,7 @@ export function MarqueeGroup({
 /**
  * Corre la animación de la fila lo justo para que `item` (con su aro de foco)
  * quede entero adentro: la fila está pausada mientras el foco del teclado está
- * en el grupo, y al reanudar sigue desde ahí, sin saltos.
+ * en ella, y al reanudar sigue desde ahí, sin saltos.
  */
 function seekToShow(
   animation: Animation,

@@ -75,21 +75,24 @@ async function expectMoving(list: Locator) {
 }
 
 /**
- * Clic hasta que el botón informa `pressed`: un clic antes de que React
- * hidrate la página se pierde, y repetirlo no lo alterna dos veces porque
- * solo se vuelve a hacer clic si el estado todavía no cambió.
+ * Activa el botón hasta que su texto pasa a `expected`: una activación antes
+ * de que React hidrate la página se pierde, y repetirla no lo alterna dos
+ * veces porque solo se vuelve a activar si el texto todavía no cambió.
  */
-async function setPressed(button: Locator, pressed: boolean) {
-  const expected = String(pressed);
-
+async function toggleTo(
+  button: Locator,
+  expected: string,
+  activate: () => Promise<void> = () => button.click(),
+) {
   await expect(async () => {
-    if ((await button.getAttribute("aria-pressed")) !== expected) {
-      await button.click();
+    if ((await button.textContent()) !== expected) {
+      await activate();
     }
-    await expect(button).toHaveAttribute("aria-pressed", expected, {
-      timeout: 1_000,
-    });
+    await expect(button).toHaveText(expected, { timeout: 1_000 });
   }).toPass();
+  // Es un botón de acción, no de estado: el nombre dice qué hace al tocarlo.
+  await expect(button).toHaveAccessibleName(expected);
+  await expect(button).not.toHaveAttribute("aria-pressed");
 }
 
 /** Tab hasta que el foco cae en `target`; falla si no llega en el tope. */
@@ -224,8 +227,9 @@ test.describe("players strip", () => {
     const list = playerListOf(page);
     const button = strip.getByRole("button");
 
+    await expect(button).toHaveText("Pausar");
     await expect(button).toHaveAccessibleName("Pausar");
-    await expect(button).toHaveAttribute("aria-pressed", "false");
+    await expect(button).not.toHaveAttribute("aria-pressed");
     const box = await button.boundingBox();
     expect(box).not.toBeNull();
     if (!box) return;
@@ -235,15 +239,33 @@ test.describe("players strip", () => {
     expect(await animationNames(strip)).not.toEqual([]);
     await expectMoving(list);
 
-    await setPressed(button, true);
-    await expect(button).toHaveText("Reanudar");
-    await expect(button).toHaveAccessibleName("Reanudar");
+    await toggleTo(button, "Reanudar");
     // Sin el puntero sobre la fila, lo único que la frena es el botón.
     await page.mouse.move(0, 0);
     await expectStill(list);
 
-    await setPressed(button, false);
-    await expect(button).toHaveText("Pausar");
+    await toggleTo(button, "Pausar");
+    await expectMoving(list);
+  });
+
+  test("keyboard users can pause and resume with the button", async ({
+    page,
+  }) => {
+    await page.goto("/es");
+
+    const button = stripOf(page).getByRole("button");
+    const list = playerListOf(page);
+    const pressSpace = () => page.keyboard.press("Space");
+
+    await tabTo(page, button);
+    // El foco en el botón no frena nada: si no, no se vería reanudar.
+    await expectMoving(list);
+
+    await toggleTo(button, "Reanudar", pressSpace);
+    await expectStill(list);
+
+    await toggleTo(button, "Pausar", pressSpace);
+    await expect(button).toBeFocused();
     await expectMoving(list);
   });
 
@@ -268,10 +290,11 @@ test.describe("players strip", () => {
     await page.mouse.move(0, 0);
     await expectMoving(list);
 
-    const button = strip.getByRole("button");
+    await makeItemsFocusable(strip, "first");
+    const item = list.getByRole("listitem").first();
 
-    await tabTo(page, button);
-    await expect(button).toHaveAttribute("aria-pressed", "false");
+    await tabTo(page, item);
+    await expect(strip.getByRole("button")).toHaveText("Pausar");
     await expectStill(list);
   });
 

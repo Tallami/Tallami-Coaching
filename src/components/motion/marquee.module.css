@@ -40,7 +40,7 @@
   background-color: rgb(174 184 214 / 0.1);
 }
 
-.toggle[aria-pressed="true"] {
+.toggle[data-paused] {
   color: var(--color-gold);
   border-color: rgb(255 201 60 / 0.55);
 }
@@ -86,14 +86,15 @@
 }
 
 /*
- * Pausa: el botón (`data-paused`), el puntero sobre cualquier fila del grupo
- * (no sobre el botón: al tocar "Reanudar" tiene que arrancar ya) y el foco del
- * teclado adentro. `:focus-visible` y no `:focus-within`: un clic deja el foco
- * en el botón, y eso no tiene que frenar lo que se acaba de reanudar.
+ * Pausa: el botón (`data-paused`), el puntero sobre cualquier fila del grupo y
+ * el foco del teclado en un elemento de alguna fila. Ni el puntero ni el foco
+ * sobre el botón frenan nada: al tocar "Reanudar", con el mouse o con el
+ * teclado, el movimiento tiene que arrancar ya. `:focus-visible` y no
+ * `:focus-within`: un clic en una tarjeta ya cae en algo que se ve.
  */
 .row[data-paused] .track,
 .group:has(.row:hover) .track,
-.group:has(:focus-visible) .track {
+.group:has(.row :focus-visible) .track {
   animation-play-state: paused;
 }
 
