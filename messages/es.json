@@ -36,6 +36,100 @@
     "othersTitle": "Otros resultados",
     "earnings": "en ganancias de coaching registradas desde {since}"
   },
+  "Services": {
+    "title": "Servicios y precios",
+    "payments": "Precios en dólares. Pagás con Mercado Pago, Pix, PayPal o cripto, según tu país.",
+    "minors": "¿Tenés menos de 18 años? Podés entrenar igual: el pago lo hace un adulto responsable.",
+    "tip": "¿Primera vez? Empezá con un VOD review grabado.",
+    "items": {
+      "vodRecorded": {
+        "name": "VOD review grabado",
+        "description": "Me mandás una partida y te devuelvo el análisis en video en 72 horas.",
+        "cta": "Reservar VOD grabado"
+      },
+      "vodLive": {
+        "name": "VOD review en vivo",
+        "description": "Vemos tu partida juntos durante 60 minutos y te corrijo en el momento.",
+        "cta": "Reservar VOD en vivo"
+      },
+      "lesson": {
+        "name": "Clase 1 a 1",
+        "description": "60 minutos sobre lo que más te cuesta. Pack de {sessions} clases: {packPrice}, ahorrás {savings}.",
+        "cta": "Reservar clase"
+      },
+      "gamePlan": {
+        "name": "Plan de juego personalizado",
+        "description": "Un plan armado para tu forma de jugar y tus próximos torneos.",
+        "cta": "Pedir mi plan"
+      },
+      "tournament": {
+        "name": "Coaching de torneo",
+        "description": "Acompaño a tu dúo o trío durante el torneo. El precio es por dúo o trío.",
+        "cta": "Reservar para mi dúo o trío"
+      },
+      "academy": {
+        "name": "Academia Tallami",
+        "description": "Entrenamiento continuo con pago mensual.",
+        "cta": "Unirme a la Academia"
+      }
+    },
+    "units": {
+      "perTeam": "por dúo o trío",
+      "perMonth": "por mes"
+    },
+    "pro": {
+      "name": "Temporada Pro",
+      "unit": "por jugador + {percent}% de premios",
+      "description": "Coaching durante toda la temporada. Se entra por aplicación.",
+      "cta": "Aplicar a Temporada Pro"
+    }
+  },
+  "HowItWorks": {
+    "title": "Cómo funciona",
+    "steps": {
+      "choose": {
+        "title": "Elegís el servicio",
+        "body": "Según lo que necesites mejorar, solo o con tu dúo o trío."
+      },
+      "pay": {
+        "title": "Pagás",
+        "body": "Con el medio de pago de tu país. Te llega la confirmación por email."
+      },
+      "schedule": {
+        "title": "Agendás",
+        "body": "Elegís día y hora con el link que te llega, y recibís tu rol en Discord."
+      },
+      "train": {
+        "title": "Entrenás",
+        "body": "La sesión o la entrega te queda guardada en tu portal."
+      }
+    }
+  },
+  "Faq": {
+    "title": "Preguntas frecuentes",
+    "items": {
+      "minors": {
+        "question": "¿Puedo entrenar si tengo menos de 18 años?",
+        "answer": "Sí. El pago lo hace un adulto responsable, y la sesión es con vos."
+      },
+      "payment": {
+        "question": "¿Cómo pago desde mi país?",
+        "answer": "Los precios están en dólares. En Argentina pagás con Mercado Pago, en Brasil con Pix y en el resto de Latinoamérica con medios de pago locales. Desde otros países, con PayPal. También podés pagar con cripto."
+      },
+      "schedule": {
+        "question": "¿Cómo agendo la sesión?",
+        "answer": "Después del pago te llega un email con el link para elegir día y hora. También recibís tu rol en Discord."
+      },
+      "pro": {
+        "question": "¿Cómo entro a la Temporada Pro?",
+        "answer": "Mandás una aplicación. Si quedás, el precio es {price} por jugador más el {percent}% de los premios."
+      }
+    }
+  },
+  "Footer": {
+    "socialLabel": "Redes",
+    "legal": "© {year} Tallami Coaching. No afiliado ni respaldado por Epic Games."
+  },
   "NotFound": {
     "title": "No encontramos esta página",
     "body": "Puede que el link esté mal o que la página ya no exista.",

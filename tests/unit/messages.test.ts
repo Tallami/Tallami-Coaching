@@ -72,6 +72,20 @@ describe("messages", () => {
 
     expect(spanish.get("Hero.title")).toEqual(["count"]);
     expect(spanish.get("Results.earnings")).toEqual(["since"]);
+    expect(spanish.get("Services.items.lesson.description")).toEqual([
+      "packPrice",
+      "savings",
+      "sessions",
+    ]);
+    expect(spanish.get("Services.pro.unit")).toEqual(["percent"]);
+    expect(spanish.get("Faq.items.pro.answer")).toEqual(["percent", "price"]);
+    expect(spanish.get("Footer.legal")).toEqual(["year"]);
+  });
+
+  test.each(catalogs)("no price is written in %s messages", (_locale, messages) => {
+    for (const [path, value] of flattenMessages(messages)) {
+      expect(String(value), path).not.toMatch(/USD\s*\d|\$\s*\d/);
+    }
   });
 
   test.each(catalogs)("no message is empty in %s", (_locale, messages) => {

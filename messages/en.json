@@ -36,6 +36,100 @@
     "othersTitle": "Other results",
     "earnings": "in recorded coaching earnings since {since}"
   },
+  "Services": {
+    "title": "Services and prices",
+    "payments": "Prices in US dollars. You pay with Mercado Pago, Pix, PayPal or crypto, depending on your country.",
+    "minors": "Under 18? You can still train: a responsible adult makes the payment.",
+    "tip": "First time? Start with a recorded VOD review.",
+    "items": {
+      "vodRecorded": {
+        "name": "Recorded VOD review",
+        "description": "You send me a game and I send back the video analysis within 72 hours.",
+        "cta": "Book recorded VOD"
+      },
+      "vodLive": {
+        "name": "Live VOD review",
+        "description": "We watch your game together for 60 minutes and I correct you in the moment.",
+        "cta": "Book live VOD"
+      },
+      "lesson": {
+        "name": "1-on-1 lesson",
+        "description": "60 minutes on what you struggle with most. Pack of {sessions} lessons: {packPrice}, you save {savings}.",
+        "cta": "Book a lesson"
+      },
+      "gamePlan": {
+        "name": "Custom game plan",
+        "description": "A plan built around how you play and your upcoming tournaments.",
+        "cta": "Request my plan"
+      },
+      "tournament": {
+        "name": "Tournament coaching",
+        "description": "I'm with your duo or trio during the tournament. The price is per duo or trio.",
+        "cta": "Book for my duo or trio"
+      },
+      "academy": {
+        "name": "Academia Tallami",
+        "description": "Ongoing training with monthly payment.",
+        "cta": "Join Academia Tallami"
+      }
+    },
+    "units": {
+      "perTeam": "per duo or trio",
+      "perMonth": "per month"
+    },
+    "pro": {
+      "name": "Temporada Pro",
+      "unit": "per player + {percent}% of prizes",
+      "description": "Coaching for the whole season. Entry is by application.",
+      "cta": "Apply to Temporada Pro"
+    }
+  },
+  "HowItWorks": {
+    "title": "How it works",
+    "steps": {
+      "choose": {
+        "title": "You choose the service",
+        "body": "Based on what you need to improve, solo or with your duo or trio."
+      },
+      "pay": {
+        "title": "You pay",
+        "body": "With the payment method from your country. Your confirmation arrives by email."
+      },
+      "schedule": {
+        "title": "You schedule",
+        "body": "You pick a day and time with the link you receive, and you get your role on Discord."
+      },
+      "train": {
+        "title": "You train",
+        "body": "Your session or delivery is saved in your portal."
+      }
+    }
+  },
+  "Faq": {
+    "title": "Frequently asked questions",
+    "items": {
+      "minors": {
+        "question": "Can I train if I'm under 18?",
+        "answer": "Yes. A responsible adult makes the payment, and the session is with you."
+      },
+      "payment": {
+        "question": "How do I pay from my country?",
+        "answer": "Prices are in US dollars. In Argentina you pay with Mercado Pago, in Brazil with Pix, and in the rest of Latin America with local payment methods. From other countries, with PayPal. You can also pay with crypto."
+      },
+      "schedule": {
+        "question": "How do I schedule the session?",
+        "answer": "After payment, you get an email with a link to pick a day and time. You also get your role on Discord."
+      },
+      "pro": {
+        "question": "How do I join Temporada Pro?",
+        "answer": "You send in an application. If you're accepted, the price is {price} per player plus {percent}% of prizes."
+      }
+    }
+  },
+  "Footer": {
+    "socialLabel": "Social media",
+    "legal": "© {year} Tallami Coaching. Not affiliated with or endorsed by Epic Games."
+  },
   "NotFound": {
     "title": "We couldn't find this page",
     "body": "The link may be wrong, or the page may no longer exist.",

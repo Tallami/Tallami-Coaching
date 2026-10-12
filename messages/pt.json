@@ -36,6 +36,100 @@
     "othersTitle": "Outros resultados",
     "earnings": "em ganhos de coaching registrados desde {since}"
   },
+  "Services": {
+    "title": "Serviços e preços",
+    "payments": "Preços em dólares. Você paga com Mercado Pago, Pix, PayPal ou cripto, conforme o seu país.",
+    "minors": "Tem menos de 18 anos? Você pode treinar do mesmo jeito: o pagamento é feito por um adulto responsável.",
+    "tip": "Primeira vez? Comece com um VOD review gravado.",
+    "items": {
+      "vodRecorded": {
+        "name": "VOD review gravado",
+        "description": "Você me manda uma partida e eu devolvo a análise em vídeo em 72 horas.",
+        "cta": "Reservar VOD gravado"
+      },
+      "vodLive": {
+        "name": "VOD review ao vivo",
+        "description": "Assistimos à sua partida juntos por 60 minutos e eu corrijo você na hora.",
+        "cta": "Reservar VOD ao vivo"
+      },
+      "lesson": {
+        "name": "Aula 1 a 1",
+        "description": "60 minutos sobre aquilo em que você tem mais dificuldade. Pacote de {sessions} aulas: {packPrice}, você economiza {savings}.",
+        "cta": "Reservar aula"
+      },
+      "gamePlan": {
+        "name": "Plano de jogo personalizado",
+        "description": "Um plano montado para o seu jeito de jogar e para os seus próximos torneios.",
+        "cta": "Pedir meu plano"
+      },
+      "tournament": {
+        "name": "Coaching de torneio",
+        "description": "Acompanho a sua dupla ou trio durante o torneio. O preço é por dupla ou trio.",
+        "cta": "Reservar para minha dupla ou trio"
+      },
+      "academy": {
+        "name": "Academia Tallami",
+        "description": "Treinamento contínuo com pagamento mensal.",
+        "cta": "Entrar na Academia Tallami"
+      }
+    },
+    "units": {
+      "perTeam": "por dupla ou trio",
+      "perMonth": "por mês"
+    },
+    "pro": {
+      "name": "Temporada Pro",
+      "unit": "por jogador + {percent}% dos prêmios",
+      "description": "Coaching durante toda a temporada. A entrada é por candidatura.",
+      "cta": "Candidatar-se à Temporada Pro"
+    }
+  },
+  "HowItWorks": {
+    "title": "Como funciona",
+    "steps": {
+      "choose": {
+        "title": "Você escolhe o serviço",
+        "body": "Conforme o que você precisa melhorar, sozinho ou com a sua dupla ou trio."
+      },
+      "pay": {
+        "title": "Você paga",
+        "body": "Com o meio de pagamento do seu país. A confirmação chega por e-mail."
+      },
+      "schedule": {
+        "title": "Você agenda",
+        "body": "Você escolhe dia e horário pelo link que recebe e ganha o seu cargo no Discord."
+      },
+      "train": {
+        "title": "Você treina",
+        "body": "A sessão ou a entrega fica guardada no seu portal."
+      }
+    }
+  },
+  "Faq": {
+    "title": "Perguntas frequentes",
+    "items": {
+      "minors": {
+        "question": "Posso treinar se eu tiver menos de 18 anos?",
+        "answer": "Sim. O pagamento é feito por um adulto responsável, e a sessão é com você."
+      },
+      "payment": {
+        "question": "Como pago do meu país?",
+        "answer": "Os preços estão em dólares. Na Argentina você paga com Mercado Pago, no Brasil com Pix e no resto da América Latina com meios de pagamento locais. De outros países, com PayPal. Você também pode pagar com cripto."
+      },
+      "schedule": {
+        "question": "Como agendo a sessão?",
+        "answer": "Depois do pagamento, você recebe um e-mail com o link para escolher dia e horário. Você também recebe o seu cargo no Discord."
+      },
+      "pro": {
+        "question": "Como entro na Temporada Pro?",
+        "answer": "Você envia uma candidatura. Se ela for aprovada, o preço é {price} por jogador mais {percent}% dos prêmios."
+      }
+    }
+  },
+  "Footer": {
+    "socialLabel": "Redes sociais",
+    "legal": "© {year} Tallami Coaching. Não afiliado nem endossado pela Epic Games."
+  },
   "NotFound": {
     "title": "Não encontramos esta página",
     "body": "Talvez o link esteja errado ou a página não exista mais.",

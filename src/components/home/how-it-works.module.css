@@ -1,0 +1,70 @@
+/* Cómo funciona: ruta de 4 pasos. Port de c-analisis.html (líneas 148-153, 181-182 y 201). */
+
+.route {
+  list-style: none;
+  margin: 32px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+  position: relative;
+  counter-reset: step;
+}
+
+/* Línea discontinua que une los círculos numerados. */
+.route::before {
+  content: "";
+  position: absolute;
+  left: 28px;
+  right: 28px;
+  top: 27px;
+  border-top: 2px dashed var(--color-zone);
+}
+
+.route li {
+  position: relative;
+  counter-increment: step;
+}
+
+.route li::before {
+  content: counter(step);
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--color-paper);
+  border: 2px solid var(--color-zone);
+  color: var(--color-zone);
+  font-weight: 800;
+  font-size: 1.3rem;
+  margin-bottom: 16px;
+}
+
+.route h3 {
+  margin: 0 0 6px;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.route p {
+  margin: 0;
+  color: var(--color-ink-2);
+}
+
+@media (max-width: 900px) {
+  .route {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .route::before {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .route {
+    grid-template-columns: 1fr;
+  }
+}

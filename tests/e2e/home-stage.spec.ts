@@ -224,10 +224,9 @@ test.describe("header", () => {
   test("book button and brand link behave per locale", async ({ page }) => {
     await page.goto("/pt");
 
-    await expect(page.getByRole("link", { name: "Reservar" })).toHaveAttribute(
-      "href",
-      "#services",
-    );
+    await expect(
+      page.getByRole("link", { name: "Reservar", exact: true }),
+    ).toHaveAttribute("href", "#services");
     await expect(page.getByRole("link", { name: "Tallami." })).toHaveAttribute(
       "href",
       "/pt",
@@ -287,9 +286,8 @@ test.describe("motion and focus", () => {
     await expect(
       page.getByRole("link", { name: "Ver servicios y precios" }),
     ).toHaveCSS("font-size", "16px");
-    await expect(page.getByRole("link", { name: "Reservar" })).toHaveCSS(
-      "font-size",
-      "15.2px",
-    );
+    await expect(
+      page.getByRole("link", { name: "Reservar", exact: true }),
+    ).toHaveCSS("font-size", "15.2px");
   });
 });

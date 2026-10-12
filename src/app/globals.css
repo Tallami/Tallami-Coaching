@@ -133,6 +133,8 @@
 }
 
 /*
+ * Superficies fijas del diseño, sin modo oscuro conmutable.
+ *
  * Superficie de escenario (oscura). Cualquier bloque oscuro lleva la clase
  * `stage`: el encabezado, la portada, los resultados, el pie y la tarjeta de
  * Temporada Pro. Pone fondo y texto del escenario y cambia el foco a dorado.
@@ -146,5 +148,25 @@
 
   .stage :focus-visible {
     outline-color: var(--color-gold);
+  }
+
+  /*
+   * Superficie de pizarra (clara): servicios, cómo funciona y preguntas. La
+   * primera lleva el filo dorado; las que le siguen, una línea de tinta.
+   * Port de c-analisis.html (líneas 124-125).
+   */
+  .paper {
+    padding-block: clamp(64px, 9vw, 112px);
+    border-top: 6px solid var(--color-gold);
+    background-image: radial-gradient(
+      circle at 1px 1px,
+      rgb(23 32 42 / 0.07) 1px,
+      transparent 0
+    );
+    background-size: 24px 24px;
+  }
+
+  .paper + .paper {
+    border-top: 2px solid var(--color-ink);
   }
 }
