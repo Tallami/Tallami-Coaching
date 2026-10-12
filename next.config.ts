@@ -22,6 +22,14 @@ const nextConfig: NextConfig = {
   },
   cacheComponents: true,
   partialPrefetching: true,
+  images: {
+    // Avatares y fotos de los tweets (`pbs.twimg.com`) y el avatar por defecto
+    // de X (`abs.twimg.com`). Solo https y solo estos dos servidores.
+    remotePatterns: [
+      { protocol: "https", hostname: "pbs.twimg.com", pathname: "/**" },
+      { protocol: "https", hostname: "abs.twimg.com", pathname: "/**" },
+    ],
+  },
   experimental: {
     // Habilita `src/app/global-not-found.tsx`: el 404 localizado que se
     // renderiza en el servidor (ver el comentario de ese archivo).

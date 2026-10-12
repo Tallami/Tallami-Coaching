@@ -207,9 +207,16 @@ test.describe("accessibility", () => {
       .getByRole("navigation", { name: "Principal" })
       .getByRole("link");
 
-    await expect(links).toHaveCount(4);
+    await expect(links).toHaveCount(5);
     for (const link of await links.all()) {
       const isReachable = await link.evaluate((node, inset) => {
+        // Con cinco links, los últimos quedan pasando el borde de la pantalla
+        // hasta que la lista se desplaza: se llevan a la vista antes de tocar.
+        node.scrollIntoView({
+          inline: "nearest",
+          block: "nearest",
+          behavior: "instant",
+        });
         const { x, y, height } = node.getBoundingClientRect();
         const hit = document.elementFromPoint(x + inset, y + height / 2);
         return hit !== null && node.contains(hit);

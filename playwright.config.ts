@@ -19,5 +19,8 @@ export default defineConfig({
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
+    // El build lee los tweets de archivos grabados (`src/lib/tweets.ts`): los
+    // e2e no dependen de la red ni de que X siga mostrando esos tweets.
+    env: { TWEETS_FIXTURE_DIR: "tests/fixtures/tweets" },
   },
 });

@@ -10,6 +10,7 @@
     "languageLabel": "Idioma",
     "mainNavLabel": "Principal",
     "results": "Resultados",
+    "reviews": "Reviews",
     "services": "Serviços",
     "howItWorks": "Como funciona",
     "faq": "Perguntas",
@@ -33,6 +34,14 @@
     "intro": "Resultados de jogadores que eu treinei. Eles autorizaram a exibição do nome e do resultado.",
     "lanTitle": "Campeonatos presenciais",
     "onlineTitle": "Campeonatos online"
+  },
+  "Reviews": {
+    "title": "Reviews",
+    "lede": "Tweets dos meus jogadores com a colocação e o que ganharam. Toque em qualquer um para ver no X.",
+    "viewOnX": "Ver no X",
+    "cardLabel": "Tweet de {name} no X",
+    "pause": "Pausar",
+    "resume": "Continuar"
   },
   "Services": {
     "title": "Serviços e preços",

@@ -1,0 +1,71 @@
+/* Muro de Reviews. Maqueta reviews-y-franja.html, opción C (.wall). */
+
+.reviews {
+  --marquee-gap: 14px;
+  padding-top: clamp(48px, 6vw, 80px);
+  padding-bottom: clamp(56px, 8vw, 104px);
+  /* Resultados también es de escenario: una línea fina marca dónde cambia la sección. */
+  border-top: 1px solid var(--color-stage-line);
+}
+
+.sectionHead {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: end;
+  gap: 16px 32px;
+  margin-bottom: 20px;
+}
+
+.sectionHead p {
+  margin: 0;
+  max-width: 52ch;
+  color: var(--color-on-stage-2);
+}
+
+/*
+ * Grilla de una columna: el botón de pausa (el primer hijo, para que el teclado
+ * llegue a él antes que a lo que se mueve) queda a la derecha, alineado con el
+ * contenido de la página (`max-w-wrap` + `px-gutter`); las filas van de borde a
+ * borde hasta ese ancho. `minmax(0, 1fr)`: una fila nunca ensancha la página.
+ */
+.wall {
+  --edge: max(
+    var(--spacing-gutter),
+    (100% - var(--container-wrap)) / 2 + var(--spacing-gutter)
+  );
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+
+.wall > button {
+  justify-self: end;
+  margin-inline-end: var(--edge);
+}
+
+/*
+ * Cinco tarjetas de 250 px más su separación miden más que los 1180 px del
+ * contenido: una copia siempre es más ancha que la ventana y el loop no deja
+ * un hueco al dar la vuelta, ni en pantallas grandes.
+ */
+.wall > [data-direction] {
+  justify-self: center;
+  width: 100%;
+  max-width: var(--container-wrap);
+}
+
+.list {
+  display: flex;
+  gap: var(--marquee-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* El `li` se estira al alto de la fila: las tarjetas de una fila miden lo mismo. */
+.item {
+  display: flex;
+  flex: none;
+  width: 250px;
+}

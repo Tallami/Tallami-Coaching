@@ -6,14 +6,25 @@ import { Link } from "@/i18n/navigation";
 
 const NAV_ITEMS = [
   { href: "#results", labelKey: "results" },
+  { href: "#reviews", labelKey: "reviews" },
   { href: "#services", labelKey: "services" },
   { href: "#how-it-works", labelKey: "howItWorks" },
   { href: "#faq", labelKey: "faq" },
 ] as const;
 
+const REVIEWS_HREF = "#reviews";
+
+interface SiteHeaderProps {
+  /** Si la sección "Reviews" se muestra. Sin tarjetas no hay sección, y el link tampoco. */
+  hasReviews: boolean;
+}
+
 /** Encabezado transparente, absoluto sobre la portada. */
-export async function SiteHeader() {
+export async function SiteHeader({ hasReviews }: SiteHeaderProps) {
   const t = await getTranslations("Header");
+  const navItems = NAV_ITEMS.filter(
+    ({ href }) => hasReviews || href !== REVIEWS_HREF,
+  );
 
   return (
     <header className="stage absolute inset-x-0 top-0 z-10 flex items-center gap-x-6 gap-y-3 bg-transparent px-gutter py-4 narrow:flex-wrap narrow:gap-y-0">
@@ -40,7 +51,7 @@ export async function SiteHeader() {
             teclado adentro se quita (`has-focus-visible`; un toque no lo quita)
             y `NavList` desplaza el link enfocado hasta verse entero. */}
         <NavList className="m-0 flex list-none gap-6 p-0 narrow:-m-1.5 narrow:gap-[18px] narrow:overflow-x-auto narrow:scroll-px-1.5 narrow:p-1.5 narrow:[mask-image:linear-gradient(90deg,#000_85%,transparent)] narrow:has-focus-visible:[mask-image:none] narrow:[scrollbar-width:none]">
-          {NAV_ITEMS.map(({ href, labelKey }) => (
+          {navItems.map(({ href, labelKey }) => (
             <li key={href}>
               <a
                 href={href}

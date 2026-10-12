@@ -1,0 +1,131 @@
+/* Tarjeta de tweet. Maqueta reviews-y-franja.html, opción C (.tw). */
+
+/*
+ * `position: relative`: el texto oculto para el lector de pantalla (`sr-only`)
+ * es absoluto. Sin un ancestro posicionado cae sobre la página y, con "reducir
+ * movimiento" (sin la animación que mueve la pista), la ensancha: las filas
+ * recortan a sus hijos, pero no a los absolutos de afuera.
+ */
+.card {
+  --mention-color: #9db2ff;
+
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--color-stage-line);
+  border-radius: 6px;
+  background: var(--color-stage-2);
+  color: var(--color-on-stage);
+  /* Saira no trae emojis ni la marca 𝕏: respaldo con la fuente de emojis del sistema. */
+  font-family:
+    var(--font-saira), system-ui, "Apple Color Emoji", "Segoe UI Emoji",
+    "Noto Color Emoji", sans-serif;
+  text-decoration: none;
+  transition: border-color 0.15s ease;
+}
+
+/* Borde dorado al pasar el mouse y con el foco del teclado (el aro de foco ya es dorado). */
+.card:hover,
+.card:focus-visible {
+  border-color: var(--color-gold);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .card {
+    transition:
+      border-color 0.15s ease,
+      transform 0.15s ease;
+  }
+
+  .card:hover {
+    transform: translateY(-2px);
+  }
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.avatar {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--color-stage-line);
+}
+
+.who {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 0.875rem;
+  line-height: 1.2;
+}
+
+.who > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.who > span {
+  color: var(--color-on-stage-2);
+  font-size: 0.8125rem;
+}
+
+.mark {
+  flex: none;
+  color: var(--color-on-stage-2);
+  font-size: 1.125rem;
+}
+
+.text {
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  overflow-wrap: break-word;
+  /* Respeta los saltos de línea del tweet sin dejar espacios de más. */
+  white-space: pre-line;
+}
+
+.self {
+  color: var(--color-gold);
+  font-weight: 700;
+}
+
+.mention {
+  color: var(--mention-color);
+}
+
+/* 16:9 aunque la foto no haya cargado: la tarjeta no cambia de alto al llegar. */
+.photo {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  border-radius: 4px;
+  object-fit: cover;
+  background: var(--color-stage-line);
+}
+
+.foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+  color: var(--color-on-stage-2);
+  font-size: 0.8125rem;
+}
+
+.go {
+  color: var(--color-gold);
+  font-weight: 700;
+  white-space: nowrap;
+}

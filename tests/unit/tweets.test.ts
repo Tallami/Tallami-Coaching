@@ -123,6 +123,49 @@ describe("toTweetCard", () => {
 
     expect(card).not.toHaveProperty("image");
   });
+
+  test("asks X for the sharp 200x200 avatar instead of the 48 px one", () => {
+    for (const id of TWEET_IDS) {
+      const { avatarUrl } = toTweetCard(fixture(id)).author;
+
+      expect(avatarUrl).toMatch(/^https:\/\/pbs\.twimg\.com\/profile_images\//);
+      expect(avatarUrl).toMatch(/_200x200\.(jpg|jpeg|png)$/);
+      expect(avatarUrl).not.toContain("_normal");
+    }
+  });
+
+  test("swaps the size suffix of the default avatar too, and nothing else", () => {
+    const withAvatar = (profile_image_url_https: string) =>
+      toTweetCard({
+        ...fixture(TISCO_TWEET_ID),
+        user: { ...fixture(TISCO_TWEET_ID).user, profile_image_url_https },
+      }).author.avatarUrl;
+
+    expect(
+      withAvatar(
+        "https://abs.twimg.com/sticky/default_profile_images/default_profile_normal.png",
+      ),
+    ).toBe(
+      "https://abs.twimg.com/sticky/default_profile_images/default_profile_200x200.png",
+    );
+    // Sin el sufijo `_normal` la URL queda como vino.
+    expect(withAvatar("https://pbs.twimg.com/profile_images/1/abc.jpg")).toBe(
+      "https://pbs.twimg.com/profile_images/1/abc.jpg",
+    );
+    // Solo se cambia el sufijo del final: un `_normal` dentro del nombre no se toca.
+    expect(
+      withAvatar("https://pbs.twimg.com/profile_images/1/my_normal_pic_normal.jpg"),
+    ).toBe("https://pbs.twimg.com/profile_images/1/my_normal_pic_200x200.jpg");
+  });
+
+  test("throws when the date is missing or is not a date", () => {
+    for (const created_at of ["", "ayer", "2026-13-45T99:99:99.000Z"]) {
+      expect(
+        () => toTweetCard({ ...fixture(TISCO_TWEET_ID), created_at }),
+        created_at,
+      ).toThrow(/created_at/);
+    }
+  });
 });
 
 describe("tweetTextParts", () => {
@@ -210,6 +253,21 @@ describe("fetchTweetCards", () => {
     expect(backward.map((card) => card.id)).toEqual(
       forward.map((card) => card.id),
     );
+  });
+
+  test("skips a tweet with a bad date and reports it, keeping the others", async () => {
+    const skipped: string[] = [];
+    const load = async (id: string) =>
+      id === "a"
+        ? { ...fixture(TISCO_TWEET_ID), created_at: "ayer" }
+        : fixture(TISCO_TWEET_ID);
+
+    const cards = await fetchTweetCards(["a", "b"], load, (id) =>
+      skipped.push(id),
+    );
+
+    expect(cards.map((card) => card.id)).toEqual([TISCO_TWEET_ID]);
+    expect(skipped).toEqual(["a"]);
   });
 
   test("returns an empty list when every tweet fails", async () => {

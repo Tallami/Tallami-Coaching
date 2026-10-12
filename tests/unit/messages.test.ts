@@ -80,6 +80,16 @@ describe("messages", () => {
     expect(spanish.get("Services.pro.unit")).toEqual([]);
     expect(spanish.get("Faq.items.pro.answer")).toEqual(["price"]);
     expect(spanish.get("Footer.legal")).toEqual(["year"]);
+    expect(spanish.get("Reviews.cardLabel")).toEqual(["name"]);
+  });
+
+  test("Reviews title and nav link are the same word in every language", () => {
+    for (const [, messages] of catalogs) {
+      expect(messages).toMatchObject({
+        Reviews: { title: "Reviews" },
+        Header: { reviews: "Reviews" },
+      });
+    }
   });
 
   test.each(catalogs)("no message says freelance in %s", (_locale, messages) => {

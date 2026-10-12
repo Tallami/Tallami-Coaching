@@ -12,6 +12,7 @@ export type TweetCard = {
   id: string;
   /** `https://x.com/<usuario>/status/<id>`. */
   url: string;
+  /** `avatarUrl` es el avatar de 200x200 (X manda el de 48 px; ver `sharpAvatarUrl`). */
   author: { name: string; handle: string; avatarUrl: string };
   /** Texto plano: sin el link `t.co` final y con las entidades HTML decodificadas. */
   text: string;
@@ -39,6 +40,7 @@ const X_REQUEST_TIMEOUT_MS = 10_000;
 
 const NUMERIC_ID = /^\d+$/;
 const TRAILING_SHORT_LINK = /\s*https:\/\/t\.co\/\w+\s*$/;
+const NORMAL_AVATAR_SUFFIX = /_normal(\.\w+)$/;
 const MENTION = /@\w+/g;
 const WORD_CHARACTER = /[\w@]/;
 
@@ -71,6 +73,24 @@ function cleanTweetText(rawText: string): string {
     .trim();
 }
 
+/**
+ * X manda el avatar de 48 px (`..._normal.jpg`), que se ve borroso a 40 px en
+ * pantallas 2x y 3x. El mismo archivo existe en 200x200: se pide ese. Una URL
+ * sin el sufijo `_normal` al final queda como vino.
+ */
+function sharpAvatarUrl(url: string): string {
+  return url.replace(NORMAL_AVATAR_SUFFIX, "_200x200$1");
+}
+
+/** Fecha ISO que se puede leer; si no, tira error (la tarjeta no se arma). */
+function requireDate(value: unknown): string {
+  const text = requireText(value, "created_at");
+  if (Number.isNaN(Date.parse(text))) {
+    throw new Error(`La respuesta de X trae un created_at que no es una fecha: ${text}`);
+  }
+  return text;
+}
+
 function firstPhoto(tweet: Tweet): TweetCard["image"] {
   const photo = tweet.photos?.[0];
   if (!photo || typeof photo.url !== "string" || photo.url === "") {
@@ -92,13 +112,15 @@ export function toTweetCard(tweet: Tweet): TweetCard {
     author: {
       name: requireText(tweet.user.name, "user.name"),
       handle,
-      avatarUrl: requireText(
-        tweet.user.profile_image_url_https,
-        "user.profile_image_url_https",
+      avatarUrl: sharpAvatarUrl(
+        requireText(
+          tweet.user.profile_image_url_https,
+          "user.profile_image_url_https",
+        ),
       ),
     },
     text: cleanTweetText(requireText(tweet.text, "text")),
-    createdAt: requireText(tweet.created_at, "created_at"),
+    createdAt: requireDate(tweet.created_at),
     ...(image && { image }),
   };
 }
@@ -134,9 +156,9 @@ export function tweetTextParts(text: string): TweetTextPart[] {
   return parts;
 }
 
+/** `toTweetCard` ya comprobó que `createdAt` es una fecha que se puede leer. */
 function timestampOf(card: TweetCard): number {
-  const time = Date.parse(card.createdAt);
-  return Number.isNaN(time) ? 0 : time;
+  return Date.parse(card.createdAt);
 }
 
 /** Los IDs de X son numéricos y crecen con el tiempo: más dígitos, más nuevo. */

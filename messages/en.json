@@ -10,6 +10,7 @@
     "languageLabel": "Language",
     "mainNavLabel": "Main",
     "results": "Results",
+    "reviews": "Reviews",
     "services": "Services",
     "howItWorks": "How it works",
     "faq": "FAQ",
@@ -33,6 +34,14 @@
     "intro": "Results from players I coached. They authorized showing their name and result.",
     "lanTitle": "In-person championships",
     "onlineTitle": "Online championships"
+  },
+  "Reviews": {
+    "title": "Reviews",
+    "lede": "Tweets from my players with their placement and what they won. Tap any one to see it on X.",
+    "viewOnX": "View on X",
+    "cardLabel": "Tweet by {name} on X",
+    "pause": "Pause",
+    "resume": "Play"
   },
   "Services": {
     "title": "Services and prices",

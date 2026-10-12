@@ -313,6 +313,7 @@ test.describe("header", () => {
 
     await expect(links).toHaveText([
       "Resultados",
+      "Reviews",
       "Servicios",
       "Cómo funciona",
       "Preguntas",
@@ -320,7 +321,13 @@ test.describe("header", () => {
     const hrefs = await links.evaluateAll((anchors) =>
       anchors.map((anchor) => anchor.getAttribute("href")),
     );
-    expect(hrefs).toEqual(["#results", "#services", "#how-it-works", "#faq"]);
+    expect(hrefs).toEqual([
+      "#results",
+      "#reviews",
+      "#services",
+      "#how-it-works",
+      "#faq",
+    ]);
   });
 
   test("book button and brand link behave per locale", async ({ page }) => {
