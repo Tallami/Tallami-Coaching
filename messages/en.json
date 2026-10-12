@@ -23,6 +23,11 @@
     "ctaResults": "See results",
     "role": "Competitive Fortnite coach, Argentina"
   },
+  "Players": {
+    "label": "Worked with",
+    "pause": "Pause",
+    "resume": "Play"
+  },
   "Results": {
     "title": "Results as a coach",
     "intro": "Results from players I coached. They authorized showing their name and result.",

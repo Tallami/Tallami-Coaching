@@ -1,0 +1,134 @@
+/*
+ * Filas en loop (franja de jugadores, muro de reviews). La pista lleva dos
+ * copias iguales del contenido y se corre la mitad de su ancho: al terminar
+ * la vuelta, la segunda copia ocupa el lugar exacto de la primera.
+ *
+ * Separación: el que usa el componente define `--marquee-gap` en un ancestro
+ * y lo usa como `gap` de su lista. Cada copia lleva la mitad de cada lado, así
+ * entre el último de una copia y el primero de la otra queda la misma
+ * separación, y el aro de foco del primero entra en la fila.
+ */
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--color-stage-line);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-on-stage-2);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.toggle:hover {
+  color: var(--color-on-stage);
+  border-color: var(--color-on-stage-2);
+}
+
+.toggle:active {
+  background-color: rgb(174 184 214 / 0.1);
+}
+
+.toggle[aria-pressed="true"] {
+  color: var(--color-gold);
+  border-color: rgb(255 201 60 / 0.55);
+}
+
+.toggle svg {
+  flex: none;
+}
+
+/*
+ * `clip` y no `hidden`: así el navegador no puede desplazar la fila al
+ * enfocar algo adentro; de mostrar entero lo enfocado se ocupa `MarqueeRow`.
+ * `container-type`: cada copia mide al menos el ancho de la fila
+ * (`100cqw`), así nunca queda un hueco vacío aunque haya poco contenido.
+ * El `padding-block` deja lugar al aro de foco (3 px + 3 px de separación).
+ */
+.row {
+  container-type: inline-size;
+  overflow-x: clip;
+  padding-block: 8px;
+  mask-image: linear-gradient(
+    90deg,
+    transparent,
+    #000 6%,
+    #000 94%,
+    transparent
+  );
+}
+
+.track {
+  display: flex;
+  width: max-content;
+  animation: marquee var(--marquee-duration, 40s) linear infinite;
+}
+
+.row[data-direction="right"] .track {
+  animation-direction: reverse;
+}
+
+.copy {
+  flex: none;
+  min-width: 100cqw;
+  padding-inline: calc(var(--marquee-gap, 28px) / 2);
+}
+
+/*
+ * Pausa: el botón (`data-paused`), el puntero sobre cualquier fila del grupo
+ * (no sobre el botón: al tocar "Reanudar" tiene que arrancar ya) y el foco del
+ * teclado adentro. `:focus-visible` y no `:focus-within`: un clic deja el foco
+ * en el botón, y eso no tiene que frenar lo que se acaba de reanudar.
+ */
+.row[data-paused] .track,
+.group:has(.row:hover) .track,
+.group:has(:focus-visible) .track {
+  animation-play-state: paused;
+}
+
+/* Con el foco del teclado en la fila, el fundido de los bordes no tapa nada. */
+.row:has(:focus-visible) {
+  mask-image: none;
+}
+
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/*
+ * "Reducir movimiento": nada se mueve y la fila se desliza a mano. Sin
+ * movimiento no hacen falta el botón ni la copia del loop.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .toggle {
+    display: none;
+  }
+
+  .track {
+    animation: none;
+  }
+
+  .row {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-stage-line) transparent;
+  }
+
+  .copy[inert] {
+    display: none;
+  }
+}

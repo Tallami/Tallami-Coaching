@@ -1,6 +1,7 @@
 import { Faq } from "@/components/home/faq";
 import { Hero } from "@/components/home/hero";
 import { HowItWorks } from "@/components/home/how-it-works";
+import { PlayersStrip } from "@/components/home/players-strip";
 import { ResultsBoard } from "@/components/home/results-board";
 import { ServicesMenu } from "@/components/home/services-menu";
 import { SiteFooter } from "@/components/home/site-footer";
@@ -12,6 +13,7 @@ export default function HomePage() {
       <SiteHeader />
       <main id="contenido">
         <Hero />
+        <PlayersStrip />
         <ResultsBoard />
         <ServicesMenu />
         <HowItWorks />

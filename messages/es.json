@@ -23,6 +23,11 @@
     "ctaResults": "Ver resultados",
     "role": "Coach de Fortnite competitivo, Argentina"
   },
+  "Players": {
+    "label": "Trabajé con",
+    "pause": "Pausar",
+    "resume": "Reanudar"
+  },
   "Results": {
     "title": "Resultados como coach",
     "intro": "Resultados de jugadores que entrené. Autorizaron mostrar su nombre y resultado.",

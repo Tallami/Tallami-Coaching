@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { PLAYERS } from "@/content/players";
 import { FNCS_TITLES, LAN_RESULTS, WINS } from "@/content/results";
 import {
   LESSON_PACK,
@@ -70,6 +71,26 @@ describe("services", () => {
     const ids = [...SERVICES.map((service) => service.id), "proSeason" as const];
     expect(ids.map((id) => bookingHref(id))).toEqual(ids.map(() => "#services"));
   });
+});
+
+describe("players", () => {
+  test("players match the approved list and order", () =>
+    expect(PLAYERS.map((p) => [p.name, p.handle])).toEqual([
+      ["K1ng", "k1ng"],
+      ["Fazer", "fazerfn"],
+      ["Phzin", "Phzinfps1"],
+      ["Randu", "randuimmm"],
+      ["Lewa", "LewaFn"],
+      ["Romero", "romerofdps"],
+      ["Edson", "edsonmalado"],
+      ["Tisco", "Tiscofn"],
+      ["Diguera", "loud_diguera"],
+      ["Mack", "mackftn"],
+      ["Vadeal", "VadealFN"],
+    ]));
+
+  test("every player has a photo", () =>
+    expect(PLAYERS.every((p) => p.photo)).toBe(true));
 });
 
 describe("social", () => {
