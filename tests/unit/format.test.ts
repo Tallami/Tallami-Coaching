@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { formatList, formatPlace, formatUsd } from "@/lib/format";
+import { formatListParts, formatPlace, formatUsd } from "@/lib/format";
 
 describe("format", () => {
   test("formatUsd groups thousands per locale", () => {
@@ -29,11 +29,26 @@ describe("format", () => {
     );
   });
 
-  test("formatList joins players with the locale conjunction", () => {
+  test("formatListParts joins players with the locale conjunction", () => {
     const players = ["K1ng", "Fazer", "Phzin"];
-    expect(formatList(players, "es")).toBe("K1ng, Fazer y Phzin");
-    expect(formatList(players, "pt")).toBe("K1ng, Fazer e Phzin");
-    expect(formatList(players, "en")).toBe("K1ng, Fazer, and Phzin");
-    expect(formatList(["Randu", "Lewa"], "es")).toBe("Randu y Lewa");
+    const joined = (items: readonly string[], locale: "es" | "pt" | "en") =>
+      formatListParts(items, locale)
+        .map(({ value }) => value)
+        .join("");
+
+    expect(joined(players, "es")).toBe("K1ng, Fazer y Phzin");
+    expect(joined(players, "pt")).toBe("K1ng, Fazer e Phzin");
+    expect(joined(players, "en")).toBe("K1ng, Fazer, and Phzin");
+    expect(joined(["Randu", "Lewa"], "es")).toBe("Randu y Lewa");
+  });
+
+  test("formatListParts marks only the names as elements", () => {
+    expect(formatListParts(["K1ng", "Fazer", "Phzin"], "es")).toEqual([
+      { type: "element", value: "K1ng" },
+      { type: "literal", value: ", " },
+      { type: "element", value: "Fazer" },
+      { type: "literal", value: " y " },
+      { type: "element", value: "Phzin" },
+    ]);
   });
 });

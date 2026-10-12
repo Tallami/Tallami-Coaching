@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { getLocale, getTranslations } from "next-intl/server";
 import {
   COACHING_EARNINGS_USD,
@@ -8,10 +9,18 @@ import {
   type Win,
 } from "@/content/results";
 import type { Locale } from "@/i18n/routing";
-import { formatList, formatPlace, formatUsd } from "@/lib/format";
+import { formatListParts, formatPlace, formatUsd } from "@/lib/format";
 import styles from "./results-board.module.css";
 
 const FIRST_PLACE = 1;
+
+/**
+ * Nombres propios (torneos, temporadas, jugadores): `translate="no"` evita que
+ * el traductor del navegador los cambie ("Fazer" → "Do").
+ */
+function Name({ children }: { children: string }) {
+  return <span translate="no">{children}</span>;
+}
 
 /** " 2025" / " CH6S1" en gris, o nada si el resultado no tiene temporada. */
 function Season({ value }: { value?: string }) {
@@ -20,7 +29,28 @@ function Season({ value }: { value?: string }) {
   return (
     <>
       {" "}
-      <span className={styles.season}>{value}</span>
+      <span className={styles.season} translate="no">
+        {value}
+      </span>
+    </>
+  );
+}
+
+/** "K1ng, Fazer y Phzin": los nombres no se traducen, la conjunción sí. */
+function Players({
+  players,
+  locale,
+}: {
+  players: readonly string[];
+  locale: Locale;
+}) {
+  return (
+    <>
+      {formatListParts(players, locale).map(({ type, value }, index) => (
+        <Fragment key={index}>
+          {type === "element" ? <Name>{value}</Name> : value}
+        </Fragment>
+      ))}
     </>
   );
 }
@@ -32,11 +62,11 @@ function WinRow({ win, locale }: { win: Win; locale: Locale }) {
         {formatPlace(FIRST_PLACE, locale)}
       </td>
       <td role="cell" className={styles.event}>
-        {win.event}
+        <Name>{win.event}</Name>
         <Season value={win.season} />
       </td>
       <td role="cell" className={styles.players}>
-        {formatList(win.players, locale)}
+        <Players players={win.players} locale={locale} />
       </td>
     </tr>
   );
@@ -51,8 +81,8 @@ function OtherResultItem({
 }) {
   return (
     <li>
-      <span className={styles.place}>{formatPlace(result.place, locale)}</span>
-      {result.event}
+      <span className={styles.place}>{formatPlace(result.place, locale)}</span>{" "}
+      <Name>{result.event}</Name>
       <Season value={result.season} />
     </li>
   );

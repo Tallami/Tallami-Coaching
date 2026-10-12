@@ -30,18 +30,24 @@ const OTHER_RESULTS_AND_EARNINGS = [
     place: "22º",
     amount: "USD 45.300",
     sentence: "en ganancias de coaching registradas desde CH5S4",
+    firstOther: "5º EWC Reload",
+    thirdOther: "11º Globals 2025",
   },
   {
     path: "/pt",
     place: "22º",
     amount: "USD 45.300",
     sentence: "em ganhos de coaching registrados desde CH5S4",
+    firstOther: "5º EWC Reload",
+    thirdOther: "11º Globals 2025",
   },
   {
     path: "/en",
     place: "22nd",
     amount: "USD 45,300",
     sentence: "in recorded coaching earnings since CH5S4",
+    firstOther: "5th EWC Reload",
+    thirdOther: "11th Globals 2025",
   },
 ] as const;
 
@@ -137,6 +143,49 @@ test.describe("results board", () => {
       await expect(results).toContainText(sentence);
     });
   }
+
+  for (const { path, firstOther, thirdOther } of OTHER_RESULTS_AND_EARNINGS) {
+    test(`other results read as place, event and season for ${path}`, async ({
+      page,
+    }) => {
+      await page.goto(path);
+
+      const items = page
+        .locator("#results")
+        .getByRole("list")
+        .getByRole("listitem");
+
+      // Un lector de pantalla leería "5ºEWC Reload" si faltara el espacio.
+      await expect(items.first()).toHaveText(firstOther);
+      await expect(items.nth(2)).toHaveText(thirdOther);
+    });
+  }
+
+  test("player, event and season names opt out of page translation", async ({
+    page,
+  }) => {
+    await page.goto("/es");
+
+    const firstWin = page.locator("#results table tbody tr").first();
+    const thirdOther = page
+      .locator("#results")
+      .getByRole("list")
+      .getByRole("listitem")
+      .nth(2);
+
+    // El "y" que une a los jugadores sí se traduce; los nombres no.
+    await expect(firstWin.locator("[translate=no]")).toHaveText([
+      "FNCS",
+      "CH6S1",
+      "K1ng",
+      "Fazer",
+      "Phzin",
+    ]);
+    await expect(thirdOther.locator("[translate=no]")).toHaveText([
+      "Globals",
+      "2025",
+    ]);
+  });
 
   test("results table stacks into a grid on phone width", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });

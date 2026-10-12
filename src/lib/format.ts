@@ -27,9 +27,22 @@ export function formatPlace(place: number, locale: Locale): string {
   return `${place}º`;
 }
 
-/** Une los nombres con la conjunción del idioma: "K1ng, Fazer y Phzin". */
-export function formatList(items: readonly string[], locale: Locale): string {
-  return new Intl.ListFormat(INTL_TAG[locale], { type: "conjunction" }).format(
-    items,
-  );
+export interface ListPart {
+  type: "element" | "literal";
+  value: string;
+}
+
+/**
+ * Une los nombres con la conjunción del idioma ("K1ng, Fazer y Phzin") y los
+ * devuelve por partes: `element` es cada nombre, `literal` son las comas y la
+ * conjunción. Así la página puede marcar los nombres como no traducibles sin
+ * tocar la conjunción.
+ */
+export function formatListParts(
+  items: readonly string[],
+  locale: Locale,
+): ListPart[] {
+  return new Intl.ListFormat(INTL_TAG[locale], {
+    type: "conjunction",
+  }).formatToParts(items);
 }
