@@ -79,7 +79,11 @@ export default async function LocaleLayout(props: LayoutProps<"/[locale]">) {
         >
           {t("skipLink")}
         </a>
-        <NextIntlClientProvider>{props.children}</NextIntlClientProvider>
+        {/* Los componentes de cliente (cambio de idioma, lista de navegación)
+            solo necesitan el idioma: sin `messages` no viaja el catálogo. */}
+        <NextIntlClientProvider messages={null}>
+          {props.children}
+        </NextIntlClientProvider>
       </body>
     </html>
   );
