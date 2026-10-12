@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#0B1433">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Saira:wdth,wght@62..125,400..800&family=Permanent+Marker&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Saira:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
 <style>
   :root {
     /* Escenario (transmisión) */
@@ -19,13 +19,11 @@
     --on-stage: #F3F5FA;
     --on-stage-2: #AEB8D6;
     --stage-line: rgba(174, 184, 214, .22);
-    --marker-on-stage: #FF6A5C;
     /* Pizarra (análisis) */
     --paper: #EEF1EC;
     --ink: #17202A;
     --ink-2: #4A5563;
     --rule: #C9D0C6;
-    --marker: #C0211A;
     --zone: #2457C5;
 
     --radius: 4px;
@@ -44,7 +42,6 @@
   .wrap { max-width: var(--wrap); margin: 0 auto; padding: 0 var(--gutter); }
   .skip { position: absolute; left: -9999px; top: 8px; background: var(--gold); color: var(--stage); padding: 10px 14px; font-weight: 700; z-index: 20; }
   .skip:focus { left: 8px; }
-  .hand { font-family: "Permanent Marker", "Comic Sans MS", cursive; font-weight: 400; line-height: 1.2; }
   .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   h1, h2, h3 { text-wrap: balance; }
   h2 { font-stretch: 72%; font-weight: 800; font-size: clamp(2.25rem, 5vw, 3.5rem); line-height: 1; margin: 0; }
@@ -90,9 +87,6 @@
   .bug-box div { background: rgba(11,20,51,.86); padding: 10px 16px; }
   .bug strong { display: block; font-size: 1.6rem; line-height: 1; font-weight: 800; color: var(--gold); }
   .bug span { font-size: .9rem; color: var(--on-stage-2); }
-  .ring { position: absolute; left: -16px; top: -14px; width: calc(50% + 26px); height: calc(100% + 28px); overflow: visible; pointer-events: none; }
-  .ring path { fill: none; stroke: var(--marker-on-stage); stroke-width: 3; stroke-linecap: round; }
-  .bug .note { position: absolute; left: -6px; top: calc(100% + 16px); color: var(--marker-on-stage); font-size: 1.05rem; transform: rotate(-3deg); white-space: nowrap; }
 
   .lower-third { display: inline-grid; max-width: 100%; }
   .lt-name { background: var(--on-stage); color: var(--stage); padding: 10px 22px 8px 18px; font-stretch: 80%; font-weight: 800; font-size: clamp(1.25rem, 2.6vw, 1.75rem); line-height: 1.1; clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 100%, 0 100%); border-left: 8px solid var(--gold); }
@@ -100,11 +94,7 @@
   @media (prefers-reduced-motion: no-preference) {
     .lt-name { animation: wipe .55s cubic-bezier(.2,.8,.2,1) .2s both; }
     .lt-role { animation: wipe .5s cubic-bezier(.2,.8,.2,1) .4s both; }
-    .ring path { stroke-dasharray: 520; stroke-dashoffset: 520; animation: draw .8s cubic-bezier(.5,0,.2,1) .9s forwards; }
-    .bug .note { animation: fade .3s ease 1.6s both; }
     @keyframes wipe { from { clip-path: polygon(0 0, 0 0, 0 100%, 0 100%); } }
-    @keyframes draw { to { stroke-dashoffset: 0; } }
-    @keyframes fade { from { opacity: 0; } }
   }
 
   /* Resultados: tabla de posiciones */
@@ -136,7 +126,7 @@
   .svc-layout { display: grid; grid-template-columns: .8fr 1.2fr; gap: clamp(32px, 6vw, 80px); align-items: start; }
   .svc-intro { position: sticky; top: 24px; }
   .svc-intro p { color: var(--ink-2); margin: 16px 0 0; max-width: 40ch; }
-  .tip { position: relative; margin-top: 28px !important; color: var(--marker) !important; font-size: 1.3rem; transform: rotate(-2deg); max-width: 19ch; }
+  .svc-intro .tip { margin-top: 28px; padding: 14px 16px; max-width: 34ch; border-left: 4px solid var(--zone); background: rgba(36,87,197,.07); color: var(--ink); font-weight: 600; }
   .menu { list-style: none; margin: 0; padding: 0; }
   .menu li { position: relative; padding: 22px 0; border-bottom: 1px solid var(--rule); }
   .menu li:first-child { padding-top: 0; }
@@ -147,8 +137,6 @@
   .amt small { display: block; margin-top: 4px; text-align: right; white-space: normal; font-size: .85rem; font-weight: 500; font-stretch: 100%; color: var(--ink-2); }
   .pro .amt small { color: var(--on-stage-2); }
   .menu p { margin: 6px 0 12px; color: var(--ink-2); max-width: 54ch; }
-  .arrow { position: absolute; right: calc(100% + 8px); top: -8px; width: 120px; height: 60px; overflow: visible; }
-  .arrow path { fill: none; stroke: var(--marker); stroke-width: 2.5; stroke-linecap: round; }
   .pro { margin-top: 40px; padding: clamp(24px, 4vw, 36px); border-radius: var(--radius); }
   .pro .row h3 { font-size: clamp(1.75rem, 3.4vw, 2.4rem); font-stretch: 72%; font-weight: 800; }
   .pro .leader { border-color: var(--stage-line); }
@@ -187,10 +175,9 @@
     .top nav:not(.lang) { order: 3; flex: 1 1 100%; min-width: 0; }
     .top nav:not(.lang) ul { gap: 18px; overflow-x: auto; scrollbar-width: none; -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent); mask-image: linear-gradient(90deg, #000 85%, transparent); }
     .hero-inner { padding-top: 132px; }
-    .bug { position: relative; top: auto; right: auto; display: inline-block; margin: 0 0 64px 16px; }
+    .bug { position: relative; top: auto; right: auto; display: inline-block; margin: 0 0 32px; }
     .svc-layout { grid-template-columns: 1fr; }
     .svc-intro { position: static; }
-    .arrow { display: none; }
     .route { grid-template-columns: 1fr 1fr; }
     .route::before { display: none; }
     .others { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; }
@@ -203,7 +190,7 @@
     .hero picture img { object-position: 72% 0%; }
     .hero::after { background: linear-gradient(180deg, rgba(11,20,51,.1) 0%, rgba(11,20,51,.35) 24%, rgba(11,20,51,.94) 46%, var(--stage) 100%); }
     .hero-inner { padding-top: 30svh; display: flex; flex-direction: column; align-items: flex-start; }
-    .hero-inner .bug { order: 5; margin: 0 0 64px 16px; }
+    .hero-inner .bug { order: 5; margin: 0 0 32px; }
     .hero-inner .lower-third { order: 6; }
     .board thead { display: none; }
     .board, .board tbody, .board tr, .board td, .board caption { display: block; }
@@ -247,8 +234,6 @@
           <div><strong>3</strong><span>títulos de FNCS</span></div>
           <div><strong>6</strong><span>primeros puestos</span></div>
         </div>
-        <svg class="ring" viewBox="0 0 140 90" preserveAspectRatio="none" aria-hidden="true"><path d="M84 6C40 0 5 14 5 44s34 42 70 40 60-16 60-42S106 4 52 10"/></svg>
-        <p class="note hand" aria-hidden="true">como coach</p>
       </div>
       <h1 id="hero-title">Entrená con el coach detrás de 3 títulos de FNCS</h1>
       <p class="lede">Reviso tus partidas como en una final: dónde rotaste tarde, qué pelea no tenías que tomar y qué hacer distinto la próxima. Coaching de Fortnite competitivo desde Argentina para toda Latinoamérica.</p>
@@ -300,12 +285,11 @@
         <h2 id="svc-title">Servicios y precios</h2>
         <p>Precios en dólares. Pagás con Mercado Pago, Pix, PayPal o cripto, según tu país.</p>
         <p>¿Tenés menos de 18 años? Podés entrenar igual: el pago lo hace un adulto responsable.</p>
-        <p class="tip hand">¿Primera vez? Empezá con un VOD review grabado.</p>
+        <p class="tip">¿Primera vez? Empezá con un VOD review grabado.</p>
       </div>
       <div>
         <ul class="menu" role="list">
           <li>
-            <svg class="arrow" viewBox="0 0 120 60" aria-hidden="true"><path d="M4 50C30 20 70 10 112 18M112 18l-14-9M112 18l-12 11"/></svg>
             <div class="row"><h3>VOD review grabado</h3><span class="leader"></span><span class="amt">USD 30</span></div>
             <p>Me mandás una partida y te devuelvo el análisis en video en 72 horas.</p>
             <a class="btn btn-line btn-sm" href="#">Reservar VOD grabado</a>
