@@ -124,7 +124,8 @@
   .place { font-stretch: 70%; font-weight: 800; font-size: 1.9rem; line-height: 1; width: 4.5rem; }
   .is-win .place { color: var(--gold); }
   .event { font-weight: 700; font-size: 1.1rem; }
-  .season { color: var(--muted); white-space: nowrap; }
+  .season { color: var(--muted); white-space: nowrap; font-weight: 500; margin-left: 6px; }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .team { color: #DDE3F2; }
   .earnings {
     margin-top: 28px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px;
@@ -190,7 +191,7 @@
     .board td { padding: 0; border: 0; }
     .board caption { display: block; }
     .board .na { display: none; }
-    .board .place { grid-row: span 3; }
+    .board .place { grid-row: span 2; }
     .svc { grid-template-columns: 1fr auto; }
     .svc .btn { grid-column: 1 / -1; justify-self: start; }
     .steps { grid-template-columns: 1fr; }
@@ -249,14 +250,14 @@
         <div><strong>6</strong><span>primeros puestos</span></div>
       </div>
       <h1 id="hero-title">Entrená con el coach detrás de 3 títulos de FNCS</h1>
-      <p class="lede">Reviso tus partidas, te armo un plan y acompaño a tu equipo en torneo. Coaching de Fortnite competitivo desde Argentina para toda Latinoamérica.</p>
+      <p class="lede">Reviso tus partidas, te armo un plan y te acompaño en torneo con tu dúo o trío. Coaching de Fortnite competitivo desde Argentina para toda Latinoamérica.</p>
       <div class="ctas">
         <a class="btn btn-primary" href="#servicios">Ver servicios y precios</a>
         <a class="btn btn-ghost" href="#resultados">Ver resultados</a>
       </div>
       <div class="lower-third">
         <div class="lt-name">Tomás “Tallami” Allami</div>
-        <div class="lt-role">Coach de Fortnite competitivo, Argentina</div>
+        <div class="lt-role">Coach freelance de Fortnite competitivo, Argentina</div>
       </div>
     </div>
   </section>
@@ -265,26 +266,26 @@
     <div class="wrap">
       <div class="section-head">
         <h2 id="res-title">Resultados como coach</h2>
-        <p>Torneos donde entrené al equipo. Los jugadores autorizaron mostrar su nombre y resultado.</p>
+        <p>Resultados de jugadores que entrené como coach freelance. Autorizaron mostrar su nombre y resultado.</p>
       </div>
       <table class="board">
         <caption>Ordenado por puesto. Los primeros puestos están en dorado.</caption>
         <thead>
-          <tr><th scope="col">Puesto</th><th scope="col">Torneo</th><th scope="col">Temporada</th><th scope="col">Equipo</th></tr>
+          <tr><th scope="col">Puesto</th><th scope="col">Torneo</th><th scope="col">Jugadores</th></tr>
         </thead>
         <tbody>
-          <tr class="is-win"><td class="place">1º</td><td class="event">FNCS</td><td class="season">CH6S1</td><td class="team">K1ng, Fazer y Phzin</td></tr>
-          <tr class="is-win"><td class="place">1º</td><td class="event">FNCS</td><td class="season">CH5S3</td><td class="team">K1ng y Fazer</td></tr>
-          <tr class="is-win"><td class="place">1º</td><td class="event">FNCS</td><td class="season">CH5S2</td><td class="team">Randu y Lewa</td></tr>
-          <tr class="is-win"><td class="place">1º</td><td class="event">Reload Elite</td><td class="season na">—</td><td class="team">Phzin y Edson</td></tr>
-          <tr class="is-win"><td class="place">1º</td><td class="event">Reload Elite</td><td class="season na">—</td><td class="team">Romero y Lewa</td></tr>
-          <tr class="is-win"><td class="place">1º</td><td class="event">Second Chance</td><td class="season na">—</td><td class="team">K1ng y Fazer</td></tr>
-          <tr><td class="place">5º</td><td class="event">EWC Reload</td><td class="season na">—</td><td class="team na">—</td></tr>
-          <tr><td class="place">9º</td><td class="event">EWC ESL</td><td class="season na">—</td><td class="team na">—</td></tr>
-          <tr><td class="place">11º</td><td class="event">FNCS Global Championship</td><td class="season">2025</td><td class="team na">—</td></tr>
-          <tr><td class="place">12º</td><td class="event">FNCS Global Championship</td><td class="season">2025</td><td class="team na">—</td></tr>
-          <tr><td class="place">14º</td><td class="event">FNCS Global Championship</td><td class="season">2026</td><td class="team na">—</td></tr>
-          <tr><td class="place">22º</td><td class="event">FNCS Global Championship</td><td class="season">2024</td><td class="team na">—</td></tr>
+          <tr class="is-win"><td class="place">1º</td><td class="event">FNCS <span class="season">CH6S1</span></td><td class="team">K1ng, Fazer y Phzin</td></tr>
+          <tr class="is-win"><td class="place">1º</td><td class="event">FNCS <span class="season">CH5S3</span></td><td class="team">K1ng y Fazer</td></tr>
+          <tr class="is-win"><td class="place">1º</td><td class="event">FNCS <span class="season">CH5S2</span></td><td class="team">Randu y Lewa</td></tr>
+          <tr class="is-win"><td class="place">1º</td><td class="event">Reload Elite</td><td class="team">Phzin y Edson</td></tr>
+          <tr class="is-win"><td class="place">1º</td><td class="event">Reload Elite</td><td class="team">Romero y Lewa</td></tr>
+          <tr class="is-win"><td class="place">1º</td><td class="event">Second Chance</td><td class="team">K1ng y Fazer</td></tr>
+          <tr><td class="place">5º</td><td class="event">EWC Reload</td><td class="team na"><span class="visually-hidden">Sin datos de jugadores</span><span aria-hidden="true">—</span></td></tr>
+          <tr><td class="place">9º</td><td class="event">EWC ESL</td><td class="team na"><span class="visually-hidden">Sin datos de jugadores</span><span aria-hidden="true">—</span></td></tr>
+          <tr><td class="place">11º</td><td class="event">Globals <span class="season">2025</span></td><td class="team na"><span class="visually-hidden">Sin datos de jugadores</span><span aria-hidden="true">—</span></td></tr>
+          <tr><td class="place">12º</td><td class="event">Globals <span class="season">2025</span></td><td class="team na"><span class="visually-hidden">Sin datos de jugadores</span><span aria-hidden="true">—</span></td></tr>
+          <tr><td class="place">14º</td><td class="event">Globals <span class="season">2026</span></td><td class="team na"><span class="visually-hidden">Sin datos de jugadores</span><span aria-hidden="true">—</span></td></tr>
+          <tr><td class="place">22º</td><td class="event">Globals <span class="season">2024</span></td><td class="team na"><span class="visually-hidden">Sin datos de jugadores</span><span aria-hidden="true">—</span></td></tr>
         </tbody>
       </table>
       <div class="earnings">
@@ -335,18 +336,18 @@
       </div>
 
       <div class="svc-group">
-        <h3>Para equipos</h3>
+        <h3>Para dúos y tríos</h3>
         <div class="svc">
           <div><h4>Coaching de torneo</h4><p>Acompaño a tu dúo o trío durante el torneo.</p></div>
-          <div class="price"><strong>USD 150</strong><small>por equipo</small></div>
-          <a class="btn btn-ghost btn-sm" href="#">Reservar para mi equipo</a>
+          <div class="price"><strong>USD 150</strong><small>por dúo o trío</small></div>
+          <a class="btn btn-ghost btn-sm" href="#">Reservar para mi dúo o trío</a>
         </div>
       </div>
 
       <div class="svc-pro">
         <div>
           <h3>Temporada Pro</h3>
-          <p>Coaching durante toda la temporada para jugadores que van por la final. Se entra por aplicación.</p>
+          <p>Coaching durante toda la temporada. Se entra por aplicación.</p>
         </div>
         <div class="price">
           <strong>USD 200</strong>
@@ -365,7 +366,7 @@
         <h2 id="how-title">Cómo funciona</h2>
       </div>
       <ol class="steps">
-        <li><h3>Elegís el servicio</h3><p>Según lo que necesites mejorar, solo o con tu equipo.</p></li>
+        <li><h3>Elegís el servicio</h3><p>Según lo que necesites mejorar, solo o con tu dúo o trío.</p></li>
         <li><h3>Pagás</h3><p>Con el medio de pago de tu país. Te llega la confirmación por email.</p></li>
         <li><h3>Agendás</h3><p>Elegís día y hora con el link que te llega, y recibís tu rol en Discord.</p></li>
         <li><h3>Entrenás</h3><p>La sesión o la entrega te queda guardada en tu portal.</p></li>
@@ -384,7 +385,7 @@
       <li><a href="https://instagram.com/tallami1">Instagram</a></li>
       <li><a href="https://tiktok.com/@tallami">TikTok</a></li>
     </ul>
-    <small>© 2026 Tallami Coaching</small>
+    <small>© 2026 Tallami Coaching. No afiliado ni respaldado por Epic Games.</small>
   </div>
 </footer>
 </body>
