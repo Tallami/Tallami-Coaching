@@ -26,8 +26,10 @@
   display: none;
 }
 
-/* El "+" es decorativo (texto alternativo vacío) y gira a "×" al abrir. */
+/* El "+" es decorativo (texto alternativo vacío) y gira a "×" al abrir. La
+   primera línea es el respaldo de los navegadores sin texto alternativo. */
 .faq summary::after {
+  content: "+";
   content: "+" / "";
   font-size: 1.6rem;
   font-weight: 500;
