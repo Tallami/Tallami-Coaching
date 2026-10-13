@@ -22,10 +22,10 @@ export type TweetCard = {
   image?: { url: string; width: number; height: number };
 };
 
-export type TweetTextPart = {
-  kind: "text" | "mention" | "self";
-  value: string;
-};
+export type TweetTextPart =
+  | { kind: "text" | "mention" | "self"; value: string }
+  /** `code` es el nombre del archivo de Twemoji (`<code>.svg`). */
+  | { kind: "emoji"; value: string; code: string };
 
 export type TweetLoader = (id: string) => Promise<Tweet | undefined>;
 
@@ -43,6 +43,16 @@ const TRAILING_SHORT_LINK = /\s*https:\/\/t\.co\/\w+\s*$/;
 const NORMAL_AVATAR_SUFFIX = /_normal(\.\w+)$/;
 const MENTION = /@\w+/g;
 const WORD_CHARACTER = /[\w@]/;
+
+/** Un grafema es un emoji si tiene un pictograma, es una bandera o es un keycap. */
+const PICTOGRAPH = /\p{Extended_Pictographic}/u;
+const FLAG = /^\p{Regional_Indicator}{2}$/u;
+// Keycap: dígito, # o * + U+FE0F (selector de emoji, opcional) + U+20E3.
+const KEYCAP = /^[0-9#*]\u{FE0F}?\u{20E3}$/u;
+const ZERO_WIDTH_JOINER = "\u{200D}";
+const VARIATION_SELECTOR_16 = /\u{FE0F}/gu;
+
+const GRAPHEMES = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 
 /** Las únicas entidades que usa X en el texto de un tweet. */
 const HTML_ENTITIES: Readonly<Record<string, string>> = {
@@ -125,10 +135,61 @@ export function toTweetCard(tweet: Tweet): TweetCard {
   };
 }
 
+function isEmoji(grapheme: string): boolean {
+  return (
+    PICTOGRAPH.test(grapheme) ||
+    FLAG.test(grapheme) ||
+    KEYCAP.test(grapheme)
+  );
+}
+
+/**
+ * Nombre del archivo de Twemoji (sin `.svg`) de un emoji, con la misma regla
+ * que su librería oficial: sin ZWJ se le quita el selector de variación
+ * U+FE0F; después, los code points en hexadecimal minúscula unidos por `-`.
+ */
+function twemojiCode(emoji: string): string {
+  const withoutSelector = emoji.includes(ZERO_WIDTH_JOINER)
+    ? emoji
+    : emoji.replace(VARIATION_SELECTOR_16, "");
+
+  // `Array.from` recorre por code point: cada carácter tiene al menos uno.
+  const codePoints = Array.from(withoutSelector, (char) =>
+    char.codePointAt(0)!.toString(16),
+  );
+  return codePoints.join("-");
+}
+
+/**
+ * Parte un tramo de texto sin menciones en `text` y `emoji`. Recorre por
+ * grafemas (un emoji con tono de piel, bandera o familia es un solo grafema) y
+ * junta los que no son emoji, así no queda ninguna parte vacía.
+ */
+function textAndEmojiParts(text: string): TweetTextPart[] {
+  const parts: TweetTextPart[] = [];
+  let plain = "";
+
+  for (const { segment } of GRAPHEMES.segment(text)) {
+    if (!isEmoji(segment)) {
+      plain += segment;
+      continue;
+    }
+    if (plain) {
+      parts.push({ kind: "text", value: plain });
+      plain = "";
+    }
+    parts.push({ kind: "emoji", value: segment, code: twemojiCode(segment) });
+  }
+
+  if (plain) parts.push({ kind: "text", value: plain });
+  return parts;
+}
+
 /**
  * Parte el texto en tramos para resaltarlo: `self` es @tallami1 (sin importar
- * mayúsculas), `mention` cualquier otro @usuario y `text` el resto. Unidos en
- * orden dan el texto original.
+ * mayúsculas), `mention` cualquier otro @usuario, `emoji` cada emoji (para
+ * mostrarlo como imagen) y `text` el resto. Unidos en orden dan el texto
+ * original.
  */
 export function tweetTextParts(text: string): TweetTextPart[] {
   const parts: TweetTextPart[] = [];
@@ -139,9 +200,7 @@ export function tweetTextParts(text: string): TweetTextPart[] {
     // "coach@tallami1.com" no es una mención: el @ va pegado a otra palabra.
     if (start > 0 && WORD_CHARACTER.test(text[start - 1])) continue;
 
-    if (start > cursor) {
-      parts.push({ kind: "text", value: text.slice(cursor, start) });
-    }
+    parts.push(...textAndEmojiParts(text.slice(cursor, start)));
     const mention = match[0];
     parts.push({
       kind: mention.toLowerCase() === COACH_MENTION ? "self" : "mention",
@@ -150,9 +209,7 @@ export function tweetTextParts(text: string): TweetTextPart[] {
     cursor = start + mention.length;
   }
 
-  if (cursor < text.length) {
-    parts.push({ kind: "text", value: text.slice(cursor) });
-  }
+  parts.push(...textAndEmojiParts(text.slice(cursor)));
   return parts;
 }
 

@@ -23,6 +23,9 @@ const CARD: TweetCardData = {
 };
 
 const LABEL = "Tweet de Lewa en X";
+/** Los emojis del texto son imágenes de Twemoji; las demás (avatar, foto) tienen `alt=""`. */
+const TWEMOJI_BASE_URL =
+  "https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0.3/assets/svg";
 
 function render(card: TweetCardData): string {
   return renderToStaticMarkup(
@@ -33,6 +36,16 @@ function render(card: TweetCardData): string {
       viewOnX: "Ver en X",
     }),
   );
+}
+
+/** Todas las etiquetas `<img>` del marcado. */
+function imagesOf(markup: string): string[] {
+  return markup.match(/<img [^>]*>/g) ?? [];
+}
+
+/** Las imágenes que no son emojis: el avatar y la foto del tweet. */
+function pictureImagesOf(markup: string): string[] {
+  return imagesOf(markup).filter((image) => !image.includes("twemoji"));
 }
 
 describe("TweetCard", () => {
@@ -85,10 +98,13 @@ describe("TweetCard", () => {
 
   test("shows the tweet photo lazily and without alt text", () => {
     const markup = render(CARD);
+    const pictures = pictureImagesOf(markup);
 
-    expect(markup).toContain('loading="lazy"');
-    expect(markup.match(/<img /g)).toHaveLength(2);
-    expect(markup.match(/alt=""/g)).toHaveLength(2);
+    expect(pictures).toHaveLength(2);
+    expect(pictures.at(-1)).toContain('loading="lazy"');
+    for (const picture of pictures) {
+      expect(picture).toContain('alt=""');
+    }
   });
 
   test("a photo-only tweet has no empty text block", () => {
@@ -97,7 +113,7 @@ describe("TweetCard", () => {
     expect(markup).not.toMatch(/<(span|p|div|b)\b[^>]*><\/(span|p|div|b)>/);
     expect(markup).toContain(LABEL);
     expect(markup).toContain("27 sept 2026");
-    expect(markup.match(/<img /g)).toHaveLength(2);
+    expect(imagesOf(markup)).toHaveLength(2);
   });
 
   test("a text-only tweet has no photo", () => {
@@ -106,8 +122,59 @@ describe("TweetCard", () => {
 
     const markup = render(withoutImage);
 
-    expect(markup.match(/<img /g)).toHaveLength(1);
+    // Solo el avatar y el emoji del texto.
+    expect(pictureImagesOf(markup)).toHaveLength(1);
     expect(markup).toContain("Top 14 ($32000)");
+  });
+
+  test("shows an emoji as a Twemoji image that falls back to the emoji itself", () => {
+    const markup = render(CARD);
+
+    const emojis = imagesOf(markup).filter((image) =>
+      image.includes("twemoji"),
+    );
+    expect(emojis).toHaveLength(1);
+    const [emoji] = emojis;
+    expect(emoji).toContain(`src="${TWEMOJI_BASE_URL}/1f972.svg"`);
+    expect(emoji).toContain('alt="🥲"');
+    expect(emoji).toContain('draggable="false"');
+    expect(emoji).toContain('loading="lazy"');
+    expect(emoji).toContain('decoding="async"');
+    expect(emoji).toMatch(/class="[^"]+"/);
+    // La imagen reemplaza al carácter: no queda también como texto suelto.
+    expect(markup.replace(emoji, "")).not.toContain("🥲");
+  });
+
+  test("keeps the text around each emoji, flags included", () => {
+    const markup = render({ ...CARD, text: "12th ($30.000)🇦🇷\nqualed 🇸🇦 @tallami1" });
+
+    expect(markup).toContain(`${TWEMOJI_BASE_URL}/1f1e6-1f1f7.svg`);
+    expect(markup).toContain(`${TWEMOJI_BASE_URL}/1f1f8-1f1e6.svg`);
+    expect(markup).toContain('alt="🇦🇷"');
+    expect(markup).toContain('alt="🇸🇦"');
+    expect(markup).toContain("12th ($30.000)");
+    expect(markup).toContain("qualed ");
+    expect(markup).toContain("@tallami1");
+  });
+
+  test("a tweet with no emojis has no Twemoji image", () => {
+    const markup = render({ ...CARD, text: "Top 14 ($32000)\n@tallami1" });
+
+    expect(markup).not.toContain("twemoji");
+    expect(imagesOf(markup)).toHaveLength(2);
+  });
+
+  test("never turns text with markup into markup, emojis included", () => {
+    const markup = render({
+      ...CARD,
+      text: "<img src=x onerror=alert(1)> 🥲 <b>gg</b>",
+    });
+
+    expect(markup).toContain("&lt;img src=x onerror=alert(1)&gt;");
+    expect(markup).toContain("&lt;b&gt;gg&lt;/b&gt;");
+    expect(markup).not.toContain("<img src=x");
+    expect(markup).not.toContain("<b>gg");
+    expect(imagesOf(markup).filter((image) => image.includes("twemoji"))).toHaveLength(1);
   });
 
   test("shows tweet text as text, never as markup", () => {
@@ -126,6 +193,7 @@ describe("TweetCard", () => {
 
     expect(markup).toContain("@romerofdps");
     expect(markup).toContain("@tallami1");
-    expect(markup).toContain("🥲\n");
+    // El salto de línea sigue justo después de la imagen del emoji.
+    expect(markup).toMatch(/alt="🥲"[^>]*>\n/);
   });
 });

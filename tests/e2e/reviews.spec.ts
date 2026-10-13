@@ -40,6 +40,16 @@ const PHOTO_TWEET_ID = NEWEST_FIRST.find(
   (id) => (readFixture(id).photos ?? []).length > 0,
 );
 
+/**
+ * Un emoji de cada tipo, con el tweet grabado de donde sale: el más nuevo
+ * (🥲, un emoji reciente) y el de Tisco (🇦🇷, una bandera). Se identifican por
+ * su ID y no por posición, así sumar un tweet más nuevo no rompe el test.
+ */
+const TWEMOJI_CASES = [
+  { tweetId: "2104290558906868129", alt: "🥲", file: "1f972" },
+  { tweetId: "1964780083618685407", alt: "🇦🇷", file: "1f1e6-1f1f7" },
+] as const;
+
 function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -330,10 +340,11 @@ test.describe("reviews wall", () => {
     test.skip(!PHOTO_TWEET_ID, "Ningún tweet de la lista trae foto");
     await page.goto("/es");
 
+    // Sin los emojis del texto: son imágenes de Twemoji, con su propio `alt`.
     const images = wallOf(page)
       .locator(`a[href$='/status/${PHOTO_TWEET_ID}']`)
       .first()
-      .locator("img");
+      .locator("img:not([src*='/twemoji@'])");
 
     await expect(images).toHaveCount(2);
     for (const image of await images.all()) {
@@ -345,6 +356,50 @@ test.describe("reviews wall", () => {
     }
     // El avatar va primero; la foto del tweet carga en diferido.
     await expect(images.nth(1)).toHaveAttribute("loading", "lazy");
+  });
+
+  // Los emojis son imágenes de Twemoji (en Windows 10 los nuevos salen como
+  // cuadraditos y las banderas como letras). No se espera a que carguen: si la
+  // imagen falla, el navegador muestra el `alt`, que es el emoji.
+  for (const { tweetId, alt, file } of TWEMOJI_CASES) {
+    test(`emoji ${alt} of tweet ${tweetId} is a Twemoji image`, async ({ page }) => {
+      await page.goto("/es");
+
+      const card = wallOf(page).locator(`a[href$='/status/${tweetId}']`).first();
+      const emoji = card.locator(`img[alt='${alt}']`);
+
+      await expect(emoji).toHaveCount(1);
+      await expect(emoji).toHaveAttribute(
+        "src",
+        new RegExp(`^https://cdn\\.jsdelivr\\.net/gh/jdecked/twemoji@[\\d.]+/assets/svg/${file}\\.svg$`),
+      );
+      await expect(emoji).toHaveAttribute("loading", "lazy");
+      await expect(emoji).toHaveAttribute("draggable", "false");
+      // Sigue siendo parte del nombre del link: el lector lee el emoji.
+      await expect(card).toHaveAccessibleName(new RegExp(escapeRegExp(alt)));
+    });
+  }
+
+  test("an emoji image sits inline with the text, a bit taller than the letters", async ({
+    page,
+  }) => {
+    await page.goto("/es");
+
+    const card = wallOf(page)
+      .locator(`a[href$='/status/${TWEMOJI_CASES[0].tweetId}']`)
+      .first();
+    const emoji = card.locator(`img[alt='${TWEMOJI_CASES[0].alt}']`);
+
+    const style = await emoji.evaluate((node) => {
+      const { display, verticalAlign, fontSize } = getComputedStyle(node);
+      const { width, height } = node.getBoundingClientRect();
+      return { display, verticalAlign, fontSize: parseFloat(fontSize), width, height };
+    });
+
+    expect(style.display).toBe("inline-block");
+    expect(style.width).toBeCloseTo(style.fontSize * 1.15, 1);
+    expect(style.height).toBeCloseTo(style.fontSize * 1.15, 1);
+    expect(style.verticalAlign).not.toBe("baseline");
   });
 
   test("coach mention is highlighted in gold", async ({ page }) => {

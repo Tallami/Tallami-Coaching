@@ -20,7 +20,11 @@
   border-radius: 6px;
   background: var(--color-stage-2);
   color: var(--color-on-stage);
-  /* Saira no trae emojis ni la marca 𝕏: respaldo con la fuente de emojis del sistema. */
+  /*
+   * Saira no trae la marca 𝕏 ni emojis: respaldo con la fuente de emojis del
+   * sistema para la marca y para el `alt` de un emoji que no cargó (los del
+   * texto son imágenes, ver `.emoji`).
+   */
   font-family:
     var(--font-saira), system-ui, "Apple Color Emoji", "Segoe UI Emoji",
     "Noto Color Emoji", sans-serif;
@@ -93,6 +97,19 @@
   overflow-wrap: break-word;
   /* Respeta los saltos de línea del tweet sin dejar espacios de más. */
   white-space: pre-line;
+}
+
+/*
+ * Emoji de Twemoji: un poco más alto que la letra y bajado para que apoye en la
+ * línea base, igual que en X. Sin las medidas en el CSS el texto saltaría al
+ * llegar la imagen; si no carga, el navegador muestra su `alt` (el emoji).
+ */
+.emoji {
+  display: inline-block;
+  width: 1.15em;
+  height: 1.15em;
+  margin: 0 0.05em;
+  vertical-align: -0.2em;
 }
 
 .self {

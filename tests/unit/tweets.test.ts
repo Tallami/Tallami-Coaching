@@ -234,6 +234,140 @@ describe("tweetTextParts", () => {
       expect(joined).toBe(text);
     }
   });
+
+  test("never leaves an empty part or two text parts in a row, in any recorded tweet", () => {
+    for (const id of TWEET_IDS) {
+      const parts = tweetTextParts(toTweetCard(fixture(id)).text);
+
+      parts.forEach((part, index) => {
+        expect(part.value, `tweet ${id}, parte ${index}`).not.toBe("");
+        if (part.kind === "text") {
+          expect(parts[index + 1]?.kind, `tweet ${id}, parte ${index}`).not.toBe(
+            "text",
+          );
+        }
+      });
+    }
+  });
+});
+
+// Los emojis salen como partes aparte para mostrarlos con imágenes de Twemoji
+// (los de Windows 10 llegan como cuadraditos o letras). `code` es el nombre del
+// archivo de Twemoji: la misma regla que su librería oficial.
+describe("tweetTextParts emojis", () => {
+  // Los caracteres invisibles van con nombre y escapados, para que se vean en el código.
+  const VS16 = "\u{FE0F}"; // selector de variación: pide la versión emoji
+  const ZWJ = "\u{200D}"; // une varios emojis en uno
+  const KEYCAP_MARK = "\u{20E3}";
+  const FAMILY = `\u{1F468}${ZWJ}\u{1F469}${ZWJ}\u{1F467}`;
+
+  // [descripción, emoji, nombre de archivo esperado]
+  const CODES: [string, string, string][] = [
+    ["a recent emoji", "🥲", "1f972"],
+    ["another recent emoji", "🫡", "1fae1"],
+    ["a flag (two regional indicators)", "🇦🇷", "1f1e6-1f1f7"],
+    ["a heart with the variation selector (dropped)", `\u{2764}${VS16}`, "2764"],
+    ["an emoji with a skin tone", "👍🏽", "1f44d-1f3fd"],
+    ["a ZWJ sequence (joiners kept)", FAMILY, "1f468-200d-1f469-200d-1f467"],
+    ["a keycap with the selector (dropped)", `1${VS16}${KEYCAP_MARK}`, "31-20e3"],
+    ["a keycap without the selector", `1${KEYCAP_MARK}`, "31-20e3"],
+    ["a hash keycap", `#${VS16}${KEYCAP_MARK}`, "23-20e3"],
+    [
+      "a ZWJ sequence keeps its variation selectors",
+      `\u{1F441}${VS16}${ZWJ}\u{1F5E8}${VS16}`,
+      "1f441-fe0f-200d-1f5e8-fe0f",
+    ],
+  ];
+
+  for (const [description, emoji, code] of CODES) {
+    test(`names the Twemoji file of ${description}`, () => {
+      expect(tweetTextParts(emoji)).toEqual([
+        { kind: "emoji", value: emoji, code },
+      ]);
+    });
+  }
+
+  test("splits mixed text into text, emoji, mentions and emoji, in order", () => {
+    expect(tweetTextParts("1st 🥲 @romerofdps @tallami1 🇦🇷")).toEqual([
+      { kind: "text", value: "1st " },
+      { kind: "emoji", value: "🥲", code: "1f972" },
+      { kind: "text", value: " " },
+      { kind: "mention", value: "@romerofdps" },
+      { kind: "text", value: " " },
+      { kind: "self", value: "@tallami1" },
+      { kind: "text", value: " " },
+      { kind: "emoji", value: "🇦🇷", code: "1f1e6-1f1f7" },
+    ]);
+  });
+
+  test("keeps the line breaks of the text around an emoji", () => {
+    expect(tweetTextParts("gg 🥲\n\n@k1ng")).toEqual([
+      { kind: "text", value: "gg " },
+      { kind: "emoji", value: "🥲", code: "1f972" },
+      { kind: "text", value: "\n\n" },
+      { kind: "mention", value: "@k1ng" },
+    ]);
+  });
+
+  test("each emoji in a row is its own part, and two flags stay two flags", () => {
+    expect(tweetTextParts("🥲🥲")).toEqual([
+      { kind: "emoji", value: "🥲", code: "1f972" },
+      { kind: "emoji", value: "🥲", code: "1f972" },
+    ]);
+    expect(tweetTextParts("a🇦🇷🇸🇦b")).toEqual([
+      { kind: "text", value: "a" },
+      { kind: "emoji", value: "🇦🇷", code: "1f1e6-1f1f7" },
+      { kind: "emoji", value: "🇸🇦", code: "1f1f8-1f1e6" },
+      { kind: "text", value: "b" },
+    ]);
+  });
+
+  test("an emoji glued to a mention does not break the mention", () => {
+    expect(tweetTextParts("@tallami1🫡 @k1ng🥲")).toEqual([
+      { kind: "self", value: "@tallami1" },
+      { kind: "emoji", value: "🫡", code: "1fae1" },
+      { kind: "text", value: " " },
+      { kind: "mention", value: "@k1ng" },
+      { kind: "emoji", value: "🥲", code: "1f972" },
+    ]);
+  });
+
+  test("a lone regional indicator and keycap look-alikes stay text", () => {
+    for (const text of ["\u{1F1E6} suelto", "#1 *2 3", "12/12 ($32.000) 100%"]) {
+      expect(tweetTextParts(text)).toEqual([{ kind: "text", value: text }]);
+    }
+  });
+
+  test("text without emojis is split exactly as before", () => {
+    expect(tweetTextParts("1st @romerofdps @Tallami1 gg ñandú — ¿qué?")).toEqual([
+      { kind: "text", value: "1st " },
+      { kind: "mention", value: "@romerofdps" },
+      { kind: "text", value: " " },
+      { kind: "self", value: "@Tallami1" },
+      { kind: "text", value: " gg ñandú — ¿qué?" },
+    ]);
+  });
+
+  test("every emoji of a recorded tweet gets a well-formed Twemoji file name", () => {
+    const FILE_NAME = /^[0-9a-f]+(-[0-9a-f]+)*$/;
+
+    for (const id of TWEET_IDS) {
+      const emojis = tweetTextParts(toTweetCard(fixture(id)).text).filter(
+        (part) => part.kind === "emoji",
+      );
+
+      for (const emoji of emojis) {
+        expect(emoji.code, `tweet ${id}`).toMatch(FILE_NAME);
+        // El nombre de archivo y el emoji cuentan los mismos code points.
+        const noSelector = emoji.value.includes(ZWJ)
+          ? emoji.value
+          : emoji.value.replaceAll(VS16, "");
+        expect(emoji.code.split("-").length, `tweet ${id}`).toBe(
+          [...noSelector].length,
+        );
+      }
+    }
+  });
 });
 
 describe("fetchTweetCards", () => {
