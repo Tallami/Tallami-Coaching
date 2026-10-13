@@ -1,9 +1,18 @@
 // Jugadores de la franja "Trabajé con", en el orden en que se muestran. El
 // nombre es el de jugador, sin tag de equipo; `handle` es su usuario de X.
 //
-// Para sumar uno: `npm run players:photo -- <usuario>` baja su foto a
-// `src/assets/players/<usuario en minúsculas>.jpg`; se importa acá y se agrega
-// a la lista. La foto es opcional: sin foto se muestra la inicial.
+// Para sumar uno:
+//   1. `npm run players:photo -- <usuario>` baja su foto a
+//      `src/assets/players/<usuario en minúsculas>.jpg`.
+//   2. Importala arriba (en orden alfabético, como las demás) y agregá una
+//      línea a `PLAYERS` con `name`, `handle` y `photo`, escrita como las
+//      demás (cada jugador en una sola línea: los e2e leen la lista de ese
+//      formato, y un test avisa si deja de coincidir).
+//   3. Corré `npm run test` y `npm run test:e2e`.
+//
+// La foto es opcional: sin foto se muestra la inicial sobre un círculo azul.
+// Si el archivo de la foto existe pero no se importó, un test lo avisa. Los
+// tweets de la sección "Reviews" solo pueden ser de jugadores de esta lista.
 
 import type { StaticImageData } from "next/image";
 import edsonmalado from "@/assets/players/edsonmalado.jpg";

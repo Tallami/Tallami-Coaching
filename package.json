@@ -14,7 +14,8 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "players:photo": "node scripts/fetch-player-photo.mjs"
+    "players:photo": "node scripts/fetch-player-photo.mjs",
+    "tweets:record": "node scripts/record-tweet.mjs"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
