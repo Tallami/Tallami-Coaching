@@ -56,8 +56,12 @@ const COACH_MENTION = "@tallami1";
 const SOURCE_ENV = "TWEETS_SOURCE";
 const SNAPSHOTS_SOURCE = "snapshots";
 
-/** Si X no contesta en este tiempo, el tweet cuenta como fallado y no frena el build. */
-const X_REQUEST_TIMEOUT_MS = 10_000;
+/**
+ * Si X no contesta en este tiempo, el tweet cuenta como fallado y se usa su
+ * copia guardada. Corto a propósito: no cuesta nada (hay respaldo) y deja
+ * margen a las funciones serverless con un límite de tiempo chico.
+ */
+const X_REQUEST_TIMEOUT_MS = 5_000;
 
 const TRAILING_SHORT_LINK = /\s*https:\/\/t\.co\/\w+\s*$/;
 const NORMAL_AVATAR_SUFFIX = /_normal(\.\w+)$/;
@@ -354,10 +358,17 @@ function logTweetPath(id: string, { path, error }: TweetResolution): void {
   }
 }
 
-/** Pide el tweet a X, con su copia guardada de respaldo. */
-async function loadFromXWithBackup(id: string): Promise<Tweet | undefined> {
+/** Caminos en los que X falló y lo que se muestra es la copia (o nada). */
+const X_FAILED_PATHS: ReadonlySet<TweetPath> = new Set(["snapshot", "unavailable"]);
+
+/** Pide el tweet a X, con su copia guardada de respaldo. `onFailure` avisa si X falló. */
+async function loadFromXWithBackup(
+  id: string,
+  onFailure: () => void,
+): Promise<Tweet | undefined> {
   const resolution = await resolveTweet(id, loadFromX, snapshotOf(id));
   logTweetPath(id, resolution);
+  if (X_FAILED_PATHS.has(resolution.path)) onFailure();
   return resolution.tweet;
 }
 
@@ -371,8 +382,13 @@ function logSkippedTweet(id: string, error: unknown): void {
  * Tarjetas de los tweets, del más nuevo al más viejo; vacía si ninguno carga.
  * Se cachea un día. Cada tweet se pide a X y, si X falla, se usa su copia
  * guardada (ver `resolveTweet`): una caída de X al regenerar la página no deja
- * la sección vacía. Con `TWEETS_SOURCE=snapshots` usa solo las copias y no
- * llama a X, así los tests e2e no dependen de la red.
+ * la sección vacía. Si X falló con algún tweet, el caché baja a minutos: la
+ * página se rehace pronto con datos en vivo en lugar de quedarse un día con
+ * copias. (`cacheLife` se queda con el menor tiempo de todas sus llamadas.
+ * `minutes` vence en una hora, más que los 5 minutos que pide Next para que la
+ * página siga siendo estática; `seconds` no.) Con `TWEETS_SOURCE=snapshots`
+ * usa solo las copias, sin llamar a X (así los tests e2e no dependen de la
+ * red), y ahí las copias son la fuente: el caché sigue en un día.
  */
 export async function getTweetCards(
   ids: readonly string[],
@@ -380,10 +396,20 @@ export async function getTweetCards(
   "use cache";
   cacheLife("days");
 
-  const load: TweetLoader =
-    process.env[SOURCE_ENV] === SNAPSHOTS_SOURCE
-      ? loadFromSnapshots
-      : loadFromXWithBackup;
+  if (process.env[SOURCE_ENV] === SNAPSHOTS_SOURCE) {
+    return fetchTweetCards(ids, loadFromSnapshots, logSkippedTweet);
+  }
 
-  return fetchTweetCards(ids, load, logSkippedTweet);
+  let xFailed = false;
+  const cards = await fetchTweetCards(
+    ids,
+    (id) =>
+      loadFromXWithBackup(id, () => {
+        xFailed = true;
+      }),
+    logSkippedTweet,
+  );
+
+  if (xFailed) cacheLife("minutes");
+  return cards;
 }

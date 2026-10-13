@@ -102,8 +102,15 @@
  * sobre el botón frenan nada: al tocar "Reanudar", con el mouse o con el
  * teclado, el movimiento tiene que arrancar ya. `:focus-visible` y no
  * `:focus-within`: un clic en una tarjeta ya cae en algo que se ve.
+ *
+ * El botón va en una regla aparte: un navegador que no entiende `:has()`
+ * descarta toda la regla que lo nombra, lista de selectores incluida, y la
+ * pausa del botón (WCAG 2.2.2) no puede depender de eso.
  */
-.row[data-paused] .track,
+.row[data-paused] .track {
+  animation-play-state: paused;
+}
+
 .group:has(.row :focus-visible) .track {
   animation-play-state: paused;
 }

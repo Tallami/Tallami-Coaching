@@ -19,8 +19,10 @@ import {
 } from "../helpers/tweet-fixtures";
 
 // `cacheLife` solo existe dentro de un scope de "use cache" de Next; en Vitest
-// no hay ninguno, así que se reemplaza por una función vacía.
-vi.mock("next/cache", () => ({ cacheLife: () => {} }));
+// no hay ninguno, así que se reemplaza por un espía que no hace nada y deja ver
+// con qué perfiles se la llamó.
+const { cacheLifeMock } = vi.hoisted(() => ({ cacheLifeMock: vi.fn() }));
+vi.mock("next/cache", () => ({ cacheLife: cacheLifeMock }));
 // `getTweet` es la única salida a la red: cada test decide qué contesta X.
 vi.mock("react-tweet/api", () => ({ getTweet: vi.fn() }));
 
@@ -520,6 +522,7 @@ describe("getTweetCards", () => {
   beforeEach(() => {
     // Sin esto, un `TWEETS_SOURCE` del entorno de quien corre los tests cambiaría el camino.
     vi.stubEnv("TWEETS_SOURCE", undefined);
+    cacheLifeMock.mockClear();
     info = vi.spyOn(console, "info").mockImplementation(() => {});
     warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     error = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -560,6 +563,13 @@ describe("getTweetCards", () => {
 
       expect(cards).toEqual([]);
     });
+
+    // Acá las copias son la fuente que se quiere, no un respaldo.
+    test("keeps the cache for days: the copies are the intended source", async () => {
+      await getTweetCards(TWEET_IDS);
+
+      expect(cacheLifeMock.mock.calls).toEqual([["days"]]);
+    });
   });
 
   describe("with X as the source", () => {
@@ -579,6 +589,54 @@ describe("getTweetCards", () => {
       expect(warn).not.toHaveBeenCalled();
       expect(error).not.toHaveBeenCalled();
       expect(info).toHaveBeenCalledTimes(TWEET_IDS.length);
+    });
+
+    // Si X falló, lo que se cacheó puede ser de las copias: la página se rehace
+    // en minutos en lugar de en un día. `minutes` y no `seconds`: con menos de
+    // 5 minutos de vida Next saca la sección del HTML estático.
+    test("keeps the cache for days when every tweet is live", async () => {
+      getTweetMock.mockImplementation(async (id) => fixture(id));
+
+      await getTweetCards(TWEET_IDS);
+
+      expect(cacheLifeMock.mock.calls).toEqual([["days"]]);
+    });
+
+    test("shortens the cache to minutes, once, when X failed for a tweet", async () => {
+      getTweetMock.mockImplementation(async (id) => {
+        if (id === TISCO_TWEET_ID) throw new Error("X respondió 503");
+        return fixture(id);
+      });
+
+      await getTweetCards(TWEET_IDS);
+
+      expect(cacheLifeMock.mock.calls).toEqual([["days"], ["minutes"]]);
+    });
+
+    test("shortens the cache to minutes, once, when X is down for every tweet", async () => {
+      getTweetMock.mockRejectedValue(new Error("fetch failed"));
+
+      await getTweetCards(TWEET_IDS);
+
+      expect(cacheLifeMock.mock.calls).toEqual([["days"], ["minutes"]]);
+    });
+
+    test("shortens the cache to minutes when X failed and there is no copy", async () => {
+      getTweetMock.mockRejectedValue(new Error("fetch failed"));
+
+      await getTweetCards(["111"]);
+
+      expect(cacheLifeMock.mock.calls).toEqual([["days"], ["minutes"]]);
+    });
+
+    test("keeps the cache for days when a tweet is simply gone", async () => {
+      getTweetMock.mockImplementation(async (id) =>
+        id === TISCO_TWEET_ID ? undefined : fixture(id),
+      );
+
+      await getTweetCards(TWEET_IDS);
+
+      expect(cacheLifeMock.mock.calls).toEqual([["days"]]);
     });
 
     test("with X down, every card comes from the saved copies", async () => {

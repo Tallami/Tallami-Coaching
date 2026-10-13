@@ -31,4 +31,20 @@ describe("marquee.module.css", () => {
 
     expect(own.some(({ body }) => /mask-image:\s*none/.test(body))).toBe(true);
   });
+
+  // El botón de pausa (WCAG 2.2.2) tiene que andar aunque el navegador no
+  // entienda `:has()`: su regla no puede compartir lista con una que lo use.
+  test("the pause button's rule does not depend on :has()", () => {
+    const own = rules.filter(({ selector }) => selector === ".row[data-paused] .track");
+
+    expect(own.some(({ body }) => /animation-play-state:\s*paused/.test(body))).toBe(true);
+  });
+
+  test("no rule shares its selector list with :has()", () => {
+    for (const { selector } of rules) {
+      if (selector.includes(":has(")) {
+        expect(selector.split(","), selector).toHaveLength(1);
+      }
+    }
+  });
 });
