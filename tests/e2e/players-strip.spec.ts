@@ -38,9 +38,17 @@ const STILL_TOLERANCE_PX = 0.5;
 const MOVING_TIMEOUT_MS = 3_000;
 const MAX_TAB_PRESSES = 20;
 const SUBPIXEL_TOLERANCE = 0.01;
+/** Ancho mínimo del aro de foco que se ve (el de la página es de 3 px). */
+const MIN_RING_WIDTH = 3;
+/** Una fila de 375 px con un aro de 3 px tiene miles de píxeles dorados; esto es un piso holgado. */
+const MIN_GOLD_RING_PIXELS = 500;
 
-function stripOf(page: Page, label: string = LABEL_ES): Locator {
-  return page.getByRole("region", { name: label });
+/**
+ * La sección de la franja. Con "reducir movimiento" la fila también es una
+ * región con el mismo nombre; por eso se pide la sección y no solo el rol.
+ */
+function stripOf(page: Page): Locator {
+  return page.locator("section[aria-labelledby='players-label']");
 }
 
 function playerListOf(page: Page): Locator {
@@ -165,6 +173,29 @@ async function rowBox(page: Page) {
     const { left, right } = node.getBoundingClientRect();
     return { left, right };
   });
+}
+
+/** Píxeles dorados (el color del aro de foco) en una captura PNG. */
+async function countGoldPixels(page: Page, png: Buffer): Promise<number> {
+  return page.evaluate(async (base64) => {
+    const image = new Image();
+    image.src = `data:image/png;base64,${base64}`;
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = image.width;
+    canvas.height = image.height;
+    const context = canvas.getContext("2d");
+    if (!context) return 0;
+    context.drawImage(image, 0, 0);
+    const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
+    let gold = 0;
+    for (let at = 0; at < data.length; at += 4) {
+      if (data[at] > 230 && data[at + 1] > 180 && data[at + 1] < 220 && data[at + 2] < 100) {
+        gold += 1;
+      }
+    }
+    return gold;
+  }, png.toString("base64"));
 }
 
 test.describe("players strip", () => {
@@ -391,5 +422,73 @@ test.describe("players strip", () => {
     await expect
       .poll(() => row.evaluate((node) => node.scrollLeft))
       .toBeGreaterThan(before);
+  });
+
+  for (const viewport of [PHONE_VIEWPORT, WIDE_VIEWPORT]) {
+    test(`reduced motion: the focused row shows a whole gold ring and a name at ${viewport.width}px`, async ({
+      page,
+    }) => {
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await page.setViewportSize(viewport);
+      await page.goto("/es");
+
+      const row = rowOf(page);
+
+      // La fila es lo único que el teclado puede enfocar en la franja: tiene
+      // que anunciarse con un rol y el nombre de la franja.
+      await expect(row).toHaveAttribute("role", "region");
+      await expect(row).toHaveAccessibleName(LABEL_ES);
+      await expect(
+        page.getByRole("region", { name: LABEL_ES }).and(page.locator("[data-direction]")),
+      ).toHaveCount(1);
+
+      await tabTo(page, row);
+
+      // El fundido de los bordes no tapa el aro (WCAG 2.4.7).
+      await expect(row).toHaveCSS("mask-image", "none");
+      const ring = await row.evaluate((node) => {
+        const style = getComputedStyle(node);
+        return {
+          style: style.outlineStyle,
+          color: style.outlineColor,
+          width: parseFloat(style.outlineWidth),
+          offset: parseFloat(style.outlineOffset),
+        };
+      });
+      expect(ring.style).not.toBe("none");
+      expect(ring.color).toBe(GOLD);
+      expect(ring.width).toBeGreaterThanOrEqual(MIN_RING_WIDTH);
+      // La fila llega de borde a borde en un celular: el aro va adentro.
+      expect(ring.offset + ring.width).toBeLessThanOrEqual(0);
+
+      expect(await countGoldPixels(page, await row.screenshot())).toBeGreaterThan(
+        MIN_GOLD_RING_PIXELS,
+      );
+    });
+  }
+
+  test("reduced motion fades only the right edge, so the first player is whole", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.setViewportSize(WIDE_VIEWPORT);
+    await page.goto("/es");
+
+    const mask = await rowOf(page).evaluate((node) => getComputedStyle(node).maskImage);
+
+    // El primer tramo del degradado es opaco: la izquierda no se atenúa.
+    expect(mask).toMatch(/^linear-gradient\(90deg, rgb\(0, 0, 0\)/);
+    expect(mask).toMatch(/rgba\(0, 0, 0, 0\)\)$/);
+  });
+
+  test("with motion the row is not a region nor a tab stop", async ({ page }) => {
+    await page.goto("/es");
+
+    const row = rowOf(page);
+
+    await expect(row).not.toHaveAttribute("role");
+    await expect(row).not.toHaveAttribute("tabindex");
+    await expect(row).not.toHaveAttribute("aria-labelledby");
+    await expect(page.getByRole("region", { name: LABEL_ES })).toHaveCount(1);
   });
 });

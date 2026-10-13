@@ -98,9 +98,21 @@
   animation-play-state: paused;
 }
 
-/* Con el foco del teclado en la fila, el fundido de los bordes no tapa nada. */
-.row:has(:focus-visible) {
+/*
+ * Con el foco del teclado en la fila (adentro, o la fila misma cuando es lo
+ * único que se puede enfocar), el fundido de los bordes no tapa nada.
+ */
+.row:has(:focus-visible),
+.row:focus-visible {
   mask-image: none;
+}
+
+/*
+ * El aro de la fila misma va adentro: la fila llega de borde a borde en un
+ * celular, y un aro afuera quedaría fuera de la pantalla.
+ */
+.row:focus-visible {
+  outline-offset: -3px;
 }
 
 @keyframes marquee {
@@ -128,12 +140,18 @@
     animation: none;
   }
 
+  /*
+   * Quieta, la fila arranca en su borde izquierdo: se funde solo el derecho,
+   * que es por donde sigue. Con el fundido de la izquierda quedaba atenuado el
+   * primer elemento (y el avatar de la primera tarjeta) en pantallas anchas.
+   */
   .row {
     overflow-x: auto;
     overscroll-behavior-x: contain;
     scroll-padding-inline: var(--marquee-inset, 0px);
     scrollbar-width: thin;
     scrollbar-color: var(--color-stage-line) transparent;
+    mask-image: linear-gradient(90deg, #000 94%, transparent);
   }
 
   .copy {

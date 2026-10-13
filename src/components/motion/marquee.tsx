@@ -44,6 +44,12 @@ export interface MarqueeRowProps {
   direction: "left" | "right";
   /** Segundos que tarda una vuelta completa (el ancho de una copia). */
   durationSeconds: number;
+  /**
+   * Id del texto que nombra la fila. Solo se usa si la fila se vuelve
+   * focusable (con "reducir movimiento" y nada enfocable adentro): entonces
+   * se anuncia como región con ese nombre.
+   */
+  labelledBy?: string;
   children: ReactNode;
 }
 
@@ -146,6 +152,28 @@ function seekToShow(
 }
 
 /**
+ * Vuelve la fila focusable (para desplazarla con las flechas) o la devuelve a
+ * su estado normal. Una fila que el teclado puede enfocar se anuncia como
+ * región con el nombre de `labelledBy`; sin nombre queda sin rol, porque una
+ * región sin nombre no dice nada. Se hace a mano sobre el DOM, y no con
+ * estado, porque lo decide el navegador (la preferencia de movimiento) y no
+ * la página que se prerenderiza.
+ */
+function setRowFocusable(row: HTMLElement, isFocusable: boolean, labelledBy?: string) {
+  if (isFocusable) {
+    row.tabIndex = 0;
+    if (labelledBy) {
+      row.setAttribute("role", "region");
+      row.setAttribute("aria-labelledby", labelledBy);
+    }
+    return;
+  }
+  row.removeAttribute("tabindex");
+  row.removeAttribute("role");
+  row.removeAttribute("aria-labelledby");
+}
+
+/**
  * Con "reducir movimiento" la fila no se mueve y se desliza a mano. Si adentro
  * no hay nada que el teclado pueda enfocar (la franja de jugadores), la fila
  * misma se vuelve focusable para poder desplazarla con las flechas.
@@ -153,6 +181,7 @@ function seekToShow(
 function useKeyboardScrollStop(
   rowRef: RefObject<HTMLDivElement | null>,
   copyRef: RefObject<HTMLDivElement | null>,
+  labelledBy?: string,
 ) {
   useEffect(() => {
     const row = rowRef.current;
@@ -160,18 +189,17 @@ function useKeyboardScrollStop(
     if (!row || !copy) return;
 
     const media = window.matchMedia(REDUCED_MOTION_QUERY);
-    const sync = () => {
-      if (media.matches && copy.querySelector(FOCUSABLE) === null) {
-        row.tabIndex = 0;
-      } else {
-        row.removeAttribute("tabindex");
-      }
-    };
+    const sync = () =>
+      setRowFocusable(
+        row,
+        media.matches && copy.querySelector(FOCUSABLE) === null,
+        labelledBy,
+      );
 
     sync();
     media.addEventListener("change", sync);
     return () => media.removeEventListener("change", sync);
-  }, [rowRef, copyRef]);
+  }, [rowRef, copyRef, labelledBy]);
 }
 
 /**
@@ -181,13 +209,18 @@ function useKeyboardScrollStop(
  * hilo principal); con el foco del teclado en un elemento de la fila, la
  * animación se adelanta o atrasa hasta que ese elemento se ve entero.
  */
-export function MarqueeRow({ direction, durationSeconds, children }: MarqueeRowProps) {
+export function MarqueeRow({
+  direction,
+  durationSeconds,
+  labelledBy,
+  children,
+}: MarqueeRowProps) {
   const paused = useContext(MarqueePausedContext);
   const rowRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const copyRef = useRef<HTMLDivElement>(null);
 
-  useKeyboardScrollStop(rowRef, copyRef);
+  useKeyboardScrollStop(rowRef, copyRef, labelledBy);
 
   if (paused === null) {
     throw new Error("MarqueeRow tiene que ir dentro de un MarqueeGroup.");

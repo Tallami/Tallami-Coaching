@@ -50,7 +50,11 @@ export async function PlayersStrip() {
           {t("label")}
         </p>
         <div className={styles.band}>
-          <MarqueeRow direction="left" durationSeconds={LOOP_SECONDS}>
+          <MarqueeRow
+            direction="left"
+            durationSeconds={LOOP_SECONDS}
+            labelledBy={LABEL_ID}
+          >
             {/* `role="list"` porque Safari quita la semántica a las listas sin viñetas.
                 `translate="no"`: los nombres de jugador no se traducen. */}
             <ul

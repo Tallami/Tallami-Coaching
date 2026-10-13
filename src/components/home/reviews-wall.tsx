@@ -86,13 +86,18 @@ export async function ReviewsWall({ cards }: ReviewsWallProps) {
         pauseLabel={t("pause")}
         resumeLabel={t("resume")}
       >
-        <MarqueeRow direction="left" durationSeconds={loopSeconds(topCards.length)}>
+        <MarqueeRow
+          direction="left"
+          durationSeconds={loopSeconds(topCards.length)}
+          labelledBy={TITLE_ID}
+        >
           <CardList cards={topCards} />
         </MarqueeRow>
         {bottomCards.length > 0 && (
           <MarqueeRow
             direction="right"
             durationSeconds={loopSeconds(bottomCards.length)}
+            labelledBy={TITLE_ID}
           >
             <CardList cards={bottomCards} />
           </MarqueeRow>

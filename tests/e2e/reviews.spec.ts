@@ -477,6 +477,24 @@ test.describe("reviews wall", () => {
     });
   }
 
+  test("reduced motion fades only the right edge, so the first card's avatar is whole", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.setViewportSize(WIDE_VIEWPORT);
+    await page.goto("/es");
+
+    for (const direction of ["left", "right"] as const) {
+      const mask = await rowOf(page, direction).evaluate(
+        (node) => getComputedStyle(node).maskImage,
+      );
+
+      // El primer tramo del degradado es opaco: la izquierda no se atenúa.
+      expect(mask).toMatch(/^linear-gradient\(90deg, rgb\(0, 0, 0\)/);
+      expect(mask).toMatch(/rgba\(0, 0, 0, 0\)\)$/);
+    }
+  });
+
   test("reduced motion keeps the wall still and scrollable", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.setViewportSize(PHONE_VIEWPORT);
