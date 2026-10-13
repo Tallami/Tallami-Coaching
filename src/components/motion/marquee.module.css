@@ -79,7 +79,15 @@
   animation-direction: reverse;
 }
 
+/*
+ * `position: relative`: lo que se posiciona de forma absoluta adentro de una
+ * copia (como el texto oculto de una tarjeta) tiene a la copia de bloque
+ * contenedor. Sin ella, quieta la fila (sin la animación, la pista deja de
+ * ser la que contiene esos elementos), un hijo así se ubicaría respecto de la
+ * página y la ensancharía.
+ */
 .copy {
+  position: relative;
   flex: none;
   min-width: 100cqw;
   padding-inline: calc(var(--marquee-gap, 28px) / 2);
@@ -93,9 +101,19 @@
  * `:focus-within`: un clic en una tarjeta ya cae en algo que se ve.
  */
 .row[data-paused] .track,
-.group:has(.row:hover) .track,
 .group:has(.row :focus-visible) .track {
   animation-play-state: paused;
+}
+
+/*
+ * El puntero solo frena donde hay uno que pueda salir de la fila: en una
+ * pantalla táctil, el `:hover` de un toque queda pegado hasta el próximo y el
+ * muro seguiría frenado con el botón diciendo "Pausar".
+ */
+@media (hover: hover) {
+  .group:has(.row:hover) .track {
+    animation-play-state: paused;
+  }
 }
 
 /*

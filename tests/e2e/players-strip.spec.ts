@@ -501,9 +501,35 @@ test.describe("players strip", () => {
 
     const row = rowOf(page);
 
+    // El botón responde cuando la página ya se hidrató: recién ahí se decide
+    // si la fila se vuelve focusable.
+    await toggleTo(stripOf(page).getByRole("button"), "Reanudar");
     await expect(row).not.toHaveAttribute("role");
     await expect(row).not.toHaveAttribute("tabindex");
     await expect(row).not.toHaveAttribute("aria-labelledby");
     await expect(page.getByRole("region", { name: LABEL_ES })).toHaveCount(1);
+  });
+
+  test("reduced motion: an absolutely positioned child cannot widen the page", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.setViewportSize(PHONE_VIEWPORT);
+    await page.goto("/es");
+
+    // Sin la animación, la pista deja de ser el bloque contenedor de lo que
+    // se posiciona de forma absoluta: lo tiene que ser la copia.
+    const { scrollWidth, clientWidth } = await page.evaluate(() => {
+      const copy = document.querySelector("[data-direction] > div > div");
+      const probe = document.createElement("span");
+      probe.style.cssText = "position:absolute;left:2000px;width:10px;height:10px";
+      copy?.append(probe);
+      return {
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+      };
+    });
+
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
   });
 });

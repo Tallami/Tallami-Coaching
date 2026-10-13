@@ -443,6 +443,41 @@ test.describe("reviews wall", () => {
     await expectBothMoving(page);
   });
 
+  test.describe("on a touch screen", () => {
+    test.use({ hasTouch: true });
+
+    test("a tap on a row does not leave the wall frozen", async ({ page }) => {
+      await page.setViewportSize(PHONE_VIEWPORT);
+      await page.goto("/es");
+
+      const wall = wallOf(page);
+
+      // Sin mouse no hay puntero que "salga" de la fila: el `:hover` de un
+      // toque queda pegado hasta el próximo, y no puede frenar el muro.
+      expect(
+        await page.evaluate(() => matchMedia("(hover: hover)").matches),
+      ).toBe(false);
+      await expectBothMoving(page);
+
+      await wall.scrollIntoViewIfNeeded();
+      const box = await rowOf(page, "right").boundingBox();
+      expect(box).not.toBeNull();
+      if (!box) return;
+      // En el borde de arriba de la fila, donde no hay ninguna tarjeta (un
+      // toque en una abre X en otra pestaña).
+      await page.touchscreen.tap(box.x + box.width / 2, box.y + 2);
+      expect(
+        await rowOf(page, "right").evaluate((row) => row.matches(":hover")),
+      ).toBe(true);
+
+      await expectBothMoving(page);
+
+      // El botón sigue siendo la forma de pausar con el dedo.
+      await toggleTo(wall.getByRole("button"), "Reanudar");
+      await expectBothStill(page);
+    });
+  });
+
   const FOCUS_CASES: { row: Direction; position: "first" | "last"; at: number }[] =
     [
       // Primera tarjeta a mitad de recorrido: fuera de la vista por la izquierda.

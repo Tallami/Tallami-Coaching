@@ -34,8 +34,6 @@ export interface MarqueeGroupProps {
   pauseLabel: string;
   /** Texto del botón con el movimiento pausado ("Reanudar"). */
   resumeLabel: string;
-  /** Nombre accesible del grupo, si la sección que lo contiene no lo nombra. */
-  label?: string;
   children: ReactNode;
   className?: string;
 }
@@ -85,18 +83,13 @@ function PlayIcon() {
 export function MarqueeGroup({
   pauseLabel,
   resumeLabel,
-  label,
   children,
   className,
 }: MarqueeGroupProps) {
   const [paused, setPaused] = useState(false);
 
   return (
-    <div
-      className={className ? `${styles.group} ${className}` : styles.group}
-      role={label ? "group" : undefined}
-      aria-label={label}
-    >
+    <div className={className ? `${styles.group} ${className}` : styles.group}>
       <button
         type="button"
         className={styles.toggle}

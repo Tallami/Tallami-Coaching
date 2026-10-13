@@ -1,18 +1,9 @@
 import { getTranslations } from "next-intl/server";
 import { LocaleSwitcher } from "@/components/home/locale-switcher";
+import { visibleNavItems } from "@/components/home/nav-items";
 import { NavList } from "@/components/home/nav-list";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
-
-const NAV_ITEMS = [
-  { href: "#results", labelKey: "results" },
-  { href: "#reviews", labelKey: "reviews" },
-  { href: "#services", labelKey: "services" },
-  { href: "#how-it-works", labelKey: "howItWorks" },
-  { href: "#faq", labelKey: "faq" },
-] as const;
-
-const REVIEWS_HREF = "#reviews";
 
 interface SiteHeaderProps {
   /** Si la sección "Reviews" se muestra. Sin tarjetas no hay sección, y el link tampoco. */
@@ -22,9 +13,7 @@ interface SiteHeaderProps {
 /** Encabezado transparente, absoluto sobre la portada. */
 export async function SiteHeader({ hasReviews }: SiteHeaderProps) {
   const t = await getTranslations("Header");
-  const navItems = NAV_ITEMS.filter(
-    ({ href }) => hasReviews || href !== REVIEWS_HREF,
-  );
+  const navItems = visibleNavItems(hasReviews);
 
   return (
     <header className="stage absolute inset-x-0 top-0 z-10 flex items-center gap-x-6 gap-y-3 bg-transparent px-gutter py-4 narrow:flex-wrap narrow:gap-y-0">
