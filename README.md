@@ -30,6 +30,8 @@ La web queda en http://localhost:3000 (redirige a `/es`, `/pt` o `/en` según el
 | `npm run tweets:record -- <id> [<id> …]` | Guarda la respuesta de X de uno o más tweets en `src/content/tweet-snapshots/` y rehace su índice (necesita internet) |
 | `npm run tweets:index` | Rehace `src/content/tweet-snapshots/index.ts` con los archivos que hay en esa carpeta (sin internet) |
 
+El ícono de la web es el monograma de `src/app/icon.svg`. `apple-icon.png` y `favicon.ico` salen de ese SVG con `node scripts/build-icons.mjs`: se corre solo si cambia el SVG, y los resultados se suben al repo.
+
 La primera vez, Playwright necesita el navegador: `npx playwright install chromium`.
 
 ## Textos
