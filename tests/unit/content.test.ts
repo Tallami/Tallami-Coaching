@@ -1,3 +1,6 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 import { PLAYERS } from "@/content/players";
 import { FNCS_TITLES, LAN_RESULTS, WINS } from "@/content/results";
@@ -9,6 +12,13 @@ import {
   lessonPackSavingsUsd,
 } from "@/content/services";
 import { SOCIAL_LINKS } from "@/content/social";
+import { readPlayerEntries } from "../helpers/players-source";
+
+/** Usuarios de X: letras, números y guion bajo, hasta 15 caracteres. */
+const X_HANDLE = /^\w{1,15}$/;
+const PHOTO_DIR = fileURLToPath(
+  new URL("../../src/assets/players", import.meta.url),
+);
 
 describe("results", () => {
   test("wins match CLAUDE.md in display order", () => {
@@ -73,24 +83,50 @@ describe("services", () => {
   });
 });
 
+// Sumar un jugador (`npm run players:photo -- <usuario>` y una línea en
+// `src/content/players.ts`) no debe romper ningún test: lo que se comprueba son
+// reglas que valen para cualquier lista.
 describe("players", () => {
-  test("players match the approved list and order", () =>
-    expect(PLAYERS.map((p) => [p.name, p.handle])).toEqual([
-      ["K1ng", "k1ng"],
-      ["Fazer", "fazerfn"],
-      ["Phzin", "Phzinfps1"],
-      ["Randu", "randuimmm"],
-      ["Lewa", "LewaFn"],
-      ["Romero", "romerofdps"],
-      ["Edson", "edsonmalado"],
-      ["Tisco", "Tiscofn"],
-      ["Diguera", "loud_diguera"],
-      ["Mack", "mackftn"],
-      ["Vadeal", "VadealFN"],
-    ]));
+  test("has players, with names and handles that are not repeated", () => {
+    expect(PLAYERS.length).toBeGreaterThan(0);
+    expect(new Set(PLAYERS.map((p) => p.name)).size).toBe(PLAYERS.length);
+    // X no distingue mayúsculas en los usuarios.
+    expect(new Set(PLAYERS.map((p) => p.handle.toLowerCase())).size).toBe(
+      PLAYERS.length,
+    );
+  });
 
-  test("every player has a photo", () =>
-    expect(PLAYERS.every((p) => p.photo)).toBe(true));
+  test("every handle is a valid X username and every name has text", () => {
+    for (const { name, handle } of PLAYERS) {
+      expect(handle, `usuario de ${name}`).toMatch(X_HANDLE);
+      expect(name.trim(), "nombre").not.toBe("");
+      expect(name, `nombre de @${handle}`).toBe(name.trim());
+    }
+  });
+
+  test("a player whose photo file exists has it wired in", () => {
+    const missing = PLAYERS.filter(
+      ({ handle, photo }) =>
+        !photo && existsSync(join(PHOTO_DIR, `${handle.toLowerCase()}.jpg`)),
+    ).map(({ handle }) => handle);
+
+    // La foto es opcional, pero si el archivo está y no se importó, la franja
+    // muestra la inicial teniendo la foto a mano.
+    expect(
+      missing,
+      "Hay foto en src/assets/players pero no se importó en src/content/players.ts",
+    ).toEqual([]);
+  });
+
+  test("the e2e reading of players.ts matches PLAYERS", () => {
+    expect(readPlayerEntries()).toEqual(
+      PLAYERS.map(({ name, handle, photo }) => ({
+        name,
+        handle,
+        hasPhoto: photo !== undefined,
+      })),
+    );
+  });
 });
 
 describe("social", () => {

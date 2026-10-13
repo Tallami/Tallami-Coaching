@@ -1,30 +1,53 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { TWEET_IDS } from "../../src/content/tweets";
+import {
+  COACH_HANDLE,
+  idsNewestFirst,
+  readFixture,
+} from "../helpers/tweet-fixtures";
 
 const GOLD = "rgb(255, 201, 60)";
 const MENTION_BLUE = "rgb(157, 178, 255)";
 /** Nombre accesible de cada tarjeta: empieza con `Reviews.cardLabel` (es). */
 const CARD_NAME = /^Tweet de .+ en X/;
 const STATUS_URL = /^https:\/\/x\.com\/\w+\/status\/(\d+)$/;
+/** Un @usuario en el texto de un tweet (no el medio de un mail). */
+const MENTION = /(?<![\w@])@\w+/g;
 
 /**
  * Orden del muro con las respuestas grabadas de `tests/fixtures/tweets`: del
- * más nuevo al más viejo, los pares arriba y los impares abajo.
+ * más nuevo al más viejo, los pares arriba y los impares abajo. Sale de los
+ * mismos archivos que lee la web, así que sumar un tweet no obliga a tocar
+ * esta lista.
  */
-const TOP_ROW_IDS = [
-  "2104290558906868129",
-  "2055799128924238181",
-  "2032968988515271075",
-  "1964780083618685407",
-  "1959441051686428791",
-];
-const BOTTOM_ROW_IDS = [
-  "2091212984919961996",
-  "2052897717295210959",
-  "2028263824235610348",
-  "1964778870126878727",
-  "1891289855725887688",
-];
+const NEWEST_FIRST = idsNewestFirst(TWEET_IDS);
+const TOP_ROW_IDS = NEWEST_FIRST.filter((_, index) => index % 2 === 0);
+const BOTTOM_ROW_IDS = NEWEST_FIRST.filter((_, index) => index % 2 === 1);
+
+const NEWEST_TWEET = readFixture(NEWEST_FIRST[0]);
+const NEWEST_MENTIONS = NEWEST_TWEET.text.match(MENTION) ?? [];
+const COACH_MENTION = NEWEST_MENTIONS.find(
+  (mention) => mention.toLowerCase() === `@${COACH_HANDLE}`,
+);
+/** Otra mención que no sea el coach ni el autor (el encabezado de la tarjeta ya muestra su usuario). */
+const OTHER_MENTION = NEWEST_MENTIONS.find((mention) =>
+  ![COACH_HANDLE, NEWEST_TWEET.user.screen_name].some(
+    (handle) => mention.toLowerCase() === `@${handle.toLowerCase()}`,
+  ),
+);
+/** El primer tweet del muro que trae foto: su tarjeta lleva avatar y foto. */
+const PHOTO_TWEET_ID = NEWEST_FIRST.find(
+  (id) => (readFixture(id).photos ?? []).length > 0,
+);
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Lo que X escribe tal cual en el texto: hasta el primer salto de línea, `&` o link. */
+function plainTextStart(text: string): string {
+  return text.split(/[&\n]|https?:\/\//)[0].trim();
+}
 
 const LOCALE_COPY = [
   {
@@ -282,9 +305,11 @@ test.describe("reviews wall", () => {
     );
 
     // El nombre del link trae el autor y también el texto del tweet.
-    await expect(links.first()).toHaveAccessibleName(/^Tweet de Lewa en X/);
     await expect(links.first()).toHaveAccessibleName(
-      /Top 14 \(\$32000\) conned 12\/12[\s\S]*@romerofdps @tallami1/,
+      new RegExp(`^Tweet de ${escapeRegExp(NEWEST_TWEET.user.name)} en X`),
+    );
+    await expect(links.first()).toHaveAccessibleName(
+      new RegExp(escapeRegExp(plainTextStart(NEWEST_TWEET.text))),
     );
   });
 
@@ -294,7 +319,7 @@ test.describe("reviews wall", () => {
     const top = (await hrefsOf(cardsOf(page, "left"))).map(idOf);
     const bottom = (await hrefsOf(cardsOf(page, "right"))).map(idOf);
 
-    expect(top[0]).toBe("2104290558906868129");
+    expect(top[0]).toBe(NEWEST_FIRST[0]);
     expect(top).toEqual(TOP_ROW_IDS);
     expect(bottom).toEqual(BOTTOM_ROW_IDS);
   });
@@ -302,9 +327,13 @@ test.describe("reviews wall", () => {
   test("card photos go through the image optimizer, lazily, without alt text", async ({
     page,
   }) => {
+    test.skip(!PHOTO_TWEET_ID, "Ningún tweet de la lista trae foto");
     await page.goto("/es");
 
-    const images = cardsOf(page, "left").first().locator("img");
+    const images = wallOf(page)
+      .locator(`a[href$='/status/${PHOTO_TWEET_ID}']`)
+      .first()
+      .locator("img");
 
     await expect(images).toHaveCount(2);
     for (const image of await images.all()) {
@@ -321,13 +350,22 @@ test.describe("reviews wall", () => {
   test("coach mention is highlighted in gold", async ({ page }) => {
     await page.goto("/es");
 
-    const wall = wallOf(page);
-    const coach = wall.getByText("@tallami1", { exact: true }).first();
-    const other = wall.getByText("@romerofdps", { exact: true }).first();
+    // El tweet más nuevo es la primera tarjeta; todos etiquetan al coach.
+    const card = cardsOf(page, "left").first();
+
+    expect(COACH_MENTION, "el tweet más nuevo etiqueta al coach").toBeDefined();
+    const coach = card.getByText(COACH_MENTION ?? "", { exact: true });
 
     await expect(coach).toHaveCSS("color", GOLD);
     await expect(coach).toHaveCSS("font-weight", "700");
-    await expect(other).toHaveCSS("color", MENTION_BLUE);
+
+    // Cualquier otra mención va en azul (si el tweet no etiqueta a nadie más, no hay qué mirar).
+    if (OTHER_MENTION) {
+      await expect(card.getByText(OTHER_MENTION, { exact: true })).toHaveCSS(
+        "color",
+        MENTION_BLUE,
+      );
+    }
   });
 
   test("loop copies are hidden and not focusable", async ({ page }) => {
@@ -336,14 +374,16 @@ test.describe("reviews wall", () => {
     const wall = wallOf(page);
     const copies = wall.locator("[inert]");
 
+    // Una copia por fila, en el mismo orden que las filas.
     await expect(copies).toHaveCount(2);
-    for (const copy of await copies.all()) {
+    const rowIds = [TOP_ROW_IDS, BOTTOM_ROW_IDS];
+    for (const [index, copy] of (await copies.all()).entries()) {
       await expect(copy).toHaveAttribute("aria-hidden", "true");
-      await expect(copy.locator("li")).toHaveCount(TOP_ROW_IDS.length);
+      await expect(copy.locator("li")).toHaveCount(rowIds[index].length);
     }
 
-    // Tab desde el botón recorre las 10 tarjetas visibles y sale del muro sin
-    // entrar en ninguna copia.
+    // Tab desde el botón recorre todas las tarjetas visibles y sale del muro
+    // sin entrar en ninguna copia.
     await wall.getByRole("button").focus();
     const visited: (string | null)[] = [];
     for (let press = 0; press < TWEET_IDS.length; press += 1) {

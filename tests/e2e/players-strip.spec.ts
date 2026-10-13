@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { readPlayerEntries } from "../helpers/players-source";
 
 const GOLD = "rgb(255, 201, 60)";
 const HERO = "section[aria-labelledby='hero-title']";
@@ -10,20 +11,10 @@ const STRIP_LABELS = [
   ["/en", "Worked with"],
 ] as const;
 
-/** Mismo orden que `PLAYERS` en `src/content/players.ts`. */
-const PLAYER_NAMES = [
-  "K1ng",
-  "Fazer",
-  "Phzin",
-  "Randu",
-  "Lewa",
-  "Romero",
-  "Edson",
-  "Tisco",
-  "Diguera",
-  "Mack",
-  "Vadeal",
-];
+/** Los jugadores de `src/content/players.ts`, en el orden en que se muestran. */
+const PLAYERS = readPlayerEntries();
+const PLAYER_NAMES = PLAYERS.map(({ name }) => name);
+const PLAYERS_WITH_PHOTO = PLAYERS.filter(({ hasPhoto }) => hasPhoto).length;
 
 const PHONE_VIEWPORT = { width: 375, height: 812 };
 /** Ancho en que el contenido de la página queda centrado y con márgenes laterales. */
@@ -53,6 +44,19 @@ function stripOf(page: Page): Locator {
 
 function playerListOf(page: Page): Locator {
   return stripOf(page).getByRole("list", { name: LABEL_ES });
+}
+
+/** El texto que cada item tiene directamente, sin el de los elementos de adentro. */
+async function ownTextOf(items: Locator): Promise<string[]> {
+  return items.evaluateAll((nodes) =>
+    nodes.map((node) =>
+      Array.from(node.childNodes)
+        .filter((child) => child.nodeType === Node.TEXT_NODE)
+        .map((child) => child.textContent)
+        .join("")
+        .trim(),
+    ),
+  );
 }
 
 /** Fila visible de la franja: el contenedor que recorta el movimiento. */
@@ -222,13 +226,24 @@ test.describe("players strip", () => {
 
     const list = playerListOf(page);
 
-    await expect(stripOf(page).getByRole("listitem")).toHaveText(PLAYER_NAMES);
+    // El nombre es el texto propio del item: la inicial de quien no tiene foto
+    // es decoración (`aria-hidden`) y no se cuenta.
+    expect(await ownTextOf(stripOf(page).getByRole("listitem"))).toEqual(PLAYER_NAMES);
     // Los nombres de jugador no se traducen.
     await expect(list).toHaveAttribute("translate", "no");
     // Fotos locales y decorativas: el nombre ya está al lado.
-    await expect(list.locator("img")).toHaveCount(PLAYER_NAMES.length);
+    await expect(list.locator("img")).toHaveCount(PLAYERS_WITH_PHOTO);
     for (const image of await list.locator("img").all()) {
       await expect(image).toHaveAttribute("alt", "");
+    }
+    // La foto es opcional: quien no la tiene muestra su inicial, también decorativa.
+    for (const [index, item] of (await list.getByRole("listitem").all()).entries()) {
+      const { hasPhoto, name } = PLAYERS[index];
+      const initial = item.locator("span[aria-hidden='true']");
+
+      await expect(item.locator("img")).toHaveCount(hasPhoto ? 1 : 0);
+      await expect(initial).toHaveCount(hasPhoto ? 0 : 1);
+      if (!hasPhoto) await expect(initial).toHaveText(name.charAt(0));
     }
   });
 

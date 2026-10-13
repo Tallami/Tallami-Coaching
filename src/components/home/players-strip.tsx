@@ -1,35 +1,12 @@
-import Image from "next/image";
 import { getTranslations } from "next-intl/server";
 import { MarqueeGroup, MarqueeRow } from "@/components/motion/marquee";
-import { PLAYERS, type Player } from "@/content/players";
+import { PLAYERS } from "@/content/players";
+import { PlayerChip } from "./player-chip";
 import styles from "./players-strip.module.css";
 
 const LABEL_ID = "players-label";
 /** Una vuelta de la franja: con los 11 jugadores, unos 33 px por segundo. */
 const LOOP_SECONDS = 40;
-const PHOTO_SIZE = 34;
-
-/** Foto redonda y nombre. Sin foto, la inicial sobre un círculo azul. */
-function PlayerChip({ player }: { player: Player }) {
-  return (
-    <li className={styles.player}>
-      {player.photo ? (
-        <Image
-          src={player.photo}
-          alt=""
-          width={PHOTO_SIZE}
-          height={PHOTO_SIZE}
-          className={styles.photo}
-        />
-      ) : (
-        <span className={styles.initial} aria-hidden="true">
-          {player.name.charAt(0)}
-        </span>
-      )}
-      {player.name}
-    </li>
-  );
-}
 
 /**
  * Franja "Trabajé con", justo debajo de la portada: jugadores que entrenó

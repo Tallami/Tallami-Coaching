@@ -1,9 +1,14 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import type { Tweet } from "react-tweet/api";
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { PLAYERS } from "@/content/players";
 import { TWEET_IDS } from "@/content/tweets";
 import {
   fetchTweetCards,
@@ -11,46 +16,57 @@ import {
   toTweetCard,
   tweetTextParts,
 } from "@/lib/tweets";
+import {
+  COACH_HANDLE,
+  FIXTURE_DIR,
+  idsNewestFirst,
+  readFixture as fixture,
+} from "../helpers/tweet-fixtures";
 
 // `cacheLife` solo existe dentro de un scope de "use cache" de Next; en Vitest
 // no hay ninguno, así que se reemplaza por una función vacía.
 vi.mock("next/cache", () => ({ cacheLife: () => {} }));
 
-const FIXTURE_DIR = fileURLToPath(
-  new URL("../fixtures/tweets", import.meta.url),
-);
-
-function fixture(id: string): Tweet {
-  return JSON.parse(readFileSync(join(FIXTURE_DIR, `${id}.json`), "utf8"));
-}
-
+const NUMERIC_ID = /^\d+$/;
+/** Un tweet grabado que sirve de base a los tests que lo modifican. */
 const TISCO_TWEET_ID = "1964780083618685407";
-const NEWEST_TWEET_ID = "2104290558906868129";
-const OLDEST_TWEET_ID = "1891289855725887688";
 
+// Sumar un tweet (su ID en `src/content/tweets.ts` y `npm run tweets:record --
+// <id>`) no debe romper ningún test: lo que se comprueba son reglas que valen
+// para cualquier lista, y la lista misma garantiza que cada tweet es real.
 describe("TWEET_IDS", () => {
-  test("lists the ten tweets of the spec, without repeats", () => {
-    expect(TWEET_IDS).toHaveLength(10);
-    expect(new Set(TWEET_IDS).size).toBe(10);
-    expect([...TWEET_IDS].sort()).toEqual(
-      [
-        "2028263824235610348",
-        "2052897717295210959",
-        "1959441051686428791",
-        "2032968988515271075",
-        "2055799128924238181",
-        "2104290558906868129",
-        "2091212984919961996",
-        "1964780083618685407",
-        "1891289855725887688",
-        "1964778870126878727",
-      ].sort(),
-    );
+  test("has tweets, without repeats, and every id is a number", () => {
+    expect(TWEET_IDS.length).toBeGreaterThan(0);
+    expect(new Set(TWEET_IDS).size).toBe(TWEET_IDS.length);
+    for (const id of TWEET_IDS) {
+      expect(id).toMatch(NUMERIC_ID);
+    }
   });
 
   test("every tweet has a recorded response", () => {
     for (const id of TWEET_IDS) {
+      expect(
+        existsSync(join(FIXTURE_DIR, `${id}.json`)),
+        `Falta tests/fixtures/tweets/${id}.json: corré "npm run tweets:record -- ${id}"`,
+      ).toBe(true);
       expect(fixture(id).id_str).toBe(id);
+    }
+  });
+
+  test("every tweet is by a listed player and tags the coach", () => {
+    const handles = new Set(PLAYERS.map(({ handle }) => handle.toLowerCase()));
+
+    for (const id of TWEET_IDS) {
+      const { author, text } = toTweetCard(fixture(id));
+
+      expect(
+        handles.has(author.handle.toLowerCase()),
+        `El tweet ${id} es de @${author.handle}, que no está en src/content/players.ts`,
+      ).toBe(true);
+      expect(
+        tweetTextParts(text).some((part) => part.kind === "self"),
+        `El tweet ${id} no etiqueta a @${COACH_HANDLE}`,
+      ).toBe(true);
     }
   });
 });
@@ -75,12 +91,13 @@ describe("toTweetCard", () => {
     expect(card.image?.height).toBeGreaterThan(0);
   });
 
-  test("every recorded tweet becomes a card with a photo and no t.co link", () => {
+  test("every recorded tweet becomes a card with no t.co link", () => {
+    // La foto es opcional (ver "leaves out the image..."): un tweet de solo
+    // texto también es una tarjeta válida.
     for (const id of TWEET_IDS) {
       const card = toTweetCard(fixture(id));
       expect(card.text).not.toContain("t.co/");
       expect(card.text).toBe(card.text.trim());
-      expect(card.image).toBeDefined();
     }
   });
 
@@ -246,13 +263,21 @@ describe("fetchTweetCards", () => {
 
     const forward = await fetchTweetCards(TWEET_IDS, load);
     const backward = await fetchTweetCards([...TWEET_IDS].reverse(), load);
+    const expected = idsNewestFirst(TWEET_IDS);
 
-    expect(forward).toHaveLength(10);
-    expect(forward[0].id).toBe(NEWEST_TWEET_ID);
-    expect(forward[9].id).toBe(OLDEST_TWEET_ID);
-    expect(backward.map((card) => card.id)).toEqual(
-      forward.map((card) => card.id),
-    );
+    expect(forward).toHaveLength(TWEET_IDS.length);
+    expect(forward.map((card) => card.id)).toEqual(expected);
+    expect(backward.map((card) => card.id)).toEqual(expected);
+  });
+
+  test("breaks a tie on the date with the larger numeric id first", async () => {
+    const sameMoment = { ...fixture(TISCO_TWEET_ID) };
+    // "99" es mayor que "100" como texto, pero "100" es el tweet más nuevo.
+    const load = async (id: string) => ({ ...sameMoment, id_str: id });
+
+    const cards = await fetchTweetCards(["99", "100", "98"], load);
+
+    expect(cards.map((card) => card.id)).toEqual(["100", "99", "98"]);
   });
 
   test("skips a tweet with a bad date and reports it, keeping the others", async () => {
@@ -302,9 +327,7 @@ describe("getTweetCards with recorded responses", () => {
 
     const cards = await getTweetCards(TWEET_IDS);
 
-    expect(cards).toHaveLength(10);
-    expect(cards[0].id).toBe(NEWEST_TWEET_ID);
-    expect(cards[9].id).toBe(OLDEST_TWEET_ID);
+    expect(cards.map((card) => card.id)).toEqual(idsNewestFirst(TWEET_IDS));
   });
 
   test("a missing or invalid file counts as a failed tweet", async () => {
