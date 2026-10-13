@@ -5,16 +5,22 @@
 //   1. Pegá su ID (el número al final del link, `x.com/<usuario>/status/<ID>`)
 //      en la lista. El orden no importa: el muro va del tweet más nuevo al más
 //      viejo.
-//   2. Corré `npm run tweets:record -- <ID>`: graba la respuesta de X en
-//      `tests/fixtures/tweets/<ID>.json`, que usan los tests y el build de los
-//      e2e en lugar de la red. Hay que subir ese archivo junto con el cambio.
+//   2. Corré `npm run tweets:record -- <ID>`: guarda la respuesta de X en
+//      `src/content/tweet-snapshots/<ID>.json` y rehace el índice de esa
+//      carpeta (`index.ts`). Es la copia que la web usa si X falla al armar la
+//      página, y la que leen los tests en lugar de la red. Hay que subir esos
+//      archivos junto con el cambio.
 //   3. Corré `npm run test` y `npm run test:e2e`. El autor del tweet tiene que
 //      estar en `src/content/players.ts` y el texto tiene que etiquetar a
 //      @tallami1; si no, el test lo avisa.
 //
+// Para sacar uno: borrá su ID de la lista y su archivo de `tweet-snapshots`, y
+// corré `npm run tweets:index` para rehacer el índice.
+//
 // El texto, la imagen y el autor se bajan de X al construir la página (ver
-// `src/lib/tweets.ts`) y se refrescan una vez por día; si el tweet se borra o X
-// no responde, su tarjeta simplemente no aparece.
+// `src/lib/tweets.ts`) y se refrescan una vez por día. Si el tweet se borra (o
+// pasa a ser privado), su tarjeta no aparece. Si X falla (red, tiempo agotado,
+// error del servidor), se usa la copia guardada de ese tweet.
 
 export const TWEET_IDS: readonly string[] = [
   "2028263824235610348",

@@ -27,7 +27,8 @@ La web queda en http://localhost:3000 (redirige a `/es`, `/pt` o `/en` según el
 | `npm run test` | Tests unitarios (Vitest) |
 | `npm run test:e2e` | Tests end to end (Playwright): hace el build y sirve la web en el puerto 3100 |
 | `npm run players:photo -- <usuario>` | Baja la foto de perfil de X de un jugador a `src/assets/players/` |
-| `npm run tweets:record -- <id> [<id> …]` | Graba la respuesta de X de uno o más tweets en `tests/fixtures/tweets/` (necesita internet) |
+| `npm run tweets:record -- <id> [<id> …]` | Guarda la respuesta de X de uno o más tweets en `src/content/tweet-snapshots/` y rehace su índice (necesita internet) |
+| `npm run tweets:index` | Rehace `src/content/tweet-snapshots/index.ts` con los archivos que hay en esa carpeta (sin internet) |
 
 La primera vez, Playwright necesita el navegador: `npx playwright install chromium`.
 
@@ -42,12 +43,22 @@ Los mensajes viven en `messages/es.json`, `messages/pt.json` y `messages/en.json
 Son tweets reales de los jugadores que etiquetan a @tallami1. Para sumar uno:
 
 1. Pegá su ID (el número al final del link, `x.com/<usuario>/status/<ID>`) en la lista de `src/content/tweets.ts`. El orden no importa: el muro va del tweet más nuevo al más viejo.
-2. Corré `npm run tweets:record -- <ID>`. Graba la respuesta de X en `tests/fixtures/tweets/<ID>.json`; subí ese archivo junto con el cambio.
+2. Corré `npm run tweets:record -- <ID>`. Guarda la respuesta de X en `src/content/tweet-snapshots/<ID>.json` y rehace el índice de esa carpeta (`index.ts`, generado: no se edita a mano); subí esos archivos junto con el cambio.
 3. Corré `npm run test` y `npm run test:e2e`. El autor del tweet tiene que estar en la lista de jugadores y el texto tiene que etiquetar a @tallami1; si no, un test lo avisa.
 
-Al construir la página, la web baja el texto, la imagen y el autor de cada tweet desde X y los refresca una vez por día. Si un tweet se borra o X no responde, esa tarjeta no aparece; si no carga ninguno, no hay sección ni link "Reviews" en el menú.
+Para sacar uno: borrá su ID de la lista y su archivo de `src/content/tweet-snapshots/`, y corré `npm run tweets:index`.
 
-`TWEETS_FIXTURE_DIR` es una variable de entorno que cambia X por archivos grabados: con `TWEETS_FIXTURE_DIR=tests/fixtures/tweets`, la web lee `<carpeta>/<ID>.json` en lugar de pedirle los tweets a X. Así lo hace el build de `npm run test:e2e`, y por eso esos tests no dependen de internet. En producción no se define. `npm run tweets:record` también la respeta: si está definida, graba en esa carpeta.
+Al construir la página, la web baja el texto, la imagen y el autor de cada tweet desde X y los refresca una vez por día. Cada tweet tiene una copia guardada en el repo (`src/content/tweet-snapshots/`), que se usa solo si X falla:
+
+| X responde | Qué se muestra |
+| --- | --- |
+| El tweet | El dato en vivo |
+| Que ya no existe (borrado o privado) | Nada: la tarjeta desaparece, aunque haya copia |
+| Con error (red, tiempo agotado, error del servidor, límite de pedidos) | La copia guardada; si no hay copia, nada |
+
+El log del build dice qué camino tomó cada tweet. Si ninguno se puede mostrar, no hay sección ni link "Reviews" en el menú.
+
+`TWEETS_SOURCE=snapshots` es una variable de entorno que cambia X por las copias guardadas: la web usa solo `src/content/tweet-snapshots/` y no llama a X. Así lo hace el build de `npm run test:e2e`, y por eso esos tests no dependen de internet. En producción no se define. `npm run tweets:record` guarda en otra carpeta si se define `TWEET_SNAPSHOTS_DIR` (lo usan sus tests).
 
 ### Sumar un jugador a "Trabajé con"
 

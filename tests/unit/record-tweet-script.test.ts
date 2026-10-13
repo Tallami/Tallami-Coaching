@@ -25,7 +25,7 @@ describe("scripts/record-tweet.mjs", () => {
     tempDirs.push(dir);
     const result = spawnSync(process.execPath, [SCRIPT, ...args], {
       encoding: "utf8",
-      env: { ...process.env, TWEETS_FIXTURE_DIR: dir },
+      env: { ...process.env, TWEET_SNAPSHOTS_DIR: dir },
     });
     return { ...result, saved: readdirSync(dir) };
   }

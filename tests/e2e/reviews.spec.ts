@@ -15,7 +15,7 @@ const STATUS_URL = /^https:\/\/x\.com\/\w+\/status\/(\d+)$/;
 const MENTION = /(?<![\w@])@\w+/g;
 
 /**
- * Orden del muro con las respuestas grabadas de `tests/fixtures/tweets`: del
+ * Orden del muro con las copias guardadas de `src/content/tweet-snapshots`: del
  * más nuevo al más viejo, los pares arriba y los impares abajo. Sale de los
  * mismos archivos que lee la web, así que sumar un tweet no obliga a tocar
  * esta lista.

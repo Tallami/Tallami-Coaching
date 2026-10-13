@@ -1,22 +1,25 @@
-// Lectura de las respuestas grabadas de X (`tests/fixtures/tweets`) para los
-// tests unitarios y e2e: así lo que se espera sale de los mismos archivos que
-// lee la web, y sumar un tweet con `npm run tweets:record` no obliga a tocar
-// ningún test. Sin dependencias de la web: solo `node:fs`.
+// Lectura de las copias guardadas de X (`src/content/tweet-snapshots/<id>.json`)
+// para los tests unitarios y e2e: así lo que se espera sale de los mismos datos
+// que usa la web, y sumar un tweet con `npm run tweets:record` no obliga a
+// tocar ningún test. Lee los archivos y no importa `index.ts`: Playwright carga
+// los tests con el ESM de Node, que exige un atributo de importación para los
+// JSON. Que el índice y la carpeta coinciden lo comprueba
+// `tests/unit/tweet-snapshots-index.test.ts`.
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Tweet } from "react-tweet/api";
 
-export const FIXTURE_DIR = fileURLToPath(
-  new URL("../fixtures/tweets", import.meta.url),
+export const SNAPSHOT_DIR = fileURLToPath(
+  new URL("../../src/content/tweet-snapshots", import.meta.url),
 );
 
 /** El usuario del coach en X (el que los jugadores etiquetan en sus tweets). */
 export const COACH_HANDLE = "tallami1";
 
 export function readFixture(id: string): Tweet {
-  return JSON.parse(readFileSync(join(FIXTURE_DIR, `${id}.json`), "utf8"));
+  return JSON.parse(readFileSync(join(SNAPSHOT_DIR, `${id}.json`), "utf8"));
 }
 
 /**

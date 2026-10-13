@@ -1,12 +1,12 @@
 // Datos de los tweets de la sección "Reviews". Solo para Server Components: baja
-// los tweets de X (o de archivos grabados en los tests), los pasa a `TweetCard`
-// y los cachea un día. Los IDs salen de `src/content/tweets.ts`.
+// los tweets de X (con la copia guardada de cada uno como respaldo, ver
+// `resolveTweet`), los pasa a `TweetCard` y los cachea un día. Los IDs salen de
+// `src/content/tweets.ts` y las copias de `src/content/tweet-snapshots`.
 
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { cacheLife } from "next/cache";
 import { getTweet } from "react-tweet/api";
 import type { Tweet } from "react-tweet/api";
+import { TWEET_SNAPSHOTS } from "@/content/tweet-snapshots";
 
 export type TweetCard = {
   id: string;
@@ -29,16 +29,36 @@ export type TweetTextPart =
 
 export type TweetLoader = (id: string) => Promise<Tweet | undefined>;
 
+/**
+ * Qué camino siguió un tweet:
+ * - `live`: X lo devolvió y se usa ese dato.
+ * - `gone`: X contestó que ya no existe (borrado o privado): no se muestra.
+ * - `snapshot`: X falló y se usa la copia guardada.
+ * - `unavailable`: X falló y no hay copia: no se muestra.
+ */
+export type TweetPath = "live" | "gone" | "snapshot" | "unavailable";
+
+export type TweetResolution = {
+  /** El tweet a mostrar; falta en `gone` y `unavailable`. */
+  tweet: Tweet | undefined;
+  path: TweetPath;
+  /** Por qué falló X; solo en `snapshot` y `unavailable`. */
+  error?: unknown;
+};
+
 /** Usuario del coach en X: sus menciones se resaltan en las tarjetas. */
 const COACH_MENTION = "@tallami1";
 
-/** Variable de entorno que reemplaza a X por archivos grabados (tests e2e). */
-const FIXTURE_DIR_ENV = "TWEETS_FIXTURE_DIR";
+/**
+ * Variable de entorno que, con el valor `snapshots`, reemplaza a X por las
+ * copias guardadas: no se llama a X (tests e2e). En producción no se define.
+ */
+const SOURCE_ENV = "TWEETS_SOURCE";
+const SNAPSHOTS_SOURCE = "snapshots";
 
 /** Si X no contesta en este tiempo, el tweet cuenta como fallado y no frena el build. */
 const X_REQUEST_TIMEOUT_MS = 10_000;
 
-const NUMERIC_ID = /^\d+$/;
 const TRAILING_SHORT_LINK = /\s*https:\/\/t\.co\/\w+\s*$/;
 const NORMAL_AVATAR_SUFFIX = /_normal(\.\w+)$/;
 const MENTION = /@\w+/g;
@@ -256,26 +276,103 @@ export async function fetchTweetCards(
     .sort(newestFirst);
 }
 
+/**
+ * Decide qué tweet mostrar. `loadLive` le pide el tweet a X y `snapshot` es la
+ * copia guardada (si hay):
+ * - X lo devuelve: se usa el dato en vivo.
+ * - X dice que no existe (`undefined`): no se muestra, aunque haya copia. Si un
+ *   jugador borra su tweet, su tarjeta tiene que desaparecer.
+ * - X falla (red, tiempo agotado, 5xx, 429) o contesta algo que no es un
+ *   tweet: se usa la copia; sin copia, no se muestra.
+ *
+ * No lee el entorno ni escribe logs: devuelve el camino que siguió para que
+ * quien la llama lo registre.
+ */
+export async function resolveTweet(
+  id: string,
+  loadLive: TweetLoader,
+  snapshot: Tweet | undefined,
+): Promise<TweetResolution> {
+  try {
+    const live = await loadLive(id);
+    if (!live) return { tweet: undefined, path: "gone" };
+    // Si no se puede armar la tarjeta, la respuesta no es un tweet: cuenta como fallo de X.
+    toTweetCard(live);
+    return { tweet: live, path: "live" };
+  } catch (error) {
+    return snapshot
+      ? { tweet: snapshot, path: "snapshot", error }
+      : { tweet: undefined, path: "unavailable", error };
+  }
+}
+
 function loadFromX(id: string): Promise<Tweet | undefined> {
   return getTweet(id, { signal: AbortSignal.timeout(X_REQUEST_TIMEOUT_MS) });
 }
 
-/** Lee la respuesta grabada `<dir>/<id>.json`. Tira error si no existe o no es JSON. */
-async function loadFromFixture(dir: string, id: string): Promise<Tweet> {
-  if (!NUMERIC_ID.test(id)) throw new Error(`ID de tweet inválido: ${id}`);
-  const file = await readFile(join(dir, `${id}.json`), "utf8");
-  return JSON.parse(file) as Tweet;
+/** `Object.hasOwn`: un ID como "constructor" no es una copia. */
+function snapshotOf(id: string): Tweet | undefined {
+  return Object.hasOwn(TWEET_SNAPSHOTS, id) ? TWEET_SNAPSHOTS[id] : undefined;
+}
+
+/** Solo las copias guardadas. Sin copia tira error, y `fetchTweetCards` lo informa. */
+async function loadFromSnapshots(id: string): Promise<Tweet> {
+  const snapshot = snapshotOf(id);
+  if (!snapshot) {
+    throw new Error(
+      `no hay copia guardada; corré "npm run tweets:record -- ${id}"`,
+    );
+  }
+  return snapshot;
+}
+
+function reasonOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/** Deja en el log qué camino siguió el tweet: así se ve si X anda o si se están usando las copias. */
+function logTweetPath(id: string, { path, error }: TweetResolution): void {
+  switch (path) {
+    case "live":
+      console.info(`Tweet ${id}: dato en vivo de X.`);
+      break;
+    case "gone":
+      console.warn(
+        `Tweet ${id}: X dice que ya no existe (borrado o privado); se omite su tarjeta.`,
+      );
+      break;
+    case "snapshot":
+      console.warn(
+        `Tweet ${id}: X falló (${reasonOf(error)}); se usa la copia guardada.`,
+      );
+      break;
+    case "unavailable":
+      console.error(
+        `Tweet ${id}: X falló (${reasonOf(error)}) y no hay copia guardada; se omite su tarjeta.`,
+      );
+      break;
+  }
+}
+
+/** Pide el tweet a X, con su copia guardada de respaldo. */
+async function loadFromXWithBackup(id: string): Promise<Tweet | undefined> {
+  const resolution = await resolveTweet(id, loadFromX, snapshotOf(id));
+  logTweetPath(id, resolution);
+  return resolution.tweet;
 }
 
 function logSkippedTweet(id: string, error: unknown): void {
-  const reason = error instanceof Error ? error.message : String(error);
-  console.error(`No se pudo cargar el tweet ${id}; se omite su tarjeta: ${reason}`);
+  console.error(
+    `No se pudo cargar el tweet ${id}; se omite su tarjeta: ${reasonOf(error)}`,
+  );
 }
 
 /**
  * Tarjetas de los tweets, del más nuevo al más viejo; vacía si ninguno carga.
- * Se cachea un día. Con `TWEETS_FIXTURE_DIR` lee `<dir>/<id>.json` en vez de
- * pedirle los tweets a X, así los tests e2e no dependen de la red.
+ * Se cachea un día. Cada tweet se pide a X y, si X falla, se usa su copia
+ * guardada (ver `resolveTweet`): una caída de X al regenerar la página no deja
+ * la sección vacía. Con `TWEETS_SOURCE=snapshots` usa solo las copias y no
+ * llama a X, así los tests e2e no dependen de la red.
  */
 export async function getTweetCards(
   ids: readonly string[],
@@ -283,10 +380,10 @@ export async function getTweetCards(
   "use cache";
   cacheLife("days");
 
-  const fixtureDir = process.env[FIXTURE_DIR_ENV];
-  const load: TweetLoader = fixtureDir
-    ? (id) => loadFromFixture(fixtureDir, id)
-    : loadFromX;
+  const load: TweetLoader =
+    process.env[SOURCE_ENV] === SNAPSHOTS_SOURCE
+      ? loadFromSnapshots
+      : loadFromXWithBackup;
 
   return fetchTweetCards(ids, load, logSkippedTweet);
 }

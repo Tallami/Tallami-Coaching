@@ -1,25 +1,27 @@
-// Graba la respuesta de X de uno o más tweets en `tests/fixtures/tweets/<id>.json`.
-// Los tests y el build de Playwright leen esos archivos en vez de pedirle los
-// tweets a X (ver `src/lib/tweets.ts`). Se corre una vez por tweet nuevo, después
-// de sumar su ID a `src/content/tweets.ts`:
+// Guarda la respuesta de X de uno o más tweets en
+// `src/content/tweet-snapshots/<id>.json` y rehace el índice de esa carpeta
+// (`index.ts`, ver `scripts/tweet-snapshots-index.mjs`). Son las copias que la
+// web usa si X falla al armar la página, y las que leen los tests en lugar de la
+// red (ver `src/lib/tweets.ts`). Se corre una vez por tweet nuevo, después de
+// sumar su ID a `src/content/tweets.ts`:
 //
 //   npm run tweets:record -- <id> [<id> …]
 //
 // `<id>` es el número al final del link del tweet (`x.com/<usuario>/status/<id>`).
-// Con `TWEETS_FIXTURE_DIR` se graba en esa carpeta en vez de la de los tests.
+// Con `TWEET_SNAPSHOTS_DIR` se guarda en esa carpeta en vez de la de la web.
 // Pide los tweets con la misma función que usa la web (`getTweet`).
 
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { getTweet } from "react-tweet/api";
+import {
+  DEFAULT_SNAPSHOTS_DIR,
+  writeSnapshotsIndex,
+} from "./tweet-snapshots-index.mjs";
 
 const NUMERIC_ID = /^\d+$/;
 const TIMEOUT_MS = 20_000;
-const FIXTURE_DIR_ENV = "TWEETS_FIXTURE_DIR";
-const DEFAULT_DIR = fileURLToPath(
-  new URL("../tests/fixtures/tweets/", import.meta.url),
-);
+const SNAPSHOTS_DIR_ENV = "TWEET_SNAPSHOTS_DIR";
 
 /** Error esperado: se muestra el mensaje solo, sin la traza. */
 class RecordError extends Error {}
@@ -28,9 +30,9 @@ function errorMessage(error) {
   return error instanceof Error ? error.message : String(error);
 }
 
-function fixtureDir() {
-  const custom = process.env[FIXTURE_DIR_ENV];
-  return custom ? path.resolve(custom) : DEFAULT_DIR;
+function snapshotsDir() {
+  const custom = process.env[SNAPSHOTS_DIR_ENV];
+  return custom ? path.resolve(custom) : DEFAULT_SNAPSHOTS_DIR;
 }
 
 /** Los IDs sin repetir; si alguno no es un número, no se pide ninguno. */
@@ -70,18 +72,29 @@ async function record(id, dir) {
 
 async function main(args) {
   const ids = parseIds(args);
-  const dir = fixtureDir();
+  const dir = snapshotsDir();
   await mkdir(dir, { recursive: true });
 
-  // Uno por uno: si un tweet falla, los demás se graban igual y el error se informa al final.
+  // Uno por uno: si un tweet falla, los demás se guardan igual y el error se informa al final.
+  let saved = 0;
   let failures = 0;
   for (const id of ids) {
     try {
       await record(id, dir);
+      saved += 1;
     } catch (error) {
       failures += 1;
       console.error(`record-tweet: ${errorMessage(error)}`);
     }
+  }
+
+  // El índice sale de lo que hay en la carpeta: se rehace aunque algún tweet
+  // haya fallado, pero no si no se guardó ninguno (no hay nada nuevo que indexar).
+  if (saved > 0) {
+    const { file, ids: indexed } = await writeSnapshotsIndex(dir);
+    console.log(
+      `Guardado ${path.relative(process.cwd(), file)} con ${indexed.length} copias.`,
+    );
   }
   if (failures > 0) process.exitCode = 1;
 }

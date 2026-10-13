@@ -1,24 +1,19 @@
-import {
-  existsSync,
-  mkdtempSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import type { Tweet } from "react-tweet/api";
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { getTweet } from "react-tweet/api";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { PLAYERS } from "@/content/players";
+import { TWEET_SNAPSHOTS } from "@/content/tweet-snapshots";
 import { TWEET_IDS } from "@/content/tweets";
 import {
   fetchTweetCards,
   getTweetCards,
+  resolveTweet,
   toTweetCard,
   tweetTextParts,
+  type TweetLoader,
 } from "@/lib/tweets";
 import {
   COACH_HANDLE,
-  FIXTURE_DIR,
   idsNewestFirst,
   readFixture as fixture,
 } from "../helpers/tweet-fixtures";
@@ -26,9 +21,11 @@ import {
 // `cacheLife` solo existe dentro de un scope de "use cache" de Next; en Vitest
 // no hay ninguno, así que se reemplaza por una función vacía.
 vi.mock("next/cache", () => ({ cacheLife: () => {} }));
+// `getTweet` es la única salida a la red: cada test decide qué contesta X.
+vi.mock("react-tweet/api", () => ({ getTweet: vi.fn() }));
 
 const NUMERIC_ID = /^\d+$/;
-/** Un tweet grabado que sirve de base a los tests que lo modifican. */
+/** Un tweet guardado que sirve de base a los tests que lo modifican. */
 const TISCO_TWEET_ID = "1964780083618685407";
 
 // Sumar un tweet (su ID en `src/content/tweets.ts` y `npm run tweets:record --
@@ -43,13 +40,22 @@ describe("TWEET_IDS", () => {
     }
   });
 
-  test("every tweet has a recorded response", () => {
+  test("every tweet has a saved copy of X's response", () => {
     for (const id of TWEET_IDS) {
       expect(
-        existsSync(join(FIXTURE_DIR, `${id}.json`)),
-        `Falta tests/fixtures/tweets/${id}.json: corré "npm run tweets:record -- ${id}"`,
+        TWEET_SNAPSHOTS[id],
+        `Falta la copia guardada del tweet ${id}: corré "npm run tweets:record -- ${id}"`,
+      ).toBeDefined();
+      expect(TWEET_SNAPSHOTS[id].id_str).toBe(id);
+    }
+  });
+
+  test("every saved copy belongs to a listed tweet", () => {
+    for (const id of Object.keys(TWEET_SNAPSHOTS)) {
+      expect(
+        TWEET_IDS.includes(id),
+        `La copia ${id} no está en src/content/tweets.ts: sumá su ID a la lista o borrá src/content/tweet-snapshots/${id}.json y corré "npm run tweets:index"`,
       ).toBe(true);
-      expect(fixture(id).id_str).toBe(id);
     }
   });
 
@@ -57,7 +63,7 @@ describe("TWEET_IDS", () => {
     const handles = new Set(PLAYERS.map(({ handle }) => handle.toLowerCase()));
 
     for (const id of TWEET_IDS) {
-      const { author, text } = toTweetCard(fixture(id));
+      const { author, text } = toTweetCard(TWEET_SNAPSHOTS[id]);
 
       expect(
         handles.has(author.handle.toLowerCase()),
@@ -440,59 +446,194 @@ describe("fetchTweetCards", () => {
   });
 });
 
-describe("getTweetCards with recorded responses", () => {
-  const tempDirs: string[] = [];
+// La decisión de qué tweet se muestra cuando X contesta, no contesta o falla.
+// Es una función pura: el cargador en vivo y la copia guardada entran como datos.
+describe("resolveTweet", () => {
+  const snapshot = fixture(TISCO_TWEET_ID);
+  const live: Tweet = { ...snapshot, text: "texto de hoy @tallami1" };
+  const xIsDown: TweetLoader = async () => {
+    throw new Error("X respondió 429");
+  };
+
+  test("uses the live tweet when X returns it, even if there is a copy", async () => {
+    const load = vi.fn<TweetLoader>(async () => live);
+
+    const result = await resolveTweet(TISCO_TWEET_ID, load, snapshot);
+
+    expect(result.path).toBe("live");
+    expect(result.tweet).toBe(live);
+    expect(load).toHaveBeenCalledExactlyOnceWith(TISCO_TWEET_ID);
+  });
+
+  test("leaves the tweet out when X says it is gone, even if there is a copy", async () => {
+    const result = await resolveTweet(
+      TISCO_TWEET_ID,
+      async () => undefined,
+      snapshot,
+    );
+
+    expect(result.path).toBe("gone");
+    expect(result.tweet).toBeUndefined();
+  });
+
+  test("uses the copy when X fails", async () => {
+    const result = await resolveTweet(TISCO_TWEET_ID, xIsDown, snapshot);
+
+    expect(result.path).toBe("snapshot");
+    expect(result.tweet).toBe(snapshot);
+    expect(result.error).toBeInstanceOf(Error);
+  });
+
+  test("leaves the tweet out when X fails and there is no copy", async () => {
+    const result = await resolveTweet(TISCO_TWEET_ID, xIsDown, undefined);
+
+    expect(result.path).toBe("unavailable");
+    expect(result.tweet).toBeUndefined();
+    expect(result.error).toBeInstanceOf(Error);
+  });
+
+  test("treats an answer that is not a tweet as X failing", async () => {
+    const withCopy = await resolveTweet(
+      TISCO_TWEET_ID,
+      async () => ({}) as Tweet,
+      snapshot,
+    );
+    const withoutCopy = await resolveTweet(
+      TISCO_TWEET_ID,
+      async () => ({ ...live, created_at: "ayer" }),
+      undefined,
+    );
+
+    expect(withCopy.path).toBe("snapshot");
+    expect(withCopy.tweet).toBe(snapshot);
+    expect(withoutCopy.path).toBe("unavailable");
+    expect(withoutCopy.tweet).toBeUndefined();
+  });
+});
+
+describe("getTweetCards", () => {
+  const getTweetMock = vi.mocked(getTweet);
+  let info: ReturnType<typeof vi.spyOn>;
+  let warn: ReturnType<typeof vi.spyOn>;
+  let error: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    // Sin esto, un `TWEETS_SOURCE` del entorno de quien corre los tests cambiaría el camino.
+    vi.stubEnv("TWEETS_SOURCE", undefined);
+    info = vi.spyOn(console, "info").mockImplementation(() => {});
+    warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    error = vi.spyOn(console, "error").mockImplementation(() => {});
+  });
 
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
-    for (const dir of tempDirs.splice(0)) {
-      rmSync(dir, { recursive: true, force: true });
-    }
+    getTweetMock.mockReset();
   });
 
-  function useFixtureDir(dir: string) {
-    vi.stubEnv("TWEETS_FIXTURE_DIR", dir);
-    vi.spyOn(console, "error").mockImplementation(() => {});
-  }
+  const idsOf = (cards: { id: string }[]) => cards.map((card) => card.id);
+  const NEWEST_FIRST = idsNewestFirst(TWEET_IDS);
 
-  test("reads <dir>/<id>.json instead of calling X", async () => {
-    useFixtureDir(FIXTURE_DIR);
+  describe("with TWEETS_SOURCE=snapshots", () => {
+    beforeEach(() => {
+      vi.stubEnv("TWEETS_SOURCE", "snapshots");
+      getTweetMock.mockRejectedValue(new Error("esto no tendría que llamarse"));
+    });
 
-    const cards = await getTweetCards(TWEET_IDS);
+    test("uses only the saved copies and never calls X", async () => {
+      const cards = await getTweetCards(TWEET_IDS);
 
-    expect(cards.map((card) => card.id)).toEqual(idsNewestFirst(TWEET_IDS));
+      expect(idsOf(cards)).toEqual(NEWEST_FIRST);
+      expect(getTweetMock).not.toHaveBeenCalled();
+    });
+
+    test("an id without a copy is left out and reported", async () => {
+      const cards = await getTweetCards([TISCO_TWEET_ID, "111"]);
+
+      expect(idsOf(cards)).toEqual([TISCO_TWEET_ID]);
+      expect(error).toHaveBeenCalledWith(expect.stringContaining("111"));
+      expect(getTweetMock).not.toHaveBeenCalled();
+    });
+
+    test("names every object has (constructor, __proto__) are not copies", async () => {
+      const cards = await getTweetCards(["constructor", "__proto__", "toString"]);
+
+      expect(cards).toEqual([]);
+    });
   });
 
-  test("a missing or invalid file counts as a failed tweet", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "tweets-"));
-    tempDirs.push(dir);
-    writeFileSync(
-      join(dir, `${TISCO_TWEET_ID}.json`),
-      JSON.stringify(fixture(TISCO_TWEET_ID)),
-    );
-    writeFileSync(join(dir, "111.json"), "esto no es JSON");
-    writeFileSync(join(dir, "222.json"), "{}");
-    useFixtureDir(dir);
+  describe("with X as the source", () => {
+    test("asks X for every tweet and shows what X returns", async () => {
+      getTweetMock.mockImplementation(async (id) => ({
+        ...fixture(id),
+        text: `${fixture(id).text} (en vivo)`,
+      }));
 
-    const cards = await getTweetCards([TISCO_TWEET_ID, "111", "222", "333"]);
+      const cards = await getTweetCards(TWEET_IDS);
 
-    expect(cards.map((card) => card.id)).toEqual([TISCO_TWEET_ID]);
-  });
+      expect(getTweetMock).toHaveBeenCalledTimes(TWEET_IDS.length);
+      expect(idsOf(cards)).toEqual(NEWEST_FIRST);
+      for (const card of cards) {
+        expect(card.text).toMatch(/\(en vivo\)$/);
+      }
+      expect(warn).not.toHaveBeenCalled();
+      expect(error).not.toHaveBeenCalled();
+      expect(info).toHaveBeenCalledTimes(TWEET_IDS.length);
+    });
 
-  test("an id that is not a number never leaves the fixture directory", async () => {
-    useFixtureDir(FIXTURE_DIR);
+    test("with X down, every card comes from the saved copies", async () => {
+      getTweetMock.mockRejectedValue(new Error("fetch failed"));
 
-    const cards = await getTweetCards(["../fixtures/tweets/" + TISCO_TWEET_ID]);
+      const cards = await getTweetCards(TWEET_IDS);
 
-    expect(cards).toEqual([]);
-  });
+      expect(idsOf(cards)).toEqual(NEWEST_FIRST);
+      expect(warn).toHaveBeenCalledTimes(TWEET_IDS.length);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("copia guardada"),
+      );
+    });
 
-  test("an empty fixture directory gives an empty list", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "tweets-"));
-    tempDirs.push(dir);
-    useFixtureDir(dir);
+    test("when X fails for one tweet, the others stay live", async () => {
+      getTweetMock.mockImplementation(async (id) => {
+        if (id === TISCO_TWEET_ID) throw new Error("X respondió 503");
+        return { ...fixture(id), text: `${fixture(id).text} (en vivo)` };
+      });
 
-    expect(await getTweetCards(TWEET_IDS)).toEqual([]);
+      const cards = await getTweetCards(TWEET_IDS);
+      const byId = new Map(cards.map((card) => [card.id, card]));
+
+      expect(idsOf(cards)).toEqual(NEWEST_FIRST);
+      expect(byId.get(TISCO_TWEET_ID)?.text).not.toMatch(/\(en vivo\)$/);
+      expect(byId.get(NEWEST_FIRST[0])?.text).toMatch(/\(en vivo\)$/);
+      expect(warn).toHaveBeenCalledExactlyOnceWith(
+        expect.stringContaining(TISCO_TWEET_ID),
+      );
+    });
+
+    test("a tweet X no longer has disappears even though it has a copy", async () => {
+      getTweetMock.mockImplementation(async (id) =>
+        id === TISCO_TWEET_ID ? undefined : fixture(id),
+      );
+
+      const cards = await getTweetCards(TWEET_IDS);
+
+      expect(idsOf(cards)).toEqual(
+        NEWEST_FIRST.filter((id) => id !== TISCO_TWEET_ID),
+      );
+      expect(warn).toHaveBeenCalledExactlyOnceWith(
+        expect.stringContaining(TISCO_TWEET_ID),
+      );
+    });
+
+    test("a tweet that X cannot give and that has no copy is left out and reported", async () => {
+      getTweetMock.mockRejectedValue(new Error("fetch failed"));
+
+      const cards = await getTweetCards([TISCO_TWEET_ID, "111"]);
+
+      expect(idsOf(cards)).toEqual([TISCO_TWEET_ID]);
+      expect(error).toHaveBeenCalledExactlyOnceWith(
+        expect.stringContaining("111"),
+      );
+    });
   });
 });
