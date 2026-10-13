@@ -55,16 +55,19 @@
  * `container-type`: cada copia mide al menos el ancho de la fila
  * (`100cqw`), así nunca queda un hueco vacío aunque haya poco contenido.
  * El `padding-block` deja lugar al aro de foco (3 px + 3 px de separación).
+ * `--marquee-fade`: ancho del desvanecido de cada borde, en % del ancho de la
+ * fila. Lo usan el degradado y, con "reducir movimiento", el relleno del final.
  */
 .row {
+  --marquee-fade: 6;
   container-type: inline-size;
   overflow-x: clip;
   padding-block: 8px;
   mask-image: linear-gradient(
     90deg,
     transparent,
-    #000 6%,
-    #000 94%,
+    #000 calc(var(--marquee-fade) * 1%),
+    #000 calc(100% - var(--marquee-fade) * 1%),
     transparent
   );
 }
@@ -117,19 +120,22 @@
 }
 
 /*
- * Con el foco del teclado en la fila (adentro, o la fila misma cuando es lo
- * único que se puede enfocar), el fundido de los bordes no tapa nada.
+ * Con el foco del teclado en un elemento de la fila, el fundido de los bordes
+ * no tapa nada.
  */
-.row:has(:focus-visible),
-.row:focus-visible {
+.row:has(:focus-visible) {
   mask-image: none;
 }
 
 /*
- * El aro de la fila misma va adentro: la fila llega de borde a borde en un
- * celular, y un aro afuera quedaría fuera de la pantalla.
+ * Lo mismo cuando la fila misma es lo único que se puede enfocar. Va en una
+ * regla aparte: un navegador que no entiende `:has()` descarta toda la regla
+ * que lo nombra, lista de selectores incluida, y el fundido taparía el aro de
+ * la fila. El aro va adentro: la fila llega de borde a borde en un celular, y
+ * un aro afuera quedaría fuera de la pantalla.
  */
 .row:focus-visible {
+  mask-image: none;
   outline-offset: -3px;
 }
 
@@ -145,9 +151,9 @@
  *
  * Quieta, la fila arranca donde empieza el contenido de la página: el que usa
  * el componente define `--marquee-inset` (el margen lateral) y la copia lo usa
- * de relleno a los dos lados. Sin él queda la mitad de la separación, como en
- * movimiento. `scroll-padding`: con el teclado, el elemento enfocado también
- * queda a esa distancia del borde.
+ * de relleno a los dos lados (al final, más el ancho del desvanecido). Sin él
+ * queda la mitad de la separación, como en movimiento. `scroll-padding`: con
+ * el teclado, el elemento enfocado también queda a esa distancia del borde.
  */
 @media (prefers-reduced-motion: reduce) {
   .toggle {
@@ -169,11 +175,23 @@
     scroll-padding-inline: var(--marquee-inset, 0px);
     scrollbar-width: thin;
     scrollbar-color: var(--color-stage-line) transparent;
-    mask-image: linear-gradient(90deg, #000 94%, transparent);
+    mask-image: linear-gradient(
+      90deg,
+      #000 calc(100% - var(--marquee-fade) * 1%),
+      transparent
+    );
   }
 
+  /*
+   * Al final del recorrido, el último elemento quedaría debajo del desvanecido
+   * de la derecha, atenuado a medias: se suma al final un espacio del mismo
+   * ancho. `cqw` es el 1 % del ancho de la fila (su `container-type`), igual
+   * que el `%` del degradado.
+   */
   .copy {
-    padding-inline: var(--marquee-inset, calc(var(--marquee-gap, 28px) / 2));
+    --copy-inset: var(--marquee-inset, calc(var(--marquee-gap, 28px) / 2));
+    padding-inline: var(--copy-inset)
+      calc(var(--copy-inset) + var(--marquee-fade) * 1cqw);
   }
 
   .copy[inert] {

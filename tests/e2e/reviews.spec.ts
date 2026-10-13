@@ -230,6 +230,19 @@ async function rowBox(page: Page, direction: Direction) {
   });
 }
 
+/**
+ * Ancho de la zona de la derecha que el degradado de `mask-image` atenúa: lo
+ * que queda después del tramo opaco, sobre el ancho de la fila.
+ */
+async function rightFadeWidth(row: Locator): Promise<number> {
+  return row.evaluate((node) => {
+    const mask = getComputedStyle(node).maskImage;
+    const opaqueUntil = /rgb\(0, 0, 0\) (?:calc\()?(\d+(?:\.\d+)?)%/.exec(mask)?.[1];
+    if (!opaqueUntil) throw new Error(`mask-image inesperada: ${mask}`);
+    return node.getBoundingClientRect().width * (1 - Number(opaqueUntil) / 100);
+  });
+}
+
 test.describe("reviews wall", () => {
   test("reviews sit between results and services in the page", async ({
     page,
@@ -409,17 +422,17 @@ test.describe("reviews wall", () => {
     const card = cardsOf(page, "left").first();
 
     expect(COACH_MENTION, "el tweet más nuevo etiqueta al coach").toBeDefined();
-    const coach = card.getByText(COACH_MENTION ?? "", { exact: true });
+    // `.first()`: un tweet puede nombrar a la misma persona más de una vez.
+    const coach = card.getByText(COACH_MENTION ?? "", { exact: true }).first();
 
     await expect(coach).toHaveCSS("color", GOLD);
     await expect(coach).toHaveCSS("font-weight", "700");
 
     // Cualquier otra mención va en azul (si el tweet no etiqueta a nadie más, no hay qué mirar).
     if (OTHER_MENTION) {
-      await expect(card.getByText(OTHER_MENTION, { exact: true })).toHaveCSS(
-        "color",
-        MENTION_BLUE,
-      );
+      await expect(
+        card.getByText(OTHER_MENTION, { exact: true }).first(),
+      ).toHaveCSS("color", MENTION_BLUE);
     }
   });
 
@@ -624,6 +637,38 @@ test.describe("reviews wall", () => {
       expect(mask).toMatch(/rgba\(0, 0, 0, 0\)\)$/);
     }
   });
+
+  for (const viewport of [PHONE_VIEWPORT, WIDE_VIEWPORT]) {
+    test(`reduced motion: scrolled to the end, the last card of each row is whole and clear of the right fade at ${viewport.width}px`, async ({
+      page,
+    }) => {
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await page.setViewportSize(viewport);
+      await page.goto("/es");
+
+      for (const direction of ["left", "right"] as const) {
+        const row = rowOf(page, direction);
+
+        await row.evaluate((node) => {
+          node.scrollLeft = node.scrollWidth;
+        });
+        // Se mide la zona del desvanecido que usa el CSS, no un ancho fijo.
+        const fade = await rightFadeWidth(row);
+        const edges = await rowBox(page, direction);
+        const card = await cardsOf(page, direction).last().boundingBox();
+
+        expect(fade, direction).toBeGreaterThan(0);
+        expect(card, direction).not.toBeNull();
+        if (!card) return;
+        expect(card.x, direction).toBeGreaterThanOrEqual(
+          edges.left - SUBPIXEL_TOLERANCE,
+        );
+        expect(card.x + card.width, direction).toBeLessThanOrEqual(
+          edges.right - fade + SUBPIXEL_TOLERANCE,
+        );
+      }
+    });
+  }
 
   test("reduced motion keeps the wall still and scrollable", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });

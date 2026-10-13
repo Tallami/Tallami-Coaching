@@ -27,6 +27,20 @@ async function openHome(page: Page, locale: string, width: number) {
   await page.evaluate(() => document.fonts.ready);
 }
 
+/** Violaciones serias o críticas de axe en la página abierta (mismos tags en todos los tests). */
+async function blockingViolations(page: Page) {
+  const results = await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze();
+
+  return results.violations
+    .filter(({ impact }) => impact && BLOCKING_IMPACTS.includes(impact))
+    .map(({ id, impact, help, nodes }) => ({
+      id,
+      impact,
+      help,
+      targets: nodes.map(({ target }) => target),
+    }));
+}
+
 /** Tab hasta que el foco cae en `target`; falla si no llega en el tope. */
 async function tabTo(page: Page, target: Locator) {
   for (let press = 0; press < MAX_TAB_PRESSES; press += 1) {
@@ -119,22 +133,26 @@ test.describe("accessibility", () => {
       }) => {
         await openHome(page, locale, width);
 
-        const results = await new AxeBuilder({ page })
-          .withTags(AXE_TAGS)
-          .analyze();
-        const blocking = results.violations
-          .filter(({ impact }) => impact && BLOCKING_IMPACTS.includes(impact))
-          .map(({ id, impact, help, nodes }) => ({
-            id,
-            impact,
-            help,
-            targets: nodes.map(({ target }) => target),
-          }));
-
-        expect(blocking).toEqual([]);
+        expect(await blockingViolations(page)).toEqual([]);
       });
     }
   }
+
+  // Con "reducir movimiento" las filas se vuelven focusables y se anuncian como
+  // grupos (ver `MarqueeRow`): otro DOM y otros estilos que revisar.
+  test("no serious or critical axe violations on /es at 375px with reduced motion", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await openHome(page, "es", PHONE_WIDTH);
+    // La fila de la franja de jugadores se vuelve focusable al hidratar la
+    // página: se espera a que lo sea para revisar el DOM final.
+    await expect(
+      page.locator("section[aria-labelledby='players-label'] [data-direction]"),
+    ).toHaveAttribute("tabindex", "0");
+
+    expect(await blockingViolations(page)).toEqual([]);
+  });
 
   test("skip link is the first focusable element and moves focus to main", async ({
     page,

@@ -35,8 +35,9 @@ const MIN_RING_WIDTH = 3;
 const MIN_GOLD_RING_PIXELS = 500;
 
 /**
- * La sección de la franja. Con "reducir movimiento" la fila también es una
- * región con el mismo nombre; por eso se pide la sección y no solo el rol.
+ * La sección de la franja. Con "reducir movimiento" la fila también lleva el
+ * mismo nombre (como grupo, no como región); por eso se pide la sección por su
+ * `aria-labelledby` y no solo por el nombre.
  */
 function stripOf(page: Page): Locator {
   return page.locator("section[aria-labelledby='players-label']");
@@ -176,6 +177,19 @@ async function rowBox(page: Page) {
   return rowOf(page).evaluate((node) => {
     const { left, right } = node.getBoundingClientRect();
     return { left, right };
+  });
+}
+
+/**
+ * Ancho de la zona de la derecha que el degradado de `mask-image` atenúa: lo
+ * que queda después del tramo opaco, sobre el ancho de la fila.
+ */
+async function rightFadeWidth(row: Locator): Promise<number> {
+  return row.evaluate((node) => {
+    const mask = getComputedStyle(node).maskImage;
+    const opaqueUntil = /rgb\(0, 0, 0\) (?:calc\()?(\d+(?:\.\d+)?)%/.exec(mask)?.[1];
+    if (!opaqueUntil) throw new Error(`mask-image inesperada: ${mask}`);
+    return node.getBoundingClientRect().width * (1 - Number(opaqueUntil) / 100);
   });
 }
 
@@ -450,12 +464,16 @@ test.describe("players strip", () => {
       const row = rowOf(page);
 
       // La fila es lo único que el teclado puede enfocar en la franja: tiene
-      // que anunciarse con un rol y el nombre de la franja.
-      await expect(row).toHaveAttribute("role", "region");
+      // que anunciarse con un rol y el nombre de la franja. Es un grupo y no
+      // una región: la sección ya es la región con ese nombre, y repetir el
+      // landmark confunde a quien navega por regiones (axe `landmark-unique`).
+      await expect(row).toHaveAttribute("role", "group");
       await expect(row).toHaveAccessibleName(LABEL_ES);
+      await expect(page.getByRole("group", { name: LABEL_ES })).toHaveCount(1);
+      await expect(page.getByRole("region", { name: LABEL_ES })).toHaveCount(1);
       await expect(
         page.getByRole("region", { name: LABEL_ES }).and(page.locator("[data-direction]")),
-      ).toHaveCount(1);
+      ).toHaveCount(0);
 
       await tabTo(page, row);
 
@@ -496,7 +514,36 @@ test.describe("players strip", () => {
     expect(mask).toMatch(/rgba\(0, 0, 0, 0\)\)$/);
   });
 
-  test("with motion the row is not a region nor a tab stop", async ({ page }) => {
+  for (const viewport of [PHONE_VIEWPORT, WIDE_VIEWPORT]) {
+    test(`reduced motion: scrolled to the end, the last player is whole and clear of the right fade at ${viewport.width}px`, async ({
+      page,
+    }) => {
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await page.setViewportSize(viewport);
+      await page.goto("/es");
+
+      const row = rowOf(page);
+      const last = playerListOf(page).getByRole("listitem").last();
+
+      await row.evaluate((node) => {
+        node.scrollLeft = node.scrollWidth;
+      });
+      // Se mide la zona del desvanecido que usa el CSS, no un ancho fijo.
+      const fade = await rightFadeWidth(row);
+      const rowEdges = await rowBox(page);
+      const player = await last.boundingBox();
+
+      expect(fade).toBeGreaterThan(0);
+      expect(player).not.toBeNull();
+      if (!player) return;
+      expect(player.x).toBeGreaterThanOrEqual(rowEdges.left - SUBPIXEL_TOLERANCE);
+      expect(player.x + player.width).toBeLessThanOrEqual(
+        rowEdges.right - fade + SUBPIXEL_TOLERANCE,
+      );
+    });
+  }
+
+  test("with motion the row is not a group nor a tab stop", async ({ page }) => {
     await page.goto("/es");
 
     const row = rowOf(page);
@@ -508,6 +555,7 @@ test.describe("players strip", () => {
     await expect(row).not.toHaveAttribute("tabindex");
     await expect(row).not.toHaveAttribute("aria-labelledby");
     await expect(page.getByRole("region", { name: LABEL_ES })).toHaveCount(1);
+    await expect(page.getByRole("group", { name: LABEL_ES })).toHaveCount(0);
   });
 
   test("reduced motion: an absolutely positioned child cannot widen the page", async ({

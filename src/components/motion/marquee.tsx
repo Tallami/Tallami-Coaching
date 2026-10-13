@@ -45,7 +45,7 @@ export interface MarqueeRowProps {
   /**
    * Id del texto que nombra la fila. Solo se usa si la fila se vuelve
    * focusable (con "reducir movimiento" y nada enfocable adentro): entonces
-   * se anuncia como región con ese nombre.
+   * se anuncia como grupo con ese nombre.
    */
   labelledBy?: string;
   children: ReactNode;
@@ -147,16 +147,18 @@ function seekToShow(
 /**
  * Vuelve la fila focusable (para desplazarla con las flechas) o la devuelve a
  * su estado normal. Una fila que el teclado puede enfocar se anuncia como
- * región con el nombre de `labelledBy`; sin nombre queda sin rol, porque una
- * región sin nombre no dice nada. Se hace a mano sobre el DOM, y no con
- * estado, porque lo decide el navegador (la preferencia de movimiento) y no
- * la página que se prerenderiza.
+ * grupo con el nombre de `labelledBy`; sin nombre queda sin rol, porque un
+ * grupo sin nombre no dice nada. Es un grupo y no una región: la `<section>`
+ * que la contiene ya es la región con ese mismo nombre, y repetir el landmark
+ * confunde a quien navega por regiones (axe `landmark-unique`). Se hace a
+ * mano sobre el DOM, y no con estado, porque lo decide el navegador (la
+ * preferencia de movimiento) y no la página que se prerenderiza.
  */
 function setRowFocusable(row: HTMLElement, isFocusable: boolean, labelledBy?: string) {
   if (isFocusable) {
     row.tabIndex = 0;
     if (labelledBy) {
-      row.setAttribute("role", "region");
+      row.setAttribute("role", "group");
       row.setAttribute("aria-labelledby", labelledBy);
     }
     return;
