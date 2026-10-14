@@ -109,8 +109,15 @@ function parseBcraQuotes(
     try {
       byDate.set(quotedOn, { quotedOn, arsPerUnit: normalizeRate(detail.tipoCotizacion) });
     } catch {
-      // Cotización en cero o con otro formato: se ignora esa fecha.
+      // Cotización en cero, negativa o con otro formato: se ignora esa fecha.
     }
+  }
+  if (results.length > 0 && byDate.size === 0) {
+    // Una respuesta sin nada usable puede ser un cambio de formato del BCRA:
+    // que quede en el log y no parezca solo "sin cotización".
+    console.warn(
+      `BCRA: la respuesta trae ${results.length} entradas pero ninguna sirve para ${currency} (${from} a ${to}).`,
+    );
   }
   return [...byDate.values()];
 }
@@ -189,7 +196,8 @@ async function storeQuotes(db: Db, currency: QuotedCurrency, quotes: Quote[]): P
  *
  * - ARS vale "1.0000"; USDT usa la cotización del dólar.
  * - Con `EXCHANGE_RATE_SOURCE=fixed` devuelve valores fijos, sin red ni base
- *   (y `null` antes de 2020, para probar la carga manual).
+ *   (y `null` antes de 2020, para probar la carga manual). En producción de
+ *   Vercel (`VERCEL_ENV=production`) se ignora, con un aviso en el log.
  * - Si no, mira `exchange_rates` y, si falta, pide al BCRA los 10 días hasta
  *   `date` (5 s de espera), guarda todo lo que llegó y devuelve la última
  *   cotización en o antes de `date`.
@@ -210,8 +218,17 @@ export async function getArsPerUnit(
     return { arsPerUnit: ARS_RATE, quotedOn: date, source: "fixed" };
   }
   if (process.env.EXCHANGE_RATE_SOURCE === "fixed") {
-    if (date < FIXED_FIRST_DATE) return null;
-    return { arsPerUnit: FIXED_RATES[currency], quotedOn: date, source: "fixed" };
+    if (process.env.VERCEL_ENV === "production") {
+      // Una variable de prueba olvidada en producción cargaría ventas con
+      // cotizaciones inventadas. Se mira VERCEL_ENV y no NODE_ENV: los e2e
+      // corren un build de producción (NODE_ENV=production) en la máquina.
+      console.warn(
+        "EXCHANGE_RATE_SOURCE=fixed se ignora en producción (VERCEL_ENV=production): se usa el BCRA. Sacá la variable.",
+      );
+    } else {
+      if (date < FIXED_FIRST_DATE) return null;
+      return { arsPerUnit: FIXED_RATES[currency], quotedOn: date, source: "fixed" };
+    }
   }
 
   const quoted: QuotedCurrency = currency === "USDT" ? "USD" : currency;

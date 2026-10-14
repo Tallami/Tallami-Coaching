@@ -160,11 +160,15 @@ describe("getArsPerUnit", () => {
           {"fecha":"mañana","detalle":[{"codigoMoneda":"USD","tipoCotizacion":1500.0}]},
           {"fecha":"2026-10-06","detalle":"nada"},
           {"fecha":"2026-10-05"},
+          {"fecha":"2026-10-04","detalle":[{"codigoMoneda":"USD","tipoCotizacion":1.5E3}]},
+          {"fecha":"2026-10-03","detalle":[{"codigoMoneda":"USD","tipoCotizacion":-5.0}]},
           null,
           {"fecha":"2026-10-02","detalle":[{"codigoMoneda":"USD","tipoCotizacion":1520.5}]}
         ]}`,
       );
 
+      // La notación exponencial (1.5E3) y el valor negativo se descartan:
+      // gana la cotización válida más reciente.
       expect(await getArsPerUnit(db, "USD", SATURDAY)).toEqual({
         arsPerUnit: "1520.5000",
         quotedOn: "2026-10-02",
@@ -303,6 +307,25 @@ describe("getArsPerUnit", () => {
       expect(await getArsPerUnit(db, "USD", SATURDAY)).toBeNull();
     });
 
+    test("warns when the answer has results but none is usable", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      mockFetch(bcraBody("USD", [["2026-10-09", "0"], ["2026-10-08", "-5.0"]]));
+
+      expect(await getArsPerUnit(db, "USD", SATURDAY)).toBeNull();
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0]?.[0])).toMatch(/BCRA.*ninguna/);
+    });
+
+    test("does not warn when the BCRA simply has no quotes for the range", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      mockFetch(USD_EMPTY);
+
+      expect(await getArsPerUnit(db, "USD", SATURDAY)).toBeNull();
+
+      expect(warn).not.toHaveBeenCalled();
+    });
+
     test("gives up after five seconds", async () => {
       const timeout = vi.spyOn(AbortSignal, "timeout").mockReturnValue(AbortSignal.abort());
       vi.stubGlobal(
@@ -385,6 +408,29 @@ describe("getArsPerUnit", () => {
       expect(await getArsPerUnit(db, "BRL", "2019-12-31")).toBeNull();
       expect((await getArsPerUnit(db, "USD", "2020-01-01"))?.arsPerUnit).toBe("1500.0000");
       expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    test("is still honoured in Vercel previews", async () => {
+      vi.stubEnv("VERCEL_ENV", "preview");
+      const fetchMock = mockFetch(USD_RANGE);
+
+      expect((await getArsPerUnit(db, "USD", SATURDAY))?.arsPerUnit).toBe("1500.0000");
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    test("is ignored in Vercel production, with a warning, and the BCRA is used", async () => {
+      vi.stubEnv("VERCEL_ENV", "production");
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const fetchMock = mockFetch(USD_RANGE);
+
+      expect(await getArsPerUnit(db, "USD", SATURDAY)).toEqual({
+        arsPerUnit: "1517.0000",
+        quotedOn: "2026-10-09",
+        source: "bcra",
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0]?.[0])).toMatch(/EXCHANGE_RATE_SOURCE/);
     });
   });
 

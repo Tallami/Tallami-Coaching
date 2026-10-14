@@ -89,7 +89,7 @@ describe("formatMoney", () => {
   });
 
   test("uses a plain space, never a non-breaking one", () => {
-    expect(formatMoney(100, "USD")).not.toMatch(/ | /);
+    expect(formatMoney(100, "USD")).not.toMatch(/\u00a0|\u202f/);
   });
 
   test("refuses amounts that are not whole cents", () => {
