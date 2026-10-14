@@ -20,6 +20,18 @@ function isUnder(pathname: string, root: string): boolean {
   return pathname === root || pathname.startsWith(`${root}/`);
 }
 
+/**
+ * Las formas de transporte de una página que Next entiende como la misma ruta:
+ * `/admin/ventas.rsc` (datos de la página) y
+ * `/admin/ventas.segments/_tree.segment.rsc` (prefetch por segmentos). Son del
+ * panel igual que `/admin/ventas` y deben pasar por el mismo filtro.
+ */
+const TRANSPORT_SUFFIX = /\.segments\/.*$|\.rsc$/;
+
+function stripTransport(pathname: string): string {
+  return pathname.replace(TRANSPORT_SUFFIX, "");
+}
+
 function decodeOrSelf(pathname: string): string {
   try {
     return decodeURIComponent(pathname);
@@ -28,18 +40,21 @@ function decodeOrSelf(pathname: string): string {
   }
 }
 
-/** Sin barras finales: `/admin/login/` es `/admin/login`. */
+/** Sin forma de transporte ni barras finales: `/admin/login.rsc` y `/admin/login/` son `/admin/login`. */
 function normalizePath(pathname: string): string {
-  const decoded = decodeOrSelf(pathname);
+  const decoded = stripTransport(decodeOrSelf(pathname));
   return decoded.length > 1 ? decoded.replace(/\/+$/, "") : decoded;
 }
 
 /**
- * ¿La ruta es del panel? Mira también la ruta decodificada: `/%61dmin` es
- * `/admin` para el router y no puede escaparse del filtro por cómo se escribe.
+ * ¿La ruta es del panel? Mira también la ruta decodificada (`/%61dmin` es
+ * `/admin` para el router) y sin la forma de transporte (`/admin.rsc`): no
+ * puede escaparse del filtro por cómo se escribe ni por cómo se pide.
  */
 export function isAdminPath(pathname: string): boolean {
-  return isUnder(pathname, PANEL_PATH) || isUnder(decodeOrSelf(pathname), PANEL_PATH);
+  return [pathname, decodeOrSelf(pathname)].some((candidate) =>
+    isUnder(stripTransport(candidate), PANEL_PATH),
+  );
 }
 
 /** Encabezados de toda respuesta del panel: ni los buscadores ni ninguna caché la guardan. */
@@ -65,7 +80,7 @@ function destinationOf(request: NextRequest): string {
   const query = new URLSearchParams(searchParams);
   query.delete(ROUTER_QUERY);
   const search = query.size > 0 ? `?${query}` : "";
-  return safeNextPath(`${pathname}${search}`);
+  return safeNextPath(`${stripTransport(pathname)}${search}`);
 }
 
 function unauthorized(): NextResponse {

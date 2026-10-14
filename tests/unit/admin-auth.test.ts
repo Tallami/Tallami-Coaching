@@ -6,8 +6,10 @@ import { hashPassword, verifyPassword } from "@/admin/auth/password";
 import {
   LOGIN_MAX_FAILURES,
   LOGIN_WINDOW_MS,
+  confirmLoginSuccess,
   isLoginBlocked,
   recordLoginAttempt,
+  reserveLoginAttempt,
 } from "@/admin/auth/rate-limit";
 import {
   ADMIN_COOKIE,
@@ -19,6 +21,14 @@ import {
 import type { Db } from "@/db/client";
 import { loginAttempts } from "@/db/schema";
 import { createTestDb } from "../helpers/db";
+
+// `verifyPassword` (scrypt) queda envuelta en un espía que conserva su
+// comportamiento: así se puede comprobar cuántas contraseñas llegó a revisar
+// `attemptLogin`, sin depender de cuánto tarda cada una.
+vi.mock("@/admin/auth/password", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/admin/auth/password")>();
+  return { ...actual, verifyPassword: vi.fn(actual.verifyPassword) };
+});
 
 const PASSWORD = "una-clave-larga-de-prueba";
 const SECRET = "secreto-de-prueba-de-mas-de-32-caracteres";
@@ -294,6 +304,44 @@ describe("login rate limit", () => {
     const [row] = await db.select().from(loginAttempts);
     expect(row).toMatchObject({ ipHash: IP, succeeded: false, createdAt: now });
   });
+
+  describe("reserving a slot before checking the password", () => {
+    test("hands out one slot per attempt and refuses the sixth without leaving a trace", async () => {
+      const ids: (number | null)[] = [];
+      for (let i = 0; i < LOGIN_MAX_FAILURES; i += 1) {
+        ids.push(await reserveLoginAttempt(db, IP, now));
+      }
+
+      expect(ids.every((id) => typeof id === "number")).toBe(true);
+      expect(await reserveLoginAttempt(db, IP, now)).toBeNull();
+      expect(await db.select().from(loginAttempts)).toHaveLength(LOGIN_MAX_FAILURES);
+    });
+
+    test("counts a reservation as a failure until it is confirmed as a success", async () => {
+      const ids: number[] = [];
+      for (let i = 0; i < LOGIN_MAX_FAILURES; i += 1) {
+        const id = await reserveLoginAttempt(db, IP, now);
+        if (id === null) throw new Error("the reservation should not be refused");
+        ids.push(id);
+      }
+      expect(await isLoginBlocked(db, IP, now)).toBe(true);
+
+      await confirmLoginSuccess(db, ids[0]);
+
+      expect(await isLoginBlocked(db, IP, now)).toBe(false);
+      const confirmed = await db.select().from(loginAttempts);
+      expect(confirmed.filter((row) => row.succeeded)).toHaveLength(1);
+      expect(typeof (await reserveLoginAttempt(db, IP, now))).toBe("number");
+    });
+
+    test("keeps each ip apart and frees the slots after the window", async () => {
+      for (let i = 0; i < LOGIN_MAX_FAILURES; i += 1) await reserveLoginAttempt(db, IP, now);
+
+      expect(await reserveLoginAttempt(db, "hash-de-otra-ip", now)).not.toBeNull();
+      const later = new Date(now.getTime() + LOGIN_WINDOW_MS);
+      expect(await reserveLoginAttempt(db, IP, later)).not.toBeNull();
+    });
+  });
 });
 
 describe("attemptLogin", () => {
@@ -339,6 +387,55 @@ describe("attemptLogin", () => {
     expect(await db.select().from(loginAttempts)).toHaveLength(LOGIN_MAX_FAILURES);
     // Otra IP sigue pudiendo entrar.
     expect(await attemptLogin(db, "hash-de-otra-ip", PASSWORD)).toBe("ok");
+  });
+
+  test("lets the right password in after earlier failures below the limit", async () => {
+    for (let i = 0; i < LOGIN_MAX_FAILURES - 1; i += 1) {
+      expect(await attemptLogin(db, IP, "incorrecta")).toBe("invalid");
+    }
+
+    expect(await attemptLogin(db, IP, PASSWORD)).toBe("ok");
+
+    const rows = await db.select().from(loginAttempts);
+    expect(rows.filter((row) => row.succeeded)).toHaveLength(1);
+    expect(rows.filter((row) => !row.succeeded)).toHaveLength(LOGIN_MAX_FAILURES - 1);
+    expect(await isLoginBlocked(db, IP, new Date())).toBe(false);
+  });
+
+  test("never checks the password while blocked", async () => {
+    for (let i = 0; i < LOGIN_MAX_FAILURES; i += 1) await attemptLogin(db, IP, "incorrecta");
+    vi.mocked(verifyPassword).mockClear();
+
+    expect(await attemptLogin(db, IP, PASSWORD)).toBe("blocked");
+    expect(await attemptLogin(db, IP, "incorrecta")).toBe("blocked");
+
+    expect(verifyPassword).not.toHaveBeenCalled();
+  });
+
+  test("simultaneous attempts cannot get past the limit: at most five passwords are checked", async () => {
+    vi.mocked(verifyPassword).mockClear();
+
+    const results = await Promise.all(
+      Array.from({ length: 20 }, (_, i) => attemptLogin(db, IP, `incorrecta-${i}`)),
+    );
+
+    const checked = results.filter((result) => result === "invalid").length;
+    expect(checked).toBeLessThanOrEqual(LOGIN_MAX_FAILURES);
+    expect(results.filter((result) => result === "blocked")).toHaveLength(20 - checked);
+    // Las bloqueadas no llegaron a scrypt.
+    expect(verifyPassword).toHaveBeenCalledTimes(checked);
+    expect(await db.select().from(loginAttempts)).toHaveLength(checked);
+  });
+
+  test("a right password among simultaneous failures below the limit still gets in", async () => {
+    const results = await Promise.all([
+      attemptLogin(db, IP, "incorrecta-1"),
+      attemptLogin(db, IP, "incorrecta-2"),
+      attemptLogin(db, IP, PASSWORD),
+      attemptLogin(db, IP, "incorrecta-3"),
+    ]);
+
+    expect(results).toEqual(["invalid", "invalid", "ok", "invalid"]);
   });
 
   test("frees the ip once the window has passed", async () => {

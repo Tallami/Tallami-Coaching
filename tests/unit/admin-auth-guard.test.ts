@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { NextRequest } from "next/server";
@@ -10,6 +11,11 @@ import { getClientIp, shouldUseSecureCookie } from "@/admin/auth/request";
 import { ADMIN_COOKIE, createSessionToken } from "@/admin/auth/session";
 import { SetupChecklist } from "@/components/admin/setup-checklist";
 import robots from "@/app/robots";
+import { config as proxyConfig } from "@/proxy";
+
+// `src/proxy.ts` arma el middleware de next-intl al cargarse, y ese paquete no
+// se resuelve bajo Vitest. Acá solo interesa su `config.matcher`.
+vi.mock("next-intl/middleware", () => ({ default: () => () => undefined }));
 
 const SECRET = "secreto-de-prueba-de-mas-de-32-caracteres";
 const ORIGIN = "http://localhost:3100";
@@ -169,7 +175,18 @@ describe("getMissingConfig", () => {
 });
 
 describe("isAdminPath", () => {
-  test.each(["/admin", "/admin/", "/admin/login", "/admin/ventas/123", "/%61dmin", "/%61dmin/ventas", "/admin%2Fventas"])(
+  test.each([
+    "/admin",
+    "/admin/",
+    "/admin/login",
+    "/admin/ventas/123",
+    "/admin/ventas.csv",
+    "/admin.rsc",
+    "/admin/login.segments/_tree.segment.rsc",
+    "/%61dmin",
+    "/%61dmin/ventas",
+    "/admin%2Fventas",
+  ])(
     "%s is the panel",
     (pathname) => {
       expect(isAdminPath(pathname)).toBe(true);
@@ -283,6 +300,28 @@ describe("guardAdmin", () => {
     },
   );
 
+  test.each([
+    ["/admin/x.csv", "%2Fadmin%2Fx.csv"],
+    ["/admin/ventas/2026.10.csv", "%2Fadmin%2Fventas%2F2026.10.csv"],
+    ["/admin.rsc", "%2Fadmin"],
+    ["/admin/ventas.rsc", "%2Fadmin%2Fventas"],
+    ["/admin/ventas.segments/_tree.segment.rsc", "%2Fadmin%2Fventas"],
+  ])("protects the file-like and transport address %s too", async (path, next) => {
+    const response = await guardAdmin(get(path));
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe(`${ORIGIN}/admin/login?next=${next}`);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("x-robots-tag")).toBe("noindex, nofollow");
+  });
+
+  test.each(["/admin/login.rsc", "/admin/login.segments/__PAGE__.segment.rsc", "/admin/setup.rsc"])(
+    "leaves the doors open in their transport form %s",
+    async (path) => {
+      expect(isPassThrough(await guardAdmin(get(path)))).toBe(true);
+    },
+  );
+
   describe("when the panel is not configured", () => {
     beforeEach(() => {
       vi.stubEnv("ADMIN_PASSWORD_HASH", "");
@@ -306,6 +345,57 @@ describe("guardAdmin", () => {
 
       expect(response.status).toBe(401);
     });
+  });
+});
+
+describe("proxy matcher", () => {
+  // La función con la que Next convierte `config.matcher` en las expresiones
+  // regulares que deciden dónde corre el proxy (suma también las formas
+  // `.rsc` y `.segments/…`). Es interna y sin tipos: si Next la renombra, este
+  // test falla a la vista en lugar de dejar de probar el matcher.
+  const { getMiddlewareMatchers } = createRequire(import.meta.url)(
+    "next/dist/build/analysis/get-page-static-info",
+  ) as {
+    getMiddlewareMatchers: (matcher: unknown, nextConfig: object) => { regexp: string }[];
+  };
+
+  function runsProxyOn(pathname: string): boolean {
+    return getMiddlewareMatchers(proxyConfig.matcher, {}).some(({ regexp }) =>
+      new RegExp(regexp).test(pathname),
+    );
+  }
+
+  test.each([
+    "/admin",
+    "/admin/",
+    "/admin/login",
+    "/admin/x.csv",
+    "/admin/ventas/2026.10.csv",
+    "/admin/clientes/ana.perez",
+    "/admin.rsc",
+    "/admin/login.segments/_tree.segment.rsc",
+  ])("runs on the panel address %s, dots included", (pathname) => {
+    expect(runsProxyOn(pathname)).toBe(true);
+  });
+
+  test.each(["/", "/es", "/pt", "/en", "/es/no-existe", "/fr"])(
+    "still runs on the public page %s",
+    (pathname) => {
+      expect(runsProxyOn(pathname)).toBe(true);
+    },
+  );
+
+  test.each([
+    "/robots.txt",
+    "/sitemap.xml",
+    "/icon.svg",
+    "/apple-icon.png",
+    "/es.rsc",
+    "/_next/static/chunk.js",
+    "/_vercel/insights/script.js",
+    "/api/interest",
+  ])("still skips %s", (pathname) => {
+    expect(runsProxyOn(pathname)).toBe(false);
   });
 });
 

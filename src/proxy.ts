@@ -19,5 +19,15 @@ export default async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: "/((?!api|trpc|_next|_vercel|.*\\..*).*)",
+  matcher: [
+    // El sitio público: todo menos `/api`, `/_next`, `/_vercel` y los archivos
+    // (cualquier ruta con un punto, como `/robots.txt`).
+    "/((?!api|trpc|_next|_vercel|.*\\..*).*)",
+    // El panel va aparte y completo, también con puntos (`/admin/ventas.csv`,
+    // `/admin/clientes/ana.perez`) y en sus formas de transporte (`/admin.rsc`,
+    // `/admin/…segment.rsc`: Next las suma a cada entrada). Sin esto, un
+    // archivo del panel quedaría sin sesión, sin `no-store` y sin `noindex`.
+    // `:path*` incluye `/admin` solo.
+    "/admin/:path*",
+  ],
 };

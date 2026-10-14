@@ -3,10 +3,17 @@
 // pedido puede caer en una instancia distinta. La IP se guarda solo como hash
 // (`hashIp`).
 //
-// Limitación conocida: mirar si la IP está bloqueada y anotar el intento son
-// dos pasos; varios pedidos simultáneos de la misma IP pueden pasar los cinco
-// antes de que se anote el primero. scrypt cuesta cientos de milisegundos y
-// 128 MiB por intento, así que la ráfaga se serializa sola en el servidor.
+// Reservar antes de revisar. Mirar si la IP está bloqueada y recién después
+// anotar el fallo deja pasar una ráfaga: todos los pedidos simultáneos ven
+// "cero fallos" antes de que alguno anote el suyo. Por eso cada intento primero
+// anota un fallo (`reserveLoginAttempt`), después cuenta los fallos de la
+// ventana incluido el propio, y solo si no se pasó del tope sigue a revisar la
+// contraseña. Cada pedido que sigue ya dejó su fila escrita antes de contar, y
+// el que cuenta último ve las de todos: como mucho `LOGIN_MAX_FAILURES`
+// contraseñas se revisan, sin transacciones ni bloqueos, igual en PGlite que
+// en el pooler de Supabase. Si el intento resulta correcto, `confirmLoginSuccess`
+// da vuelta su fila a éxito; si se bloquea, su fila se borra (un bloqueo no
+// se prolonga por seguir intentando).
 
 import { and, count, eq, gt, lt } from "drizzle-orm";
 import type { Db } from "../../db/client";
@@ -17,8 +24,8 @@ export const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 /** Los intentos más viejos que esto se borran: la tabla no crece sin límite ni guarda historia de más. */
 const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
-/** ¿Esta IP ya hizo `LOGIN_MAX_FAILURES` intentos fallidos en los últimos 15 minutos? */
-export async function isLoginBlocked(db: Db, ipHash: string, now: Date): Promise<boolean> {
+/** Fallos de esta IP en los 15 minutos anteriores a `now` (sin contar el límite exacto). */
+async function countRecentFailures(db: Db, ipHash: string, now: Date): Promise<number> {
   const since = new Date(now.getTime() - LOGIN_WINDOW_MS);
   const [row] = await db
     .select({ failures: count() })
@@ -30,12 +37,23 @@ export async function isLoginBlocked(db: Db, ipHash: string, now: Date): Promise
         gt(loginAttempts.createdAt, since),
       ),
     );
-  return (row?.failures ?? 0) >= LOGIN_MAX_FAILURES;
+  return row?.failures ?? 0;
+}
+
+async function purgeOldAttempts(db: Db, now: Date): Promise<void> {
+  await db
+    .delete(loginAttempts)
+    .where(lt(loginAttempts.createdAt, new Date(now.getTime() - RETENTION_MS)));
+}
+
+/** ¿Esta IP ya hizo `LOGIN_MAX_FAILURES` intentos fallidos en los últimos 15 minutos? */
+export async function isLoginBlocked(db: Db, ipHash: string, now: Date): Promise<boolean> {
+  return (await countRecentFailures(db, ipHash, now)) >= LOGIN_MAX_FAILURES;
 }
 
 /**
- * Anota un intento y borra los de hace más de 30 días. La hora la pone la app
- * (no la base), la misma con la que después se consulta el bloqueo.
+ * Anota un intento ya resuelto y borra los de hace más de 30 días. La hora la
+ * pone la app (no la base), la misma con la que después se consulta el bloqueo.
  */
 export async function recordLoginAttempt(
   db: Db,
@@ -44,7 +62,35 @@ export async function recordLoginAttempt(
   at: Date = new Date(),
 ): Promise<void> {
   await db.insert(loginAttempts).values({ ipHash, succeeded, createdAt: at });
-  await db
-    .delete(loginAttempts)
-    .where(lt(loginAttempts.createdAt, new Date(at.getTime() - RETENTION_MS)));
+  await purgeOldAttempts(db, at);
+}
+
+/**
+ * Reserva un lugar para un intento de ingreso, antes de revisar la contraseña.
+ * Devuelve el id de la reserva (un fallo anotado hasta que se confirme el éxito)
+ * o `null` si la IP ya agotó sus intentos: en ese caso no deja ninguna fila.
+ */
+export async function reserveLoginAttempt(
+  db: Db,
+  ipHash: string,
+  at: Date = new Date(),
+): Promise<number | null> {
+  const [reservation] = await db
+    .insert(loginAttempts)
+    .values({ ipHash, succeeded: false, createdAt: at })
+    .returning({ id: loginAttempts.id });
+
+  // Cuenta también la fila recién escrita: pasarse del tope es tener ya
+  // `LOGIN_MAX_FAILURES` fallos antes de este intento.
+  if ((await countRecentFailures(db, ipHash, at)) > LOGIN_MAX_FAILURES) {
+    await db.delete(loginAttempts).where(eq(loginAttempts.id, reservation.id));
+    return null;
+  }
+  await purgeOldAttempts(db, at);
+  return reservation.id;
+}
+
+/** La contraseña era correcta: la reserva deja de contar como fallo. */
+export async function confirmLoginSuccess(db: Db, attemptId: number): Promise<void> {
+  await db.update(loginAttempts).set({ succeeded: true }).where(eq(loginAttempts.id, attemptId));
 }

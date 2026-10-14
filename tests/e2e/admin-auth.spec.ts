@@ -1,4 +1,4 @@
-import { request as httpRequest } from "node:http";
+import { request as httpRequest, type IncomingHttpHeaders } from "node:http";
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import {
@@ -29,7 +29,12 @@ function rawGet(
   baseURL: string,
   path: string,
   headers: Record<string, string> = {},
-): Promise<{ status: number; body: string; location?: string }> {
+): Promise<{
+  status: number;
+  body: string;
+  location?: string;
+  headers: IncomingHttpHeaders;
+}> {
   const { hostname, port } = new URL(baseURL);
   return new Promise((resolve, reject) => {
     const req = httpRequest({ hostname, port, path, method: "GET", headers }, (res) => {
@@ -40,6 +45,7 @@ function rawGet(
           status: res.statusCode ?? 0,
           body: Buffer.concat(chunks).toString("utf8"),
           location: res.headers.location,
+          headers: res.headers,
         }),
       );
     });
@@ -151,6 +157,29 @@ test.describe("without a session", () => {
 
       expect(response.body).not.toContain(PANEL_MARKER);
       expect([307, 308, 404]).toContain(response.status);
+    });
+  }
+
+  for (const path of ["/admin/x.csv", "/admin/ventas/2026.10.csv", "/admin/clientes/ana.perez"]) {
+    test(`panel addresses with a dot are guarded too: ${path}`, async ({ baseURL }) => {
+      const response = await rawGet(baseURL!, path);
+
+      expect(response.status).toBe(307);
+      expect(response.location).toContain("/admin/login?next=");
+      expect(response.headers["cache-control"]).toBe("no-store");
+      expect(response.headers["x-robots-tag"]).toContain("noindex");
+      expect(response.body).not.toContain(PANEL_MARKER);
+    });
+  }
+
+  for (const path of ["/admin.rsc", "/admin/login.segments/_tree.segment.rsc"]) {
+    test(`the transport form of a panel address does not skip the proxy: ${path}`, async ({
+      baseURL,
+    }) => {
+      const response = await rawGet(baseURL!, path);
+
+      expect(response.body).not.toContain(PANEL_MARKER);
+      expect(response.headers["x-robots-tag"]).toContain("noindex");
     });
   }
 
