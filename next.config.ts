@@ -22,6 +22,13 @@ const nextConfig: NextConfig = {
   },
   cacheComponents: true,
   partialPrefetching: true,
+  // PGlite (la base local del panel, ver `src/db/pglite.ts`) no se puede
+  // empaquetar: carga sus archivos wasm con `fs.readFile(new URL(…))`, y dentro
+  // del bundle de Turbopack esa URL llega como otra clase `URL` y falla con
+  // `ERR_INVALID_ARG_TYPE` al abrir la base en `next start` (el login lo usa
+  // para anotar los intentos). Se deja como paquete externo de Node. En Vercel
+  // no se usa: allá la base es `DATABASE_URL`.
+  serverExternalPackages: ["@electric-sql/pglite"],
   images: {
     // Avatares y fotos de los tweets (`pbs.twimg.com`) y el avatar por defecto
     // de X (`abs.twimg.com`). Solo https y solo estos dos servidores.

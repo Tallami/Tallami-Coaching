@@ -29,6 +29,12 @@ function isAllowed(url: string): boolean {
   return hasRemoteMatch([], [...remotePatterns], new URL(url));
 }
 
+describe("next.config serverExternalPackages", () => {
+  test("keeps PGlite out of the server bundle, where its wasm files cannot load", () => {
+    expect(nextConfig.serverExternalPackages).toContain("@electric-sql/pglite");
+  });
+});
+
 describe("next.config images.remotePatterns", () => {
   test.each(ALLOWED)("allows %s", (url) => {
     expect(isAllowed(url)).toBe(true);

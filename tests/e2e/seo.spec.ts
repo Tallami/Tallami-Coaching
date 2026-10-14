@@ -171,7 +171,7 @@ test.describe("crawler files", () => {
     }
   });
 
-  test("robots allows everything and points to the sitemap", async ({
+  test("robots allows the public site, closes the admin panel and points to the sitemap", async ({
     request,
   }) => {
     const response = await request.get("/robots.txt");
@@ -181,7 +181,9 @@ test.describe("crawler files", () => {
 
     expect(text).toMatch(/User-Agent: \*/i);
     expect(text).toMatch(/Allow: \//i);
-    expect(text).not.toMatch(/Disallow: \//i);
+    // Solo el panel está cerrado: un `Disallow: /` a secas bloquearía todo el sitio.
+    expect(text).not.toMatch(/^Disallow: \/\s*$/im);
+    expect(text).toMatch(/^Disallow: \/admin\s*$/im);
     expect(text).toMatch(/Sitemap: \S+\/sitemap\.xml/i);
   });
 });

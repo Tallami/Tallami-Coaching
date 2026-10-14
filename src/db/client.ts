@@ -13,6 +13,7 @@
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import { getDatabaseUrl, isDbConfigured } from "./config";
 import * as schema from "./schema";
 
 /** Base de datos con el schema del panel, sea cual sea el driver. */
@@ -37,11 +38,11 @@ const globalForDb = globalThis as typeof globalThis & {
 };
 
 async function openDb(): Promise<Db> {
-  const url = process.env.DATABASE_URL?.trim();
+  const url = getDatabaseUrl();
   if (url) {
     return drizzle(postgres(url, { prepare: false }), { schema });
   }
-  if (process.env.VERCEL) {
+  if (!isDbConfigured()) {
     throw new DbNotConfiguredError();
   }
   const { openPglite } = await import("./pglite");

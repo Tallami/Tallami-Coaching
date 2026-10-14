@@ -7,8 +7,8 @@ const BASELINE_HEADERS = {
   "permissions-policy": "camera=(), microphone=(), geolocation=()",
 } as const;
 
-/** Una página estática, el 404 dinámico y un archivo para buscadores. */
-const PATHS = ["/es", "/en/no-existe", "/robots.txt"] as const;
+/** Una página estática, el 404 dinámico, un archivo para buscadores y el login del panel. */
+const PATHS = ["/es", "/en/no-existe", "/robots.txt", "/admin/login"] as const;
 
 test.describe("security headers", () => {
   for (const path of PATHS) {

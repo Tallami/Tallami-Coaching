@@ -28,6 +28,7 @@ La web queda en http://localhost:3000 (redirige a `/es`, `/pt` o `/en` según el
 | `npm run test:e2e` | Tests end to end (Playwright): hace el build y sirve la web en el puerto 3100 |
 | `npm run db:generate` | Genera en `drizzle/` la migración SQL de los cambios hechos en `src/db/schema.ts` (la migración se sube al repo) |
 | `npm run db:migrate` | Aplica las migraciones de `drizzle/` a la base de `DATABASE_URL` (Supabase). La base local (PGlite) se migra sola al abrirse |
+| `npm run admin:password` | Genera el hash de la contraseña del panel (`ADMIN_PASSWORD_HASH`) y un secreto para las sesiones (`ADMIN_SESSION_SECRET`). Ver "Panel de admin" |
 | `npm run players:photo -- <usuario>` | Baja la foto de perfil de X de un jugador a `src/assets/players/` |
 | `npm run tweets:record -- <id> [<id> …]` | Guarda la respuesta de X de uno o más tweets en `src/content/tweet-snapshots/` y rehace su índice (necesita internet) |
 | `npm run tweets:index` | Rehace `src/content/tweet-snapshots/index.ts` con los archivos que hay en esa carpeta (sin internet) |
@@ -71,6 +72,34 @@ El log del build dice qué camino tomó cada tweet. Si ninguno se puede mostrar,
 3. Corré `npm run test` y `npm run test:e2e`.
 
 La foto es opcional: sin foto, la franja muestra la inicial sobre un círculo azul.
+
+## Panel de admin
+
+El panel privado de Tallami vive en `/admin` (solo en español, fuera de los idiomas del sitio). Entra una sola persona, con una contraseña. No está enlazado desde el sitio público, lleva `noindex` y `robots.txt` lo bloquea.
+
+### Dejarlo listo
+
+1. Corré `npm run admin:password`: pide la contraseña (12 caracteres o más, sin mostrarla) e imprime dos variables, `ADMIN_PASSWORD_HASH` y `ADMIN_SESSION_SECRET`, en dos formatos.
+2. Local: copiá las líneas de `.env.local` a un archivo `.env.local`. El hash lleva `$` y Next.js los expande como variables, por eso el script los imprime escritos `\$`: copiá esas líneas, no las de Vercel.
+3. En Vercel (Project Settings → Environment Variables): pegá los valores de la sección "En Vercel", tal cual. Agregá también `DATABASE_URL` (Supabase, pooler de transacciones); en Vercel el panel no usa la base local. Volvé a desplegar.
+4. Abrí `/admin`. Si falta algo, te lleva a `/admin/setup`, que dice qué variable falta (solo el nombre, nunca el valor).
+
+Localmente entrá por `http://localhost:3000/admin`, no por la IP de tu red: la cookie de sesión lleva `Secure` en cualquier dirección que no sea `localhost`, y el navegador no la guarda sobre http.
+
+### Cómo se protege
+
+| Qué | Cómo |
+| --- | --- |
+| Contraseña | Hash scrypt (`scrypt$N$r$p$sal$hash`, N=2^17, r=8, p=1: el primer perfil que recomienda OWASP) con comparación en tiempo constante. Para cambiarla: volvé a correr `npm run admin:password` y reemplazá `ADMIN_PASSWORD_HASH` |
+| Sesión | JWT HS256 firmado con `ADMIN_SESSION_SECRET`, audiencia `tallami-admin`, 12 horas. Cookie `tallami_admin`: `httpOnly`, `SameSite=Strict`, solo para `/admin`, y `Secure` siempre (excepto http sobre `localhost`). Cambiar el secreto cierra todas las sesiones |
+| Intentos | 5 fallidos por IP cada 15 minutos, guardados en la tabla `login_attempts` con la IP convertida en un hash con clave (nunca la IP). Los registros se borran a los 30 días |
+| IP del visitante | Primer valor de `x-forwarded-for`. En Vercel lo escribe Vercel y no se puede falsificar; fuera de Vercel lo manda el propio cliente, así que el límite solo es una defensa real detrás de Vercel |
+| Doble verificación | El `proxy` (`src/proxy.ts`) manda a `/admin/login` a quien no tenga sesión válida; además cada página y cada Server Action del panel llama a `requireAdmin()` (`src/admin/auth/require-admin.ts`). Una página o acción nueva sin esa llamada queda abierta: es obligatoria |
+| Redirecciones | `?next=` del login solo acepta rutas `/admin…` del mismo sitio |
+
+### Tests del panel
+
+`npm run test:e2e` arranca el servidor con una contraseña y un secreto de prueba (`tests/helpers/admin-server.ts`), una base PGlite vacía en una carpeta temporal que se borra al iniciar, y `EXCHANGE_RATE_SOURCE=fixed` (cotizaciones fijas, sin llamar al BCRA; en producción de Vercel esa variable se ignora). Cada test navega con su propia IP, así los bloqueos de uno no afectan a los otros.
 
 ## Deploy (Vercel)
 

@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { adminServerEnv } from "./tests/helpers/admin-server";
 
 const PORT = 3100;
 const BASE_URL = `http://localhost:${PORT}`;
@@ -19,9 +20,15 @@ export default defineConfig({
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
-    // El build usa solo las copias guardadas de los tweets
-    // (`src/content/tweet-snapshots`, ver `src/lib/tweets.ts`): los e2e no
-    // dependen de la red ni de que X siga mostrando esos tweets.
-    env: { TWEETS_SOURCE: "snapshots" },
+    env: {
+      // El build usa solo las copias guardadas de los tweets
+      // (`src/content/tweet-snapshots`, ver `src/lib/tweets.ts`): los e2e no
+      // dependen de la red ni de que X siga mostrando esos tweets.
+      TWEETS_SOURCE: "snapshots",
+      // Panel de admin: contraseña y secreto de prueba, una base PGlite
+      // vacía en una carpeta temporal (se borra al arrancar) y cotizaciones
+      // fijas en lugar del BCRA (ver `tests/helpers/admin-server.ts`).
+      ...(await adminServerEnv()),
+    },
   },
 });

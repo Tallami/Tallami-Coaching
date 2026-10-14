@@ -1,0 +1,103 @@
+// Primera barrera del panel, en el `proxy`: un filtro rápido que corre antes de
+// renderizar nada. Deja pasar solo los pedidos con una sesión válida (la misma
+// verificación completa de firma, audiencia y vencimiento que hace
+// `requireAdmin`), y manda al resto al login.
+//
+// No es la protección real: la real es `requireAdmin()` en cada página y en
+// cada Server Action. El `proxy` no ve, por ejemplo, un Server Action que se
+// mude a otra ruta, ni lo que un cambio futuro del `matcher` deje afuera.
+
+import { NextResponse, type NextRequest } from "next/server";
+import { getMissingConfig } from "./config";
+import { LOGIN_PATH, PANEL_PATH, SETUP_PATH, safeNextPath } from "./redirect";
+import { ADMIN_COOKIE, verifySessionToken } from "./session";
+
+const SERVER_ACTION_HEADER = "next-action";
+/** Parámetro con el que el router de Next pide los datos de una página; no es parte de la dirección. */
+const ROUTER_QUERY = "_rsc";
+
+function isUnder(pathname: string, root: string): boolean {
+  return pathname === root || pathname.startsWith(`${root}/`);
+}
+
+function decodeOrSelf(pathname: string): string {
+  try {
+    return decodeURIComponent(pathname);
+  } catch {
+    return pathname;
+  }
+}
+
+/** Sin barras finales: `/admin/login/` es `/admin/login`. */
+function normalizePath(pathname: string): string {
+  const decoded = decodeOrSelf(pathname);
+  return decoded.length > 1 ? decoded.replace(/\/+$/, "") : decoded;
+}
+
+/**
+ * ¿La ruta es del panel? Mira también la ruta decodificada: `/%61dmin` es
+ * `/admin` para el router y no puede escaparse del filtro por cómo se escribe.
+ */
+export function isAdminPath(pathname: string): boolean {
+  return isUnder(pathname, PANEL_PATH) || isUnder(decodeOrSelf(pathname), PANEL_PATH);
+}
+
+/** Encabezados de toda respuesta del panel: ni los buscadores ni ninguna caché la guardan. */
+function withPanelHeaders(response: NextResponse): NextResponse {
+  response.headers.set("X-Robots-Tag", "noindex, nofollow");
+  response.headers.set("Cache-Control", "no-store");
+  return response;
+}
+
+function redirectTo(request: NextRequest, pathname: string, next?: string): NextResponse {
+  const url = request.nextUrl.clone();
+  url.pathname = pathname;
+  url.search = "";
+  if (next) url.searchParams.set("next", next);
+  // 307 conserva el método; un POST suelto que vuelve al login se reenvía como GET (303).
+  const isRead = request.method === "GET" || request.method === "HEAD";
+  return withPanelHeaders(NextResponse.redirect(url, isRead ? 307 : 303));
+}
+
+/** Adónde volver tras el login: la dirección pedida, sin el parámetro interno del router. */
+function destinationOf(request: NextRequest): string {
+  const { pathname, searchParams } = request.nextUrl;
+  const query = new URLSearchParams(searchParams);
+  query.delete(ROUTER_QUERY);
+  const search = query.size > 0 ? `?${query}` : "";
+  return safeNextPath(`${pathname}${search}`);
+}
+
+function unauthorized(): NextResponse {
+  return withPanelHeaders(new NextResponse(null, { status: 401 }));
+}
+
+/**
+ * Decide qué pasa con un pedido a `/admin…`:
+ * - panel sin configurar → `/admin/setup` (o 401 si es un Server Action);
+ * - `/admin/login` y `/admin/setup` → pasan (son las puertas);
+ * - con sesión válida → pasa;
+ * - sin ella → redirección al login con `?next=`, o 401 si es un Server Action
+ *   (un redirect no le sirve a quien llama a una acción).
+ */
+export async function guardAdmin(request: NextRequest): Promise<NextResponse> {
+  const pathname = normalizePath(request.nextUrl.pathname);
+  const isServerAction = request.headers.has(SERVER_ACTION_HEADER);
+
+  if (getMissingConfig().length > 0) {
+    if (isServerAction) return unauthorized();
+    if (pathname === SETUP_PATH) return withPanelHeaders(NextResponse.next());
+    return redirectTo(request, SETUP_PATH);
+  }
+
+  if (pathname === LOGIN_PATH || pathname === SETUP_PATH) {
+    return withPanelHeaders(NextResponse.next());
+  }
+
+  if (await verifySessionToken(request.cookies.get(ADMIN_COOKIE)?.value)) {
+    return withPanelHeaders(NextResponse.next());
+  }
+
+  if (isServerAction) return unauthorized();
+  return redirectTo(request, LOGIN_PATH, destinationOf(request));
+}

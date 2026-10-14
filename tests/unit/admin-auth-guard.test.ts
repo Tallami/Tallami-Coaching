@@ -1,0 +1,339 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { NextRequest } from "next/server";
+import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
+import { getMissingConfig } from "@/admin/auth/config";
+import { guardAdmin, isAdminPath } from "@/admin/auth/guard";
+import { hashPassword } from "@/admin/auth/password";
+import { safeNextPath } from "@/admin/auth/redirect";
+import { getClientIp, shouldUseSecureCookie } from "@/admin/auth/request";
+import { ADMIN_COOKIE, createSessionToken } from "@/admin/auth/session";
+import { SetupChecklist } from "@/components/admin/setup-checklist";
+import robots from "@/app/robots";
+
+const SECRET = "secreto-de-prueba-de-mas-de-32-caracteres";
+const ORIGIN = "http://localhost:3100";
+
+let storedHash: string;
+
+beforeAll(async () => {
+  storedHash = await hashPassword("una-clave-larga-de-prueba");
+});
+
+beforeEach(() => {
+  vi.stubEnv("ADMIN_PASSWORD_HASH", storedHash);
+  vi.stubEnv("ADMIN_SESSION_SECRET", SECRET);
+  vi.stubEnv("VERCEL", "");
+  vi.stubEnv("DATABASE_URL", "");
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
+describe("safeNextPath", () => {
+  test.each([
+    ["/admin", "/admin"],
+    ["/admin/ventas", "/admin/ventas"],
+    ["/admin/ventas?mes=2026-10&q=ana", "/admin/ventas?mes=2026-10&q=ana"],
+    ["/admin/ventas/", "/admin/ventas/"],
+    ["/admin?x=1", "/admin?x=1"],
+  ])("keeps the panel path %s", (raw, expected) => {
+    expect(safeNextPath(raw)).toBe(expected);
+  });
+
+  test.each([
+    undefined,
+    null,
+    42,
+    "",
+    "admin",
+    "/",
+    "/es",
+    "/admin2",
+    "/administrator",
+    "/admin.evil.com",
+    "/admin@evil.com",
+    "//evil.com",
+    "///evil.com",
+    "//evil.com/admin",
+    "/\\evil.com",
+    "\\\\evil.com",
+    "/\t/evil.com",
+    "\n/admin",
+    " /admin",
+    "https://evil.com/admin",
+    "http://localhost:3100/admin",
+    "javascript:alert(1)",
+    "data:text/html,hola",
+    "/admin/../es",
+    "/admin/%2e%2e/%2e%2e/es",
+    "/admin%0d%0aSet-Cookie:x=1",
+    `/admin/${"a".repeat(3000)}`,
+  ])("falls back to /admin for the hostile value %j", (raw) => {
+    expect(safeNextPath(raw)).toBe("/admin");
+  });
+
+  test.each(["/admin/login", "/admin/login?next=/admin/ventas", "/admin/setup"])(
+    "does not send you back to %s",
+    (raw) => {
+      expect(safeNextPath(raw)).toBe("/admin");
+    },
+  );
+});
+
+describe("getClientIp", () => {
+  const headersWith = (forwardedFor?: string) =>
+    new Headers(forwardedFor === undefined ? {} : { "x-forwarded-for": forwardedFor });
+
+  test.each([
+    ["203.0.113.7", "203.0.113.7"],
+    [" 203.0.113.7 ", "203.0.113.7"],
+    ["203.0.113.7, 70.41.3.18, 150.172.238.178", "203.0.113.7"],
+    ["2001:DB8::1", "2001:db8::1"],
+  ])("takes the first hop of %j", (header, expected) => {
+    expect(getClientIp(headersWith(header))).toBe(expected);
+  });
+
+  test.each([undefined, "", "no-es-una-ip", "203.0.113.7:4000", "999.1.1.1", "a".repeat(500)])(
+    "falls back to a shared bucket for %j",
+    (header) => {
+      expect(getClientIp(headersWith(header))).toBe("unknown");
+    },
+  );
+});
+
+describe("shouldUseSecureCookie", () => {
+  const request = (headers: Record<string, string>) => new Headers(headers);
+
+  test("is always on in Vercel, whatever the host says", () => {
+    vi.stubEnv("VERCEL", "1");
+
+    expect(shouldUseSecureCookie(request({ host: "localhost:3000" }))).toBe(true);
+    expect(shouldUseSecureCookie(request({ host: "tallami.com" }))).toBe(true);
+  });
+
+  test.each(["localhost:3100", "localhost", "127.0.0.1:3000", "[::1]:3000"])(
+    "is off for plain http on the loopback host %s, so local development works",
+    (host) => {
+      expect(shouldUseSecureCookie(request({ host }))).toBe(false);
+    },
+  );
+
+  test.each([
+    ["a public host", { host: "tallami.com" }],
+    ["a LAN address", { host: "192.168.1.5:3000" }],
+    ["no host at all", {}],
+    ["https behind a proxy, even on localhost", { host: "localhost:3000", "x-forwarded-proto": "https" }],
+    ["a proxy chain that starts with https", { host: "localhost:3000", "x-forwarded-proto": "https, http" }],
+  ])("is on for %s", (_label, headers) => {
+    expect(shouldUseSecureCookie(request(headers))).toBe(true);
+  });
+});
+
+describe("getMissingConfig", () => {
+  test("is empty when everything is set", () => {
+    expect(getMissingConfig()).toEqual([]);
+  });
+
+  test.each([
+    ["ADMIN_PASSWORD_HASH", "", "missing"],
+    ["ADMIN_PASSWORD_HASH", "una-clave-en-texto-plano", "invalid"],
+    ["ADMIN_SESSION_SECRET", "", "missing"],
+    ["ADMIN_SESSION_SECRET", "x".repeat(31), "too-short"],
+  ])("flags %s set to %j as %s", (name, value, problem) => {
+    vi.stubEnv(name, value);
+
+    expect(getMissingConfig()).toEqual([{ name, problem }]);
+  });
+
+  test("asks for DATABASE_URL in Vercel, but not on a local machine", () => {
+    expect(getMissingConfig()).toEqual([]);
+
+    vi.stubEnv("VERCEL", "1");
+    expect(getMissingConfig()).toEqual([{ name: "DATABASE_URL", problem: "missing" }]);
+
+    vi.stubEnv("DATABASE_URL", "postgres://usuario:clave@host:6543/db");
+    expect(getMissingConfig()).toEqual([]);
+  });
+
+  test("never reports a value, only names and problems", () => {
+    vi.stubEnv("ADMIN_SESSION_SECRET", "corto-secreto");
+    vi.stubEnv("ADMIN_PASSWORD_HASH", "texto-plano-secreto");
+
+    const report = JSON.stringify(getMissingConfig());
+
+    expect(report).not.toContain("corto-secreto");
+    expect(report).not.toContain("texto-plano-secreto");
+  });
+});
+
+describe("isAdminPath", () => {
+  test.each(["/admin", "/admin/", "/admin/login", "/admin/ventas/123", "/%61dmin", "/%61dmin/ventas", "/admin%2Fventas"])(
+    "%s is the panel",
+    (pathname) => {
+      expect(isAdminPath(pathname)).toBe(true);
+    },
+  );
+
+  test.each(["/", "/es", "/es/admin", "/administrator", "/adminx/login", "/api/admin", "/admin.png"])(
+    "%s is not the panel",
+    (pathname) => {
+      expect(isAdminPath(pathname)).toBe(false);
+    },
+  );
+});
+
+describe("guardAdmin", () => {
+  async function validCookie(): Promise<string> {
+    return `${ADMIN_COOKIE}=${await createSessionToken()}`;
+  }
+
+  function get(path: string, headers: Record<string, string> = {}, method = "GET") {
+    return new NextRequest(`${ORIGIN}${path}`, { method, headers });
+  }
+
+  const isPassThrough = (response: Response) => response.headers.get("x-middleware-next") === "1";
+
+  test("sends a visitor without a session to the login, remembering where they were going", async () => {
+    const response = await guardAdmin(get("/admin"));
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe(`${ORIGIN}/admin/login?next=%2Fadmin`);
+
+    const sales = await guardAdmin(get("/admin/ventas?mes=2026-10"));
+    expect(sales.headers.get("location")).toBe(
+      `${ORIGIN}/admin/login?next=%2Fadmin%2Fventas%3Fmes%3D2026-10`,
+    );
+  });
+
+  test("drops the router's own query when remembering the destination", async () => {
+    const response = await guardAdmin(get("/admin/ventas?_rsc=abc123"));
+
+    expect(response.headers.get("location")).toBe(`${ORIGIN}/admin/login?next=%2Fadmin%2Fventas`);
+  });
+
+  test.each([
+    ["a forged value", "una-cookie-inventada"],
+    ["a value shaped like a token", "aaa.bbb.ccc"],
+  ])("sends %s to the login too", async (_label, value) => {
+    const response = await guardAdmin(get("/admin", { cookie: `${ADMIN_COOKIE}=${value}` }));
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain("/admin/login");
+  });
+
+  test("lets a valid session through, with noindex and no caching", async () => {
+    const response = await guardAdmin(get("/admin/ventas", { cookie: await validCookie() }));
+
+    expect(isPassThrough(response)).toBe(true);
+    expect(response.headers.get("x-robots-tag")).toBe("noindex, nofollow");
+    expect(response.headers.get("cache-control")).toBe("no-store");
+  });
+
+  test("answers 401 to a server action without a valid session, never a redirect", async () => {
+    const action = { "next-action": "40abc", "content-type": "text/plain" };
+
+    const anonymous = await guardAdmin(get("/admin/ventas", action, "POST"));
+    const forged = await guardAdmin(
+      get("/admin/ventas", { ...action, cookie: `${ADMIN_COOKIE}=falsa` }, "POST"),
+    );
+
+    for (const response of [anonymous, forged]) {
+      expect(response.status).toBe(401);
+      expect(response.headers.get("location")).toBeNull();
+    }
+  });
+
+  test("lets a server action with a valid session through", async () => {
+    const response = await guardAdmin(
+      get("/admin/ventas", { "next-action": "40abc", cookie: await validCookie() }, "POST"),
+    );
+
+    expect(isPassThrough(response)).toBe(true);
+  });
+
+  test("sends a plain POST without a session to the login with a 303", async () => {
+    const response = await guardAdmin(get("/admin/ventas", {}, "POST"));
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toContain("/admin/login");
+  });
+
+  test.each(["/admin/login", "/admin/login/", "/admin/setup"])(
+    "leaves %s open without a session",
+    async (path) => {
+      expect(isPassThrough(await guardAdmin(get(path)))).toBe(true);
+    },
+  );
+
+  test("leaves the login action open without a session", async () => {
+    const response = await guardAdmin(get("/admin/login", { "next-action": "40abc" }, "POST"));
+
+    expect(isPassThrough(response)).toBe(true);
+  });
+
+  test.each(["/%61dmin", "/%61dmin/ventas", "/admin%2Fventas", "/admin/"])(
+    "does not let the spelling %s skip the check",
+    async (path) => {
+      const response = await guardAdmin(get(path));
+
+      expect(response.status).toBe(307);
+      expect(response.headers.get("location")).toContain("/admin/login");
+    },
+  );
+
+  describe("when the panel is not configured", () => {
+    beforeEach(() => {
+      vi.stubEnv("ADMIN_PASSWORD_HASH", "");
+    });
+
+    test("sends everything to the setup page, valid cookie or not", async () => {
+      for (const path of ["/admin", "/admin/login", "/admin/ventas"]) {
+        const response = await guardAdmin(get(path));
+
+        expect(response.status).toBe(307);
+        expect(response.headers.get("location")).toBe(`${ORIGIN}/admin/setup`);
+      }
+    });
+
+    test("serves the setup page itself", async () => {
+      expect(isPassThrough(await guardAdmin(get("/admin/setup")))).toBe(true);
+    });
+
+    test("answers 401 to server actions", async () => {
+      const response = await guardAdmin(get("/admin/login", { "next-action": "40abc" }, "POST"));
+
+      expect(response.status).toBe(401);
+    });
+  });
+});
+
+describe("SetupChecklist", () => {
+  test("names each missing variable and says how to fix it", () => {
+    const html = renderToStaticMarkup(
+      createElement(SetupChecklist, {
+        items: [
+          { name: "ADMIN_PASSWORD_HASH", problem: "missing" },
+          { name: "ADMIN_SESSION_SECRET", problem: "too-short" },
+          { name: "DATABASE_URL", problem: "missing" },
+        ],
+      }),
+    );
+
+    expect(html).toContain("ADMIN_PASSWORD_HASH");
+    expect(html).toContain("npm run admin:password");
+    expect(html).toContain("ADMIN_SESSION_SECRET");
+    expect(html).toContain("32");
+    expect(html).toContain("DATABASE_URL");
+  });
+});
+
+describe("robots.txt", () => {
+  test("keeps the public site open and the panel closed", () => {
+    const { rules, sitemap } = robots();
+
+    expect(rules).toMatchObject({ userAgent: "*", allow: "/", disallow: "/admin" });
+    expect(String(sitemap)).toMatch(/\/sitemap\.xml$/);
+  });
+});
