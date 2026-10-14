@@ -30,12 +30,15 @@ async function closeOpenDb(): Promise<void> {
 
 describe("getDb", () => {
   let dataDir: string;
+  // Con una carpeta madre que no existe, como `.data/pglite` en un clon nuevo.
+  let pgliteDir: string;
 
   beforeEach(async () => {
     dataDir = await mkdtemp(path.join(tmpdir(), "tallami-pglite-"));
+    pgliteDir = path.join(dataDir, "nested", "db");
     vi.stubEnv("DATABASE_URL", "");
     vi.stubEnv("VERCEL", "");
-    vi.stubEnv("PGLITE_DIR", path.join(dataDir, "db"));
+    vi.stubEnv("PGLITE_DIR", pgliteDir);
   });
 
   afterEach(async () => {
@@ -48,7 +51,7 @@ describe("getDb", () => {
     vi.stubEnv("VERCEL", "1");
 
     await expect(getDb()).rejects.toBeInstanceOf(DbNotConfiguredError);
-    expect(existsSync(path.join(dataDir, "db"))).toBe(false);
+    expect(existsSync(pgliteDir)).toBe(false);
   });
 
   test("after a failed attempt the next call tries again", async () => {
@@ -69,7 +72,7 @@ describe("getDb", () => {
     const client = (db as unknown as { $client: { options: { prepare: boolean } } })
       .$client;
     expect(client.options.prepare).toBe(false);
-    expect(existsSync(path.join(dataDir, "db"))).toBe(false);
+    expect(existsSync(pgliteDir)).toBe(false);
   });
 
   test("locally it opens a migrated PGlite on disk and reuses it", async () => {
@@ -77,7 +80,7 @@ describe("getDb", () => {
     const second = await getDb();
 
     expect(second).toBe(first);
-    expect(existsSync(path.join(dataDir, "db"))).toBe(true);
+    expect(existsSync(pgliteDir)).toBe(true);
     await expect(first.select({ rows: count() }).from(customers)).resolves.toEqual([
       { rows: 0 },
     ]);
