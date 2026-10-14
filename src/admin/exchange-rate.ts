@@ -8,6 +8,7 @@
 
 import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 import type { Currency } from "@/admin/catalog";
+import { isValidIsoDate } from "@/admin/dates";
 import type { Db } from "@/db/client";
 import { exchangeRates } from "@/db/schema";
 import { normalizeRate } from "@/lib/money";
@@ -42,16 +43,9 @@ const ARS_RATE = FIXED_RATES.ARS;
 
 // --- Fechas (texto "YYYY-MM-DD", calendario en UTC: no dependen de la zona) ---
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const SATURDAY = 6;
 const SUNDAY = 0;
-
-function isValidIsoDate(value: string): boolean {
-  if (!ISO_DATE.test(value)) return false;
-  const parsed = new Date(`${value}T00:00:00Z`);
-  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(value);
-}
 
 function shiftDays(date: string, days: number): string {
   const shifted = new Date(new Date(`${date}T00:00:00Z`).getTime() + days * MS_PER_DAY);

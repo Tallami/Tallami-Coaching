@@ -1,4 +1,5 @@
 import type { LoginErrorCode } from "@/admin/auth/login-errors";
+import { Monogram } from "@/admin/ui/monogram";
 import { SubmitButton } from "@/components/admin/submit-button";
 
 interface LoginFormProps {
@@ -16,16 +17,6 @@ const ERROR_MESSAGES: Record<LoginErrorCode, string> = {
 };
 
 const ERROR_ID = "login-error";
-
-function Monogram() {
-  return (
-    <svg viewBox="0 0 64 64" width="44" height="44" aria-hidden="true">
-      <rect width="64" height="64" rx="11.52" fill="#0B1433" />
-      <path fill="#F3F5FA" d="M13.5 11h34v12H36.5v30h-12V23h-11z" />
-      <rect x="40.5" y="43" width="10" height="10" fill="#FFC93C" />
-    </svg>
-  );
-}
 
 export function LoginForm({ action, error, next }: LoginFormProps) {
   return (

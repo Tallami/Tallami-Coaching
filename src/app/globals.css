@@ -23,6 +23,21 @@
 
   --container-wrap: 1180px;
   --spacing-gutter: clamp(16px, 4vw, 40px);
+
+  /*
+   * Estados del panel de admin (insignias, avisos y errores). Cada color de
+   * texto contrasta 7:1 o más sobre su fondo suave.
+   */
+  --color-danger: #a4261c;
+  --color-danger-ink: #7a1b14;
+  --color-danger-tint: #fbe4e1;
+  --color-ok-ink: #14532d;
+  --color-ok-tint: #dcf0e2;
+  --color-info-ink: #1b3f93;
+  --color-info-tint: #dde7fb;
+  --color-warn-ink: #5c4300;
+  --color-warn-tint: #fff0c2;
+  --color-neutral-tint: #e4e7e2;
 }
 
 @theme inline {

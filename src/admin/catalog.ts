@@ -21,6 +21,19 @@ export type SaleItem = (typeof SALE_ITEMS)[number];
 export const CURRENCIES = ["USD", "ARS", "BRL", "USDT"] as const;
 export type Currency = (typeof CURRENCIES)[number];
 
+/** USD y USDT valen un dólar: su monto en dólares es el mismo número. */
+export function isDollarCurrency(currency: Currency): boolean {
+  return currency === "USD" || currency === "USDT";
+}
+
+/**
+ * La moneda cobrada necesita su propia cotización además de la del dólar
+ * (hoy, solo el real). El dólar y el peso se resuelven con la del dólar.
+ */
+export function needsOwnRate(currency: Currency): boolean {
+  return currency === "BRL";
+}
+
 export const PAYMENT_METHODS = [
   "mercadopago",
   "pix",
@@ -53,6 +66,19 @@ export type InvoiceType = (typeof INVOICE_TYPES)[number];
 /** De dónde salió el tipo de cambio guardado en la venta. */
 export const RATE_SOURCES = ["bcra", "manual", "fixed"] as const;
 export type RateSource = (typeof RATE_SOURCES)[number];
+
+export const CURRENCY_LABELS: Record<Currency, string> = {
+  USD: "USD (dólar)",
+  ARS: "ARS (peso)",
+  BRL: "BRL (real)",
+  USDT: "USDT (dólar cripto)",
+};
+
+export const RATE_SOURCE_LABELS: Record<RateSource, string> = {
+  bcra: "BCRA (oficial)",
+  manual: "cargado a mano",
+  fixed: "valor fijo de prueba",
+};
 
 export const ITEM_LABELS: Record<SaleItem, string> = {
   vodRecorded: "VOD review grabado",

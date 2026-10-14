@@ -3,9 +3,12 @@ import {
   arsToUsdMinor,
   convertToArsMinor,
   formatMoney,
+  formatRate,
   InvalidAmountError,
+  InvalidRateError,
   normalizeRate,
   parseAmountToMinor,
+  parseRateInput,
 } from "@/lib/money";
 
 describe("parseAmountToMinor", () => {
@@ -175,4 +178,48 @@ describe("normalizeRate", () => {
       expect(() => normalizeRate(value)).toThrow(RangeError);
     },
   );
+});
+
+describe("parseRateInput", () => {
+  test("parses spanish and plain rates to four decimals", () => {
+    expect(parseRateInput("1500")).toBe("1500.0000");
+    expect(parseRateInput("1500,5")).toBe("1500.5000");
+    expect(parseRateInput("1500.5")).toBe("1500.5000");
+    expect(parseRateInput("1.500,25")).toBe("1500.2500");
+    expect(parseRateInput(" 301,5651 ")).toBe("301.5651");
+    expect(parseRateInput("99.999,5")).toBe("99999.5000");
+  });
+
+  test.each([
+    ["empty", ""],
+    ["text", "abc"],
+    ["negative", "-5"],
+    ["zero", "0"],
+    ["zero with decimals", "0,0000"],
+    ["five decimals", "1500,12345"],
+    ["english thousands", "1,500.25"],
+    ["ambiguous comma plus three digits", "1,500"],
+    ["ambiguous dot plus three digits", "1.500"],
+    ["currency symbol", "$ 1500"],
+    ["above the sane limit", "100001"],
+  ])("rejects %s (%s) with a spanish message", (_label, input) => {
+    expect(() => parseRateInput(input)).toThrow(InvalidRateError);
+    expect(() => parseRateInput(input)).toThrow(/cambio/i);
+  });
+
+  test("accepts the sane limit", () => {
+    expect(parseRateInput("100000")).toBe("100000.0000");
+  });
+});
+
+describe("formatRate", () => {
+  test("shows a stored rate in es-AR with at least two decimals", () => {
+    expect(formatRate("1500.0000")).toBe("1.500,00");
+    expect(formatRate("1400.5000")).toBe("1.400,50");
+    expect(formatRate("1517.3300")).toBe("1.517,33");
+    expect(formatRate("301.5651")).toBe("301,5651");
+    expect(formatRate("12.1230")).toBe("12,123");
+    expect(formatRate("1.0000")).toBe("1,00");
+    expect(formatRate("1234567.0000")).toBe("1.234.567,00");
+  });
 });

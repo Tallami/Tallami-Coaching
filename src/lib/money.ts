@@ -34,6 +34,14 @@ export class InvalidAmountError extends Error {
   }
 }
 
+/** El texto que escribió el usuario no es un tipo de cambio válido. */
+export class InvalidRateError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidRateError";
+  }
+}
+
 // --- Montos escritos por una persona ---------------------------------------
 
 /** "1234", "1234,56", "1234.56": solo dígitos y, a lo sumo, un separador. */
@@ -118,6 +126,16 @@ export function formatMoney(
   return `${sign}${CURRENCY_PREFIX[currency]} ${shown}`;
 }
 
+/**
+ * Un tipo de cambio guardado ("1400.5000") como se lee en es-AR: "1.400,50".
+ * Muestra al menos 2 decimales y hasta 4 si hacen falta ("301,5651").
+ */
+export function formatRate(rate: string): string {
+  const [whole = "0", fraction = ""] = rate.split(".");
+  const decimals = fraction.replace(/0+$/, "").padEnd(2, "0");
+  return `${groupThousands(BigInt(whole))},${decimals}`;
+}
+
 // --- Tipos de cambio y conversiones ----------------------------------------
 
 const RATE_TEXT = /^(\d+)(?:\.(\d{1,4}))?$/;
@@ -150,6 +168,48 @@ export function normalizeRate(decimal: string): string {
   }
   if (scaled <= ZERO) {
     throw new RangeError(`Tipo de cambio inválido: "${decimal}" tiene que ser mayor a cero.`);
+  }
+  return formatScaledRate(scaled);
+}
+
+/** Tope de un tipo de cambio escrito: 100.000 pesos por unidad. Mucho más es un error de tipeo. */
+const MAX_RATE_SCALED = BigInt(100_000) * RATE_SCALE;
+/** "1500", "1500,5", "1500.5": solo dígitos y, a lo sumo, un separador con hasta 4 decimales. */
+const PLAIN_RATE = /^(\d+)(?:[.,](\d{1,4}))?$/;
+/** "1.500,25": miles con punto y decimales con coma. */
+const GROUPED_RATE = /^(\d{1,3}(?:\.\d{3})+)(?:,(\d{1,4}))?$/;
+
+/**
+ * Pasa un tipo de cambio escrito ("1.512,50", "1512,5", "1512.5", "1512") a
+ * texto con 4 decimales ("1512.5000"), listo para guardar. Igual que con los
+ * montos, "1.500" o "1,500" es ambiguo y se pide aclarar. Tira
+ * `InvalidRateError`, con el mensaje listo para mostrar, si no es un número
+ * mayor a cero y de hasta 100.000.
+ */
+export function parseRateInput(input: string): string {
+  const text = input.trim();
+  if (text === "") {
+    throw new InvalidRateError("Ingresá el tipo de cambio.");
+  }
+  if (AMBIGUOUS_AMOUNT.test(text)) {
+    throw new InvalidRateError(
+      `El tipo de cambio "${text}" es ambiguo: escribilo sin separador de miles (1500) o con coma para los decimales (1500,50).`,
+    );
+  }
+  const match = PLAIN_RATE.exec(text) ?? GROUPED_RATE.exec(text);
+  if (!match) {
+    throw new InvalidRateError(
+      "El tipo de cambio no es válido: usá solo números, con coma o punto para los decimales (hasta 4), por ejemplo 1.512,50.",
+    );
+  }
+  const scaled =
+    BigInt(match[1].replaceAll(".", "")) * RATE_SCALE +
+    BigInt((match[2] ?? "").padEnd(RATE_DECIMALS, "0"));
+  if (scaled <= ZERO) {
+    throw new InvalidRateError("El tipo de cambio tiene que ser mayor a cero.");
+  }
+  if (scaled > MAX_RATE_SCALED) {
+    throw new InvalidRateError("El tipo de cambio es demasiado grande.");
   }
   return formatScaledRate(scaled);
 }
