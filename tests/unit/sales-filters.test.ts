@@ -67,6 +67,22 @@ describe("parseSalesQuery", () => {
     expect(parseSalesQuery({ pagina: "12" }).page).toBe(12);
   });
 
+  test("ignores dates outside 2000 to 2100, which the database would refuse", () => {
+    const query = parseSalesQuery({ desde: "0000-01-01", hasta: "9999-12-31" });
+    expect(query).toEqual({ filter: {}, page: 1 });
+    expect(parseSalesQuery({ desde: "1999-12-31" }).filter).toEqual({});
+    expect(parseSalesQuery({ desde: "2000-01-01", hasta: "2100-12-31" }).filter).toEqual({
+      from: "2000-01-01",
+      to: "2100-12-31",
+    });
+  });
+
+  test("drops NUL characters from the search, which the database refuses", () => {
+    expect(parseSalesQuery({ q: "ana\u0000pérez" }).filter.q).toBe("anapérez");
+    expect(parseSalesQuery({ q: "\u0000" }).filter).toEqual({});
+    expect(parseSalesQuery({ q: " \u0000 " }).filter).toEqual({});
+  });
+
   test("cuts a very long search", () => {
     expect(parseSalesQuery({ q: "x".repeat(500) }).filter.q).toHaveLength(100);
   });

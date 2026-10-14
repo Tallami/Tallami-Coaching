@@ -21,7 +21,7 @@ import {
   type SaleItem,
   type SaleStatus,
 } from "@/admin/catalog";
-import { argentinaLocalToDate, isValidIsoDate } from "@/admin/dates";
+import { argentinaLocalToDate, isPlausibleDay } from "@/admin/dates";
 import {
   InvalidAmountError,
   InvalidRateError,
@@ -44,8 +44,6 @@ const MAX_NAME_LENGTH = 120;
 const MAX_DISCORD_LENGTH = 64;
 const MAX_DESCRIPTION_LENGTH = 200;
 const MAX_NOTES_LENGTH = 2000;
-const MIN_YEAR = 2000;
-const MAX_YEAR = 2100;
 
 /** Estados en los que la venta ya se cobró: la base exige su fecha de cobro. */
 const STATUSES_WITH_PAYMENT = new Set<SaleStatus>(["paid", "delivered", "refunded"]);
@@ -110,22 +108,20 @@ const optionalDay = z
   .string()
   .trim()
   .refine(
-    (value) => {
-      if (value === "") return true;
-      const year = Number(value.slice(0, 4));
-      return isValidIsoDate(value) && year >= MIN_YEAR && year <= MAX_YEAR;
-    },
+    (value) => value === "" || isPlausibleDay(value),
     { error: MESSAGES.date },
   )
   .optional();
 
-/** Fecha con hora opcional (`datetime-local`, hora de Argentina). */
+/** Fecha con hora opcional (`datetime-local`, hora de Argentina), con el mismo rango de años que el día. */
 const optionalDateTime = z
   .string()
   .trim()
-  .refine((value) => value === "" || argentinaLocalToDate(value) !== null, {
-    error: MESSAGES.dateTime,
-  })
+  .refine(
+    (value) =>
+      value === "" || (argentinaLocalToDate(value) !== null && isPlausibleDay(value.slice(0, 10))),
+    { error: MESSAGES.dateTime },
+  )
   .optional();
 
 /** El monto escrito debe ser válido y entrar en el tope. */

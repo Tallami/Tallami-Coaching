@@ -148,6 +148,18 @@ describe("saleInputSchema", () => {
     );
   });
 
+  test("the due and delivery times need a sane year, like the payment day", () => {
+    // Chrome convierte un "26" tipeado en el año 0026: no se guarda en silencio.
+    for (const dateTime of ["0026-10-20T15:00", "0000-01-01T00:00", "1999-12-31T23:59", "2101-01-01T00:00", "9999-12-31T10:00"]) {
+      expect(errorsOf(raw({ dueAt: dateTime })).dueAt, dateTime).toBe("La fecha y hora no son válidas.");
+      expect(errorsOf(raw({ deliveredAt: dateTime })).deliveredAt, dateTime).toBe(
+        "La fecha y hora no son válidas.",
+      );
+    }
+    expect(saleInputSchema.parse(raw({ dueAt: "2000-01-01T00:00" })).dueAt).toBeInstanceOf(Date);
+    expect(saleInputSchema.parse(raw({ dueAt: "2100-12-31T23:59" })).dueAt).toBeInstanceOf(Date);
+  });
+
   test("keeps notes short", () => {
     expect(errorsOf(raw({ notes: "x".repeat(2001) })).notes).toBe(
       "Las notas son demasiado largas (máximo 2000 caracteres).",

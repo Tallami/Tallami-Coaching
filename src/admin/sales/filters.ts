@@ -8,7 +8,7 @@ import {
   SALE_ITEMS,
   SALE_STATUSES,
 } from "@/admin/catalog";
-import { isValidIsoDate } from "@/admin/dates";
+import { isPlausibleDay } from "@/admin/dates";
 import type { SaleFilter } from "@/admin/sales/repository";
 
 export interface SalesQuery {
@@ -22,6 +22,7 @@ const MAX_SEARCH_LENGTH = 100;
 /** Más páginas que esto no existen: alcanza para mil millones de ventas. */
 const MAX_PAGE = 1_000_000;
 const WHOLE_NUMBER = /^\d{1,9}$/;
+const NUL = "\u0000";
 
 /** Nombres de los parámetros de la dirección, en el orden en que se escriben. */
 export const SALES_PARAMS = {
@@ -45,13 +46,14 @@ function oneOf<T extends string>(values: readonly T[], value: string | undefined
 }
 
 function day(value: string | undefined): string | undefined {
-  return value && isValidIsoDate(value) ? value : undefined;
+  return value && isPlausibleDay(value) ? value : undefined;
 }
 
 /** Los filtros y la página que dice la dirección. */
 export function parseSalesQuery(params: SearchParams): SalesQuery {
   const read = (key: keyof typeof SALES_PARAMS) => firstValue(params[SALES_PARAMS[key]])?.trim();
-  const q = read("q")?.slice(0, MAX_SEARCH_LENGTH).trim();
+  // Postgres no guarda ni compara el carácter NUL: en una dirección escrita a mano daría un error 500.
+  const q = read("q")?.replaceAll(NUL, "").slice(0, MAX_SEARCH_LENGTH).trim();
   const page = read("page");
 
   const entries = {

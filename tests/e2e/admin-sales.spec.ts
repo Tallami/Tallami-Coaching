@@ -280,6 +280,16 @@ test.describe("sales", () => {
     await expect(page.getByLabel("Estado", { exact: true })).toHaveValue("");
   });
 
+  test("a hand-typed address with absurd dates or a NUL character still shows the list", async ({ page }) => {
+    for (const query of ["desde=0000-01-01", "hasta=9999-12-31", "q=%00", "desde=0000-01-01&hasta=9999-12-31&q=a%00b"]) {
+      const response = await page.goto(`/admin/ventas?${query}`);
+
+      expect(response?.status(), query).toBe(200);
+      await expect(page.getByRole("heading", { name: "Ventas", level: 1 }), query).toBeVisible();
+      await expect(page.getByLabel("Buscar alumno", { exact: true }), query).toBeVisible();
+    }
+  });
+
   test("a sale that does not exist says so inside the panel", async ({ page }) => {
     for (const id of ["00000000-0000-4000-8000-000000000000", "no-es-un-id"]) {
       await page.goto(`/admin/ventas/${id}`);

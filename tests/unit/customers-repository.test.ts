@@ -47,6 +47,11 @@ describe("customers repository", () => {
     expect(await searchCustomers(db, "\\")).toEqual([]);
   });
 
+  test("a NUL character in the search is ignored instead of breaking the query", async () => {
+    expect((await searchCustomers(db, "souza\u0000")).map((c) => c.name)).toEqual(["Bruno Souza"]);
+    expect((await searchCustomers(db, "\u0000")).length).toBeGreaterThan(0);
+  });
+
   test("answers at most eight students by default, ordered by name", async () => {
     const found = await searchCustomers(db, "Lote");
 

@@ -76,11 +76,17 @@ function amountToText(minor: number): string {
   return cents === 0 ? String(whole) : `${whole},${String(cents).padStart(2, "0")}`;
 }
 
-/** Tipo de cambio guardado ("1400.5000") → texto para el campo ("1400,5"). */
+/**
+ * Tipo de cambio guardado ("1400.5000") → texto para el campo ("1400,5"), sin
+ * ceros de sobra. Con tres decimales exactos se deja el cuarto cero ("59,8750"):
+ * "59,875" se leería como miles ("ambiguo") y el formulario rechazaría un valor
+ * que él mismo escribió.
+ */
 function rateToText(rate: string): string {
   const [whole, fraction = ""] = rate.split(".");
   const trimmed = fraction.replace(/0+$/, "");
-  return trimmed ? `${whole},${trimmed}` : whole;
+  if (!trimmed) return whole;
+  return `${whole},${trimmed.length === 3 ? trimmed.padEnd(4, "0") : trimmed}`;
 }
 
 /** La venta guardada, como la muestra el formulario de edición. */

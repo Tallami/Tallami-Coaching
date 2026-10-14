@@ -253,8 +253,7 @@ export async function getSale(db: Db, id: string): Promise<SaleRow | null> {
 }
 
 function filterConditions(filter: SaleFilter): (SQL | undefined)[] {
-  const text = filter.q?.trim();
-  const pattern = text ? containsPattern(text) : undefined;
+  const pattern = filter.q === undefined ? null : containsPattern(filter.q);
   return [
     filter.from ? gte(sales.paidOn, filter.from) : undefined,
     filter.to ? lte(sales.paidOn, filter.to) : undefined,

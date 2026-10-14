@@ -46,8 +46,8 @@ export async function searchCustomers(
   q: string,
   limit: number = DEFAULT_SEARCH_LIMIT,
 ): Promise<CustomerOption[]> {
-  const text = q.trim();
-  const pattern = containsPattern(text);
+  // Sin texto que buscar (vacío, espacios o NUL) se traen los primeros alumnos.
+  const pattern = containsPattern(q);
   return db
     .select({
       id: customers.id,
@@ -56,7 +56,7 @@ export async function searchCustomers(
       country: customers.country,
     })
     .from(customers)
-    .where(text ? or(ilike(customers.name, pattern), ilike(customers.discord, pattern)) : undefined)
+    .where(pattern ? or(ilike(customers.name, pattern), ilike(customers.discord, pattern)) : undefined)
     .orderBy(asc(customers.name), asc(customers.createdAt), asc(customers.id))
     .limit(limit);
 }

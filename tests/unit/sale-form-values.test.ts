@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { SaleRow } from "@/admin/sales/repository";
+import { parseRateInput } from "@/lib/money";
 import {
   customerLabel,
   emptySaleFormValues,
@@ -104,6 +105,38 @@ describe("saleToFormValues", () => {
       arsPerUsd: "1400.0000",
     });
     expect(manual).toMatchObject({ rateMode: "manual", arsPerUnit: "280,5", arsPerUsd: "1400" });
+  });
+
+  test.each([
+    "59.8750",
+    "281.2550",
+    "1.0010",
+    "12.1230",
+    "0.1230",
+    "1517.0000",
+    "280.5000",
+    "0.1234",
+    "99999.9990",
+    "100.0000",
+    "1400.0500",
+  ])("a manual rate of %s saved by the app is accepted again when the sale is re-saved", (stored) => {
+    const values = saleToFormValues({
+      ...SALE,
+      currency: "BRL",
+      rateSource: "manual",
+      arsPerUnit: stored,
+      arsPerUsd: stored,
+    });
+
+    // El texto que vuelve al formulario tiene que entrar de nuevo, sin avisos de "ambiguo", y dar lo mismo.
+    expect(parseRateInput(values.arsPerUnit)).toBe(stored);
+    expect(parseRateInput(values.arsPerUsd)).toBe(stored);
+  });
+
+  test("a rate with three decimals keeps a fourth zero so it is not mistaken for thousands", () => {
+    const values = saleToFormValues({ ...SALE, rateSource: "manual", arsPerUsd: "59.8750" });
+
+    expect(values.arsPerUsd).toBe("59,8750");
   });
 
   test("a description and notes come back as text", () => {

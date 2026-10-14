@@ -7,6 +7,10 @@ const BUSINESS_TIME_ZONE = "America/Argentina/Buenos_Aires";
 /** Argentina no tiene horario de verano desde 2009: el desfase es fijo. */
 const ARGENTINA_UTC_OFFSET = "-03:00";
 
+/** Años que el panel acepta en una fecha: fuera de ese rango es un tipeo (Chrome vuelve "26" el año 0026). */
+const MIN_YEAR = 2000;
+const MAX_YEAR = 2100;
+
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const LOCAL_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
 
@@ -33,6 +37,12 @@ export function isValidIsoDate(value: string): boolean {
   if (!ISO_DATE.test(value)) return false;
   const parsed = new Date(`${value}T00:00:00Z`);
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(value);
+}
+
+/** ¿Es un día real del calendario y de un año entre 2000 y 2100? Fuera de eso, la base lo rechazaría o sería un tipeo. */
+export function isPlausibleDay(value: string): boolean {
+  const year = Number(value.slice(0, 4));
+  return isValidIsoDate(value) && year >= MIN_YEAR && year <= MAX_YEAR;
 }
 
 /** El día de hoy en Argentina ("2026-10-14"), aunque en UTC ya sea mañana. */

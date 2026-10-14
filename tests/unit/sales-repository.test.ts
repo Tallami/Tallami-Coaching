@@ -412,6 +412,11 @@ describe("listSales", () => {
     expect(await tagsOf({ q: "a_a" })).toEqual([]);
   });
 
+  test("a NUL character in the search is ignored instead of breaking the query", async () => {
+    expect(await tagsOf({ q: "ana\u0000" })).toEqual(["s1", "s2"]);
+    expect((await tagsOf({ q: "\u0000" })).length).toBe(5);
+  });
+
   test("combines every filter", async () => {
     expect(await tagsOf({ q: "ana", status: "paid", paymentMethod: "transfer", from: "2026-09-01" })).toEqual(["s1"]);
     expect(await tagsOf({ q: "bruno", item: "vodLive", invoiceStatus: "pending" })).toEqual(["s5"]);
