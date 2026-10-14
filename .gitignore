@@ -11,6 +11,9 @@ Thumbs.db
 __pycache__/
 *.pyc
 
+# base local del panel de admin (PGlite)
+.data/
+
 # testing
 /coverage/
 /test-results/

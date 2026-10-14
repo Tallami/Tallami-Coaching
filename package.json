@@ -14,15 +14,20 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
     "players:photo": "node scripts/fetch-player-photo.mjs",
     "tweets:record": "node scripts/record-tweet.mjs",
     "tweets:index": "node scripts/tweet-snapshots-index.mjs"
   },
   "dependencies": {
+    "@electric-sql/pglite": "^0.5.9",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",
+    "drizzle-orm": "^0.45.4",
     "next": "16.4.0",
     "next-intl": "^4.14.9",
+    "postgres": "^3.4.9",
     "radix-ui": "^1.8.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
@@ -37,10 +42,12 @@
     "@types/node": "^24.19.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "drizzle-kit": "^0.31.11",
     "eslint": "^9",
     "eslint-config-next": "16.4.0",
     "sharp": "^0.35.5",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "^5.0.3"
   }

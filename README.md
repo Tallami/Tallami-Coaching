@@ -26,6 +26,8 @@ La web queda en http://localhost:3000 (redirige a `/es`, `/pt` o `/en` según el
 | `npm run typecheck` | TypeScript sin emitir archivos (corré antes `npm run build` o `npx next typegen`) |
 | `npm run test` | Tests unitarios (Vitest) |
 | `npm run test:e2e` | Tests end to end (Playwright): hace el build y sirve la web en el puerto 3100 |
+| `npm run db:generate` | Genera en `drizzle/` la migración SQL de los cambios hechos en `src/db/schema.ts` (la migración se sube al repo) |
+| `npm run db:migrate` | Aplica las migraciones de `drizzle/` a la base de `DATABASE_URL` (Supabase). La base local (PGlite) se migra sola al abrirse |
 | `npm run players:photo -- <usuario>` | Baja la foto de perfil de X de un jugador a `src/assets/players/` |
 | `npm run tweets:record -- <id> [<id> …]` | Guarda la respuesta de X de uno o más tweets en `src/content/tweet-snapshots/` y rehace su índice (necesita internet) |
 | `npm run tweets:index` | Rehace `src/content/tweet-snapshots/index.ts` con los archivos que hay en esa carpeta (sin internet) |
