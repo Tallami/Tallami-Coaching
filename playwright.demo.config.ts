@@ -9,13 +9,21 @@ import { demoServerEnv } from "./tests/helpers/admin-server";
 // Nadie escribe en esa base: los tests son de solo lectura, así los números
 // esperados salen de los mismos datos de ejemplo con las mismas funciones puras.
 //
-//   npm run test:e2e        # los dos configs, uno después del otro
-//   npm run test:e2e:demo   # solo este (arma el build si todavía no existe)
+//   npm run test:e2e        # los dos configs, uno después del otro (el build lo arma el primero)
+//   npm run test:e2e:demo   # solo este: arma el build y corre (así no usa uno viejo)
 
 const PORT = 3101;
 const BASE_URL = `http://localhost:${PORT}`;
-/** El build lo arma el servidor principal (`playwright.config.ts`); acá se reutiliza. */
-const HAS_BUILD = existsSync(path.join(process.cwd(), ".next", "BUILD_ID"));
+/**
+ * El build lo arma el servidor principal (`playwright.config.ts`) y acá se
+ * reutiliza. Se arma de nuevo (con las variables de abajo, sin red) cuando falta
+ * o cuando la tanda se corre sola con `npm run test:e2e:demo`: npm avisa el
+ * nombre del script en `npm_lifecycle_event`, y así esa tanda nunca usa un
+ * build viejo.
+ */
+const NEEDS_BUILD =
+  !existsSync(path.join(process.cwd(), ".next", "BUILD_ID")) ||
+  process.env.npm_lifecycle_event === "test:e2e:demo";
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -33,7 +41,7 @@ export default defineConfig({
     // Sembrar y recién entonces levantar: PGlite no admite dos procesos a la vez
     // en la misma carpeta. `db:seed:demo` se niega si hubiera `DATABASE_URL`
     // (el entorno de abajo la deja vacía).
-    command: `${HAS_BUILD ? "" : "npm run build && "}npm run db:seed:demo && npm run start -- --port ${PORT}`,
+    command: `${NEEDS_BUILD ? "npm run build && " : ""}npm run db:seed:demo && npm run start -- --port ${PORT}`,
     url: BASE_URL,
     // Nunca se reutiliza un servidor que ya esté en el puerto: tiene que ser el sembrado acá.
     reuseExistingServer: false,

@@ -25,7 +25,7 @@ La web queda en http://localhost:3000 (redirige a `/es`, `/pt` o `/en` según el
 | `npm run lint` | ESLint |
 | `npm run typecheck` | TypeScript sin emitir archivos (corré antes `npm run build` o `npx next typegen`) |
 | `npm run test` | Tests unitarios (Vitest) |
-| `npm run test:e2e` | Tests end to end (Playwright), en dos tandas: la web en el puerto 3100 (hace el build) y el resumen del panel con datos de ejemplo en el 3101 (reutiliza ese build). `test:e2e:main` y `test:e2e:demo` corren cada una por separado |
+| `npm run test:e2e` | Tests end to end (Playwright), en dos tandas: la web en el puerto 3100 (hace el build) y el resumen del panel con datos de ejemplo en el 3101 (reutiliza ese build). `test:e2e:main` y `test:e2e:demo` corren cada una por separado (la segunda siempre arma el build antes) |
 | `npm run db:generate` | Genera en `drizzle/` la migración SQL de los cambios hechos en `src/db/schema.ts` (la migración se sube al repo) |
 | `npm run db:migrate` | Aplica las migraciones de `drizzle/` a la base de `DATABASE_URL` (Supabase). La base local (PGlite) se migra sola al abrirse |
 | `npm run db:seed:demo` | Carga en la base local (PGlite) 25 alumnos y unas 120 ventas ficticias de los últimos 14 meses, para ver el resumen del panel con números. Se niega a correr si hay `DATABASE_URL`; se puede repetir (refresca las fechas) |
@@ -102,7 +102,7 @@ Localmente entrá por `http://localhost:3000/admin`, no por la IP de tu red: la 
 
 `npm run test:e2e` arranca el servidor con una contraseña y un secreto de prueba (`tests/helpers/admin-server.ts`), una base PGlite vacía en una carpeta temporal que se borra al iniciar, y `EXCHANGE_RATE_SOURCE=fixed` (cotizaciones fijas, sin llamar al BCRA; en producción de Vercel esa variable se ignora). Cada test navega con su propia IP, así los bloqueos de uno no afectan a los otros.
 
-Los tests que verifican totales (`tests/e2e/admin-overview.spec.ts`) corren aparte, con `playwright.demo.config.ts`: un segundo servidor en el puerto 3101, con el mismo build y su propia base PGlite que se siembra con `buildDemoData(hoy en Argentina)` antes de arrancar (`src/admin/demo-data.ts`). Nadie escribe en esa base, así los números esperados salen de los mismos datos con las mismas funciones que usa la página. Si todavía no hay build, ese config lo arma.
+Los tests que verifican totales (`tests/e2e/admin-overview.spec.ts`) corren aparte, con `playwright.demo.config.ts`: un segundo servidor en el puerto 3101, con el mismo build y su propia base PGlite que se siembra con `buildDemoData(hoy en Argentina)` antes de arrancar (`src/admin/demo-data.ts`). Nadie escribe en esa base, así los números esperados salen de los mismos datos con las mismas funciones que usa la página. `npm run test:e2e:demo` arma el build y corre solo esa tanda; con `npm run test:e2e` el build lo arma la primera.
 
 ## Deploy (Vercel)
 

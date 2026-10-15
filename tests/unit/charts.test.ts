@@ -4,7 +4,7 @@ import { describe, expect, test } from "vitest";
 import { BarChart, type BarDatum } from "@/admin/charts/bar-chart";
 import { DeltaBadge } from "@/admin/charts/delta-badge";
 import { HBarChart, type HBarRow } from "@/admin/charts/hbar-chart";
-import { Meter, meterTone } from "@/admin/charts/meter";
+import { Meter, type MeterTone } from "@/admin/charts/meter";
 
 function html(element: ReturnType<typeof createElement>): string {
   return renderToStaticMarkup(element);
@@ -128,11 +128,11 @@ describe("HBarChart", () => {
 });
 
 describe("Meter", () => {
-  function meter(usedPct: number): string {
+  function meter(usedPct: number, tone: MeterTone = "accent"): string {
     return html(
       createElement(Meter, {
         usedPct,
-        tone: meterTone(usedPct),
+        tone,
         label: "Tope usado",
         valueText: `${usedPct} % del tope`,
       }),
@@ -160,16 +160,11 @@ describe("Meter", () => {
     expect(meter(0)).not.toContain('data-testid="meter-fill"');
   });
 
-  test("the color follows how much was used", () => {
-    expect(meterTone(0)).toBe("accent");
-    expect(meterTone(79.9)).toBe("accent");
-    expect(meterTone(80)).toBe("warn");
-    expect(meterTone(99.9)).toBe("warn");
-    expect(meterTone(100)).toBe("danger");
-    expect(meterTone(250)).toBe("danger");
-    expect(meter(50)).toContain("fill-zone");
-    expect(meter(90)).toContain("fill-warn");
-    expect(meter(120)).toContain("fill-danger");
+  test("the fill and its track take the color of the tone they are given", () => {
+    expect(meter(50, "accent")).toContain("fill-zone");
+    expect(meter(90, "warn")).toContain("fill-warn");
+    expect(meter(120, "danger")).toContain("fill-danger");
+    expect(meter(50, "accent")).toContain("fill-zone/15");
   });
 });
 

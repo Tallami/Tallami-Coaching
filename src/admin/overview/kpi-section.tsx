@@ -18,9 +18,9 @@ interface StatProps {
 /** Un indicador chico: nombre, número y una línea que explica qué cuenta. */
 function Stat({ testId, label, value, caption }: StatProps) {
   return (
-    <div data-testid={testId} className="border-2 border-ink bg-white px-4 py-3.5">
+    <div data-testid={testId} className="min-w-0 border-2 border-ink bg-white px-4 py-3.5">
       <dt className="text-[0.9375rem] font-semibold text-ink-2">{label}</dt>
-      <dd className="mt-1.5 text-[2rem] leading-none font-extrabold whitespace-nowrap [font-stretch:75%]">
+      <dd className="mt-1.5 text-[1.75rem] leading-none font-extrabold break-words min-[1280px]:text-[2rem] [font-stretch:75%]">
         {value}
       </dd>
       <dd className="mt-1.5 text-[0.875rem] leading-snug text-ink-2">{caption}</dd>
@@ -43,8 +43,8 @@ export function KpiSection({ data }: { data: OverviewData }) {
       <h2 id="indicadores-title" className="sr-only">
         Indicadores del período
       </h2>
-      <div className="stage grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] border-l-[6px] border-l-gold narrow:grid-cols-1">
-        <div data-testid="kpi-income-usd" className="px-6 py-5 narrow:px-5">
+      <div className="stage grid grid-cols-1 border-l-[6px] border-l-gold min-[1100px]:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+        <div data-testid="kpi-income-usd" className="min-w-0 px-6 py-5 narrow:px-5">
           <p className="text-[1rem] font-semibold text-on-stage-2">Cobrado en dólares</p>
           <p className="mt-1 text-[clamp(2.75rem,6vw,4.25rem)] leading-[1.05] font-extrabold [font-stretch:75%]">
             <MoneyFigure text={formatMoney(kpis.incomeUsdMinor, "USD")} />
@@ -66,7 +66,7 @@ export function KpiSection({ data }: { data: OverviewData }) {
         </div>
         <div
           data-testid="kpi-income-ars"
-          className="border-t border-stage-line px-6 py-5 narrow:px-5 min-[901px]:border-t-0 min-[901px]:border-l"
+          className="min-w-0 border-t border-stage-line px-6 py-5 narrow:px-5 min-[1100px]:border-t-0 min-[1100px]:border-l"
         >
           <p className="text-[1rem] font-semibold text-on-stage-2">Cobrado en pesos</p>
           <p className="mt-1 text-[clamp(1.875rem,3.4vw,2.5rem)] leading-[1.1] font-extrabold [font-stretch:75%]">
@@ -78,7 +78,7 @@ export function KpiSection({ data }: { data: OverviewData }) {
         </div>
       </div>
 
-      <dl className="mt-4 grid grid-cols-4 gap-4 narrow:grid-cols-2 narrow:gap-3">
+      <dl className="mt-4 grid grid-cols-2 gap-3 min-[1100px]:grid-cols-4 min-[1100px]:gap-4">
         <Stat
           testId="kpi-sales"
           label="Ventas cobradas"
@@ -101,7 +101,7 @@ export function KpiSection({ data }: { data: OverviewData }) {
           testId="kpi-repeat-rate"
           label="Recompra"
           value={hasSales ? formatPercent(kpis.repeatRatePct) : "—"}
-          caption="ya habían comprado antes"
+          caption="de los que compraron, ya habían comprado antes"
         />
       </dl>
     </section>

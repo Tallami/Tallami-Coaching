@@ -39,13 +39,19 @@ function resetPgliteDir(dir: string): string {
   return dir;
 }
 
-/** Variables de entorno de un servidor del panel de prueba, con su base en `pgliteDir` (vacía al arrancar). */
+/**
+ * Variables de entorno de un servidor del panel de prueba, con su base en
+ * `pgliteDir` (vacía al arrancar). `DATABASE_URL` va siempre vacía, aunque el
+ * entorno de quien corre los tests tenga una: los e2e cargan ventas y alumnos y
+ * nunca pueden escribir en una base remota.
+ */
 async function serverEnv(pgliteDir: string): Promise<Record<string, string>> {
   return {
     ADMIN_PASSWORD_HASH: await hashPassword(ADMIN_TEST_PASSWORD),
     ADMIN_SESSION_SECRET: ADMIN_TEST_SESSION_SECRET,
     PGLITE_DIR: resetPgliteDir(pgliteDir),
     EXCHANGE_RATE_SOURCE: "fixed",
+    DATABASE_URL: "",
   };
 }
 
@@ -57,10 +63,8 @@ export function adminServerEnv(): Promise<Record<string, string>> {
 /**
  * Lo mismo para el servidor de los datos de ejemplo: su propia carpeta de base,
  * vacía al arrancar (el comando de la configuración la siembra antes de
- * levantar el servidor; la base del servidor principal no se toca) y sin
- * `DATABASE_URL` aunque el entorno de quien corre los tests la tenga: esos
- * datos nunca van a una base remota.
+ * levantar el servidor; la base del servidor principal no se toca).
  */
-export async function demoServerEnv(): Promise<Record<string, string>> {
-  return { ...(await serverEnv(E2E_DEMO_PGLITE_DIR)), DATABASE_URL: "" };
+export function demoServerEnv(): Promise<Record<string, string>> {
+  return serverEnv(E2E_DEMO_PGLITE_DIR);
 }

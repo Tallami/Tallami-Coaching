@@ -241,6 +241,60 @@ describe("OverviewView", () => {
     expect(card).toContain("$ 250.000,00");
   });
 
+  test("next to the cap the card never writes a negative amount or a zero over", () => {
+    const cardFor = (collectedArsMinor: number) =>
+      plain(
+        section(
+          render(
+            build([sale({ amountArsMinor: collectedArsMinor, amountUsdMinor: 1 })], "thisMonth", {
+              ...SETTINGS,
+              annualCapArsMinor: 10_000_000,
+            }),
+          ),
+          "monotributo",
+        ),
+      );
+
+    // 99,95 %: se redondea a 100 %, pero todavía quedan $ 50,00.
+    const almost = cardFor(9_995_000);
+    expect(almost).toContain("100 %");
+    expect(almost).toContain("Estás a punto de llegar al tope: te quedan $ 50,00");
+    expect(almost).not.toContain("Superaste");
+    expect(almost).not.toContain("-$");
+    // Justo el tope.
+    const exact = cardFor(10_000_000);
+    expect(exact).toContain("Llegaste al tope");
+    expect(exact).not.toContain("Superaste");
+    expect(exact).not.toContain("$ 0,00 ");
+    // 100,05 %: pasado por $ 50,00.
+    const over = cardFor(10_005_000);
+    expect(over).toContain("Superaste el tope por $ 50,00");
+    expect(over).not.toContain("-$");
+  });
+
+  test("the meter of the card is warn near the cap and danger only at or over it", () => {
+    const meterOf = (collectedArsMinor: number) =>
+      section(
+        render(
+          build([sale({ amountArsMinor: collectedArsMinor, amountUsdMinor: 1 })], "thisMonth", {
+            ...SETTINGS,
+            annualCapArsMinor: 10_000_000,
+          }),
+        ),
+        "monotributo",
+      );
+
+    expect(meterOf(9_995_000)).toContain("fill-warn");
+    expect(meterOf(9_995_000)).not.toContain("fill-danger");
+    expect(meterOf(10_000_000)).toContain("fill-danger");
+    expect(meterOf(10_005_000)).toContain("fill-danger");
+  });
+
+  test("the repeat rate says of whom it is", () => {
+    const html = render(build(sampleSales()));
+    expect(plain(section(html, "kpi-repeat-rate"))).toContain("de los que compraron, ya habían comprado antes");
+  });
+
   test("pending deliveries and sessions link to their sale and flag what is unpaid", () => {
     const sales = [
       sale({ id: "vod-late", item: "vodRecorded", customerId: "ana", dueAt: "2026-10-12T18:00:00.000Z" }),

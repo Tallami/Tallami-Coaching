@@ -1,8 +1,9 @@
 import { CircleCheckIcon, TriangleAlertIcon } from "lucide-react";
 import Link from "next/link";
-import { Meter, meterTone, type MeterTone } from "@/admin/charts/meter";
+import { Meter, type MeterTone } from "@/admin/charts/meter";
 import { formatDay } from "@/admin/dates";
 import { formatPercent } from "@/admin/overview/labels";
+import { monotributoVerdict } from "@/admin/overview/monotributo-verdict";
 import type { OverviewData } from "@/admin/overview/overview-data";
 import { SectionCard } from "@/admin/overview/section-card";
 import { Button } from "@/components/ui/button";
@@ -16,13 +17,6 @@ const TONE_TEXT: Record<MeterTone, string> = {
   warn: "text-warn-ink",
   danger: "text-danger-ink",
 };
-
-/** Lo que dice el medidor con palabras: lo que queda, que se está llegando o que se pasó. */
-function verdict(tone: MeterTone, remainingArsMinor: number): string {
-  if (tone === "danger") return `Superaste el tope por ${formatMoney(-remainingArsMinor, "ARS")}`;
-  const remaining = formatMoney(remainingArsMinor, "ARS");
-  return tone === "warn" ? `Estás cerca del tope: te quedan ${remaining}` : `Te quedan ${remaining}`;
-}
 
 /**
  * Los ingresos en pesos de los últimos 12 meses móviles contra el tope anual
@@ -53,7 +47,7 @@ export function MonotributoCard({ data }: { data: OverviewData }) {
     );
   }
 
-  const tone = meterTone(status.usedPct);
+  const { tone, text } = monotributoVerdict(status.usedPct, status.remainingArsMinor);
   const Icon = tone === "accent" ? CircleCheckIcon : TriangleAlertIcon;
   return (
     <SectionCard id="monotributo" testId="monotributo" title="Monotributo" description={description}>
@@ -72,7 +66,7 @@ export function MonotributoCard({ data }: { data: OverviewData }) {
       />
       <p className={cn("mt-3 flex items-start gap-2 font-bold", TONE_TEXT[tone])}>
         <Icon className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
-        {verdict(tone, status.remainingArsMinor)}
+        {text}
       </p>
       <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 border-t border-rule pt-3 text-[0.9375rem]">
         <dt className="text-ink-2">Cobrado en 12 meses</dt>

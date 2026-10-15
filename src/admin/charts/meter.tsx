@@ -23,15 +23,6 @@ const TONE_CLASSES: Record<MeterTone, { fill: string; track: string }> = {
 const METER_HEIGHT = 14;
 const CORNER_RADIUS = 4;
 const FULL_PCT = 100;
-/** Desde acá el medidor avisa que se está llegando al tope. */
-const WARN_FROM_PCT = 80;
-
-/** El tono según cuánto se usó: acento hasta el 80 %, aviso hasta el 100 %, alerta al pasarlo. */
-export function meterTone(usedPct: number): MeterTone {
-  if (usedPct >= FULL_PCT) return "danger";
-  if (usedPct >= WARN_FROM_PCT) return "warn";
-  return "accent";
-}
 
 /**
  * Medidor de un número contra un tope. SVG del servidor: el ancho del relleno

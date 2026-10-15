@@ -287,6 +287,50 @@ test("the overview is accessible", async ({ page }) => {
   ).toEqual([]);
 });
 
+/**
+ * Cada tarjeta de indicadores (las dos de arriba y las cuatro de abajo) con lo
+ * que se sale de su caja: el contenido que pasa su borde o llega a tocarlo
+ * (las tarjetas tienen 16 px de relleno, así que a menos de 12 px del borde ya
+ * se ve pegado).
+ */
+async function cardsSpilling(page: Page): Promise<string[]> {
+  return page.evaluate((margin) => {
+    const spilling: string[] = [];
+    for (const card of document.querySelectorAll<HTMLElement>('[data-testid^="kpi-"]')) {
+      const name = card.dataset.testid;
+      const edge = card.getBoundingClientRect().right - margin;
+      if (card.scrollWidth > card.clientWidth) spilling.push(`${name}: scrollWidth ${card.scrollWidth} > ${card.clientWidth}`);
+      for (const element of card.querySelectorAll<HTMLElement>("*")) {
+        const right = element.getBoundingClientRect().right;
+        if (right > edge) spilling.push(`${name} > ${element.tagName.toLowerCase()}: right ${Math.round(right)} > ${Math.round(edge)}`);
+        // (El texto solo para lectores de pantalla mide 1 px de ancho y está recortado a propósito.)
+        if (element.clientWidth > 1 && element.scrollWidth > element.clientWidth + 1) {
+          spilling.push(`${name} > ${element.tagName.toLowerCase()}: scrollWidth ${element.scrollWidth} > ${element.clientWidth}`);
+        }
+      }
+    }
+    return spilling;
+  }, 12);
+}
+
+test.describe("on medium screens, where the sidebar is visible and the page is still narrow", () => {
+  for (const width of [920, 1024, 1100, 1280]) {
+    for (const period of ["thisMonth", "last12"] as const) {
+      test(`the indicator cards hold their numbers at ${width}px (${PERIOD_LABELS[period]})`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 900 });
+        await openOverview(page, period);
+        await expect(page.getByTestId("kpi-average-ticket")).toBeVisible();
+
+        expect(await cardsSpilling(page)).toEqual([]);
+        const sideways = await page.evaluate(
+          () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        );
+        expect(sideways).toBe(0);
+      });
+    }
+  }
+});
+
 test.describe("on a phone", () => {
   test.use({ viewport: PHONE });
 
@@ -302,6 +346,7 @@ test.describe("on a phone", () => {
         .slice(0, 5),
     }));
     expect(overflow).toEqual({ page: 0, wide: [] });
+    expect(await cardsSpilling(page)).toEqual([]);
   });
 
   test("the overview is accessible on a phone", async ({ page }) => {
