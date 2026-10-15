@@ -10,13 +10,12 @@ import {
 } from "@/admin/catalog";
 import { isPlausibleDay } from "@/admin/dates";
 import type { SaleFilter } from "@/admin/sales/repository";
+import { firstValue, type SearchParams } from "@/admin/ui/search-params";
 
 export interface SalesQuery {
   filter: SaleFilter;
   page: number;
 }
-
-type SearchParams = Record<string, string | string[] | undefined>;
 
 const MAX_SEARCH_LENGTH = 100;
 /** Más páginas que esto no existen: alcanza para mil millones de ventas. */
@@ -35,11 +34,6 @@ export const SALES_PARAMS = {
   q: "q",
   page: "pagina",
 } as const;
-
-/** `?clave=a&clave=b` llega como lista: vale el primero. */
-function firstValue(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
-}
 
 function oneOf<T extends string>(values: readonly T[], value: string | undefined): T | undefined {
   return values.find((candidate) => candidate === value);

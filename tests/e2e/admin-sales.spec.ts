@@ -1,63 +1,14 @@
 import AxeBuilder from "@axe-core/playwright";
-import type { Locator, Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { expect, loginAsAdmin, test } from "../helpers/admin";
-
-const PHONE = { width: 375, height: 812 } as const;
-
-/** Nombre único por test: los tests corren en paralelo contra una sola base, cada uno mira solo sus filas. */
-function uniqueName(prefix: string): string {
-  return `${prefix} ${Math.random().toString(36).slice(2, 8)}`;
-}
-
-interface SaleDraft {
-  student: string;
-  item?: string;
-  currency?: string;
-  amount?: string;
-  paymentMethod?: string;
-  status?: string;
-  paidOn?: string;
-}
-
-/**
- * Espera a que React haya tomado el elemento (la página ya reacciona a los clics).
- * Un botón que se toca antes de la hidratación no hace nada y el test se quedaría esperando.
- */
-async function whenInteractive(locator: Locator): Promise<void> {
-  await expect
-    .poll(() => locator.evaluate((element) => Object.keys(element).some((key) => key.startsWith("__reactProps"))))
-    .toBe(true);
-}
-
-/** Abre el formulario de alta y espera a que esté listo para usarse. */
-async function openNewSale(page: Page): Promise<void> {
-  await page.goto("/admin/ventas/nueva");
-  await expect(page.locator("form[data-hydrated='true']")).toBeVisible();
-}
-
-/** Completa el formulario con un alumno nuevo; deja sin tocar lo que el borrador no define. */
-async function fillSale(page: Page, draft: SaleDraft): Promise<void> {
-  await page.getByRole("radio", { name: "Alumno nuevo" }).check();
-  await page.getByLabel("Nombre", { exact: true }).fill(draft.student);
-  if (draft.item) await page.getByLabel("Servicio", { exact: true }).selectOption(draft.item);
-  if (draft.currency) await page.getByLabel("Moneda", { exact: true }).selectOption(draft.currency);
-  if (draft.amount !== undefined) await page.getByLabel("Monto", { exact: true }).fill(draft.amount);
-  if (draft.paymentMethod) {
-    await page.getByLabel("Medio de pago", { exact: true }).selectOption(draft.paymentMethod);
-  }
-  if (draft.status) await page.getByLabel("Estado", { exact: true }).selectOption(draft.status);
-  if (draft.paidOn !== undefined) {
-    await page.getByLabel("Fecha de cobro", { exact: true }).fill(draft.paidOn);
-  }
-}
-
-/** Carga una venta completa por el formulario y espera a volver a la lista. */
-async function createSale(page: Page, draft: SaleDraft): Promise<void> {
-  await openNewSale(page);
-  await fillSale(page, { item: "lesson", paymentMethod: "transfer", status: "paid", ...draft });
-  await page.getByRole("button", { name: "Guardar venta" }).click();
-  await expect(page).toHaveURL(/\/admin\/ventas\?guardada=creada$/);
-}
+import {
+  PHONE,
+  createSale,
+  fillSale,
+  openNewSale,
+  uniqueName,
+  whenInteractive,
+} from "../helpers/admin-ui";
 
 /** La lista filtrada por el nombre del alumno. */
 async function openListFor(page: Page, student: string): Promise<void> {

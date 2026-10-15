@@ -5,30 +5,34 @@
 // Las funciones que escriben van en una transacción: un alumno nuevo y su
 // venta se guardan juntos o no se guarda nada.
 
-import { and, count, desc, eq, gte, ilike, lte, or, sql, type SQL } from "drizzle-orm";
+import { and, count, eq, gte, ilike, lte, or, type SQL } from "drizzle-orm";
 import {
   isDollarCurrency,
-  type Currency,
   type InvoiceStatus,
-  type InvoiceType,
   type PaymentMethod,
-  type RateSource,
   type SaleItem,
   type SaleStatus,
 } from "@/admin/catalog";
-import { createCustomer } from "@/admin/customers/repository";
+import { CustomerNotFoundError, createCustomer } from "@/admin/customers/repository";
 import type { SaleRates } from "@/admin/sales/rates";
+import { newestSalesFirst, saleRowColumns, toSaleRow, type SaleRow } from "@/admin/sales/sale-row";
 import type { SaleCustomerInput, SaleInput } from "@/admin/sales/schema";
 import type { Db } from "@/db/client";
 import { containsPattern } from "@/db/like";
 import { customers, sales } from "@/db/schema";
+import { isUuid } from "@/db/uuid";
 import { arsToUsdMinor, convertToArsMinor } from "@/lib/money";
+
+// La forma de una venta vive en `sale-row.ts`; se vuelve a exportar acá porque
+// es lo que el resto del panel importa junto con las funciones de este archivo.
+export type { SaleRow };
+// El error vive con el repositorio de alumnos, que es quien lo tira al buscar uno.
+export { CustomerNotFoundError };
 
 /** Ventas por página si no se pide otro tamaño. */
 const DEFAULT_PAGE_SIZE = 25;
 /** Tope de página: más allá, el desplazamiento dejaría de ser un entero seguro. */
 const MAX_PAGE = 1_000_000;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** La venta que se quiere editar no existe. */
 export class SaleNotFoundError extends Error {
@@ -36,48 +40,6 @@ export class SaleNotFoundError extends Error {
     super("No encontramos esa venta.");
     this.name = "SaleNotFoundError";
   }
-}
-
-/** El alumno elegido para la venta no existe (por ejemplo, ya no está). */
-export class CustomerNotFoundError extends Error {
-  constructor() {
-    super("Ese alumno ya no existe: elegí otro o cargalo de nuevo.");
-    this.name = "CustomerNotFoundError";
-  }
-}
-
-/** Una venta con los datos de su alumno, tal como la muestran la lista y el formulario. */
-export interface SaleRow {
-  id: string;
-  customerId: string;
-  customerName: string;
-  customerDiscord: string | null;
-  customerCountry: string | null;
-  item: SaleItem;
-  description: string | null;
-  currency: Currency;
-  /** Monto en la moneda cobrada, en unidades menores. */
-  amountMinor: number;
-  arsPerUnit: string;
-  arsPerUsd: string;
-  rateSource: RateSource;
-  rateQuotedOn: string | null;
-  amountArsMinor: number;
-  amountUsdMinor: number;
-  paymentMethod: PaymentMethod;
-  status: SaleStatus;
-  /** Día de cobro (Argentina), "AAAA-MM-DD". */
-  paidOn: string | null;
-  dueAt: Date | null;
-  deliveredAt: Date | null;
-  invoiceStatus: InvoiceStatus;
-  invoiceType: InvoiceType | null;
-  invoiceNumber: string | null;
-  invoicedOn: string | null;
-  source: string;
-  notes: string | null;
-  createdAt: Date;
-  updatedAt: Date;
 }
 
 /** Filtros de la lista de ventas. Las fechas son el día de cobro, extremos incluidos. */
@@ -90,69 +52,6 @@ export interface SaleFilter {
   invoiceStatus?: InvoiceStatus;
   /** Texto en el nombre o el Discord del alumno. */
   q?: string;
-}
-
-const rowColumns = {
-  id: sales.id,
-  customerId: sales.customerId,
-  customerName: customers.name,
-  customerDiscord: customers.discord,
-  customerCountry: customers.country,
-  item: sales.item,
-  description: sales.description,
-  currency: sales.currency,
-  amountMinor: sales.amountMinor,
-  arsPerUnit: sales.arsPerUnit,
-  arsPerUsd: sales.arsPerUsd,
-  rateSource: sales.rateSource,
-  rateQuotedOn: sales.rateQuotedOn,
-  amountArsMinor: sales.amountArsMinor,
-  amountUsdMinor: sales.amountUsdMinor,
-  paymentMethod: sales.paymentMethod,
-  status: sales.status,
-  paidOn: sales.paidOn,
-  dueAt: sales.dueAt,
-  deliveredAt: sales.deliveredAt,
-  invoiceStatus: sales.invoiceStatus,
-  invoiceType: sales.invoiceType,
-  invoiceNumber: sales.invoiceNumber,
-  invoicedOn: sales.invoicedOn,
-  source: sales.source,
-  notes: sales.notes,
-  createdAt: sales.createdAt,
-  updatedAt: sales.updatedAt,
-};
-
-/** La fila como la devuelve la base: las listas cerradas son texto suelto. */
-type RawRow = Omit<
-  SaleRow,
-  "item" | "currency" | "rateSource" | "paymentMethod" | "status" | "invoiceStatus" | "invoiceType"
-> & {
-  item: string;
-  currency: string;
-  rateSource: string;
-  paymentMethod: string;
-  status: string;
-  invoiceStatus: string;
-  invoiceType: string | null;
-};
-
-/**
- * Las columnas de lista cerrada llegan como texto; la base las limita con
- * restricciones `check` a los valores del catálogo, así que el cambio de tipo
- * es seguro.
- */
-function toSaleRow(raw: RawRow): SaleRow {
-  return {
-    ...raw,
-    item: raw.item as SaleItem,
-    currency: raw.currency as Currency,
-    rateSource: raw.rateSource as RateSource,
-    paymentMethod: raw.paymentMethod as PaymentMethod,
-    status: raw.status as SaleStatus,
-    invoiceStatus: raw.invoiceStatus as InvoiceStatus,
-    invoiceType: raw.invoiceType as InvoiceType | null,
-  };
 }
 
 /** El alumno de la venta: el elegido (si existe) o uno nuevo dado de alta. */
@@ -227,7 +126,7 @@ export async function updateSale(
   input: SaleInput,
   rates: SaleRates,
 ): Promise<{ id: string }> {
-  if (!UUID.test(id)) throw new SaleNotFoundError();
+  if (!isUuid(id)) throw new SaleNotFoundError();
   return db.transaction(async (tx) => {
     const customerId = await resolveCustomerId(tx, input.customer);
     const [updated] = await tx
@@ -242,9 +141,9 @@ export async function updateSale(
 
 /** Una venta con los datos de su alumno, o `null` si no existe (o el id no es un id). */
 export async function getSale(db: Db, id: string): Promise<SaleRow | null> {
-  if (!UUID.test(id)) return null;
+  if (!isUuid(id)) return null;
   const [row] = await db
-    .select(rowColumns)
+    .select(saleRowColumns)
     .from(sales)
     .innerJoin(customers, eq(sales.customerId, customers.id))
     .where(eq(sales.id, id))
@@ -282,11 +181,11 @@ export async function listSales(
 
   const [rows, [totals]] = await Promise.all([
     db
-      .select(rowColumns)
+      .select(saleRowColumns)
       .from(sales)
       .innerJoin(customers, eq(sales.customerId, customers.id))
       .where(where)
-      .orderBy(sql`${sales.paidOn} desc nulls first`, desc(sales.createdAt), desc(sales.id))
+      .orderBy(...newestSalesFirst)
       .limit(pageSize)
       .offset((safePage - 1) * pageSize),
     db

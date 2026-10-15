@@ -14,6 +14,7 @@ import { AdminShell } from "@/admin/ui/admin-shell";
 import { Notice } from "@/admin/ui/notice";
 import { PageHeader } from "@/admin/ui/page-header";
 import { Pagination } from "@/admin/ui/pagination";
+import { firstValue } from "@/admin/ui/search-params";
 import { Button } from "@/components/ui/button";
 import { getDb } from "@/db/client";
 
@@ -27,10 +28,6 @@ const SAVED_MESSAGES: Record<string, string> = {
   creada: "Venta guardada.",
   editada: "Cambios guardados.",
 };
-
-function firstValue(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
-}
 
 export default async function SalesPage(props: PageProps<"/admin/ventas">) {
   await requireAdmin();
