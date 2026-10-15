@@ -187,6 +187,7 @@ describe("pending work", () => {
         unpaid: false,
       },
     ]);
+    // El pack de clases de ayer no está: es de varias sesiones y no se marca como una sola.
     expect(work.toMark).toEqual([
       {
         id: "mark-old",
@@ -194,13 +195,15 @@ describe("pending work", () => {
         customerId: "dario",
         customerName: "Dario",
         dueAt: "2026-09-01T15:00:00.000Z",
+        unpaid: false,
       },
       {
-        id: "mark-yesterday",
-        item: "lessonPack",
+        id: "mark-unpaid",
+        item: "lesson",
         customerId: "ana",
         customerName: "Ana",
         dueAt: "2026-10-12T20:00:00.000Z",
+        unpaid: true,
       },
     ]);
     expect(work.uninvoiced).toEqual({ count: 2, arsMinor: 10_500_000, usdMinor: 7000 });
@@ -245,7 +248,7 @@ describe("pending work", () => {
     ]);
   });
 
-  test("only paid sessions are left to mark, never the unpaid, cancelled or refunded ones", () => {
+  test("past sessions to mark are the paid and the unpaid ones, never the cancelled or refunded", () => {
     const past = "2026-10-01T15:00:00.000Z";
     const sales = [
       sale({ id: "paid", item: "lesson", dueAt: past }),
@@ -254,24 +257,69 @@ describe("pending work", () => {
       sale({ id: "refunded", item: "lesson", status: "refunded", dueAt: past }),
       sale({ id: "delivered", item: "lesson", status: "delivered", dueAt: past }),
       sale({ id: "marked", item: "lesson", dueAt: past, deliveredAt: "2026-10-01T16:00:00.000Z" }),
+      sale({
+        id: "unpaid-marked",
+        item: "lesson",
+        status: "pending",
+        paidOn: null,
+        dueAt: past,
+        deliveredAt: "2026-10-01T16:00:00.000Z",
+      }),
       sale({ id: "undated", item: "lesson", dueAt: null }),
+      sale({ id: "unpaid-undated", item: "lesson", status: "pending", paidOn: null, dueAt: null }),
       // Los VOD grabados y planes de juego son entregas, no sesiones.
       sale({ id: "delivery", item: "vodRecorded", dueAt: past }),
+      sale({ id: "unpaid-delivery", item: "vodRecorded", status: "pending", paidOn: null, dueAt: past }),
       sale({ id: "other", item: "other", dueAt: past }),
     ];
     const work = pendingWork(sales, NOW);
-    expect(ids(work.toMark)).toEqual(["paid"]);
+    expect(work.toMark.map((entry) => [entry.id, entry.unpaid])).toEqual([
+      ["paid", false],
+      ["unpaid", true],
+    ]);
     expect(ids(work.deliveries)).toEqual(["delivery"]);
   });
 
-  test("sessions to mark go oldest first, then by id", () => {
+  test("an unpaid session from before today is flagged unpaid; today's is still a session", () => {
+    const sales = [
+      sale({ id: "yesterday", item: "vodLive", status: "pending", paidOn: null, dueAt: "2026-10-12T20:00:00.000Z" }),
+      sale({ id: "last-night", item: "lesson", status: "pending", paidOn: null, dueAt: "2026-10-13T02:59:59.000Z" }),
+      sale({ id: "this-morning", item: "lesson", status: "pending", paidOn: null, dueAt: START_OF_TODAY }),
+    ];
+    const work = pendingWork(sales, NOW);
+    expect(work.toMark.map((entry) => [entry.id, entry.unpaid])).toEqual([
+      ["yesterday", true],
+      ["last-night", true],
+    ]);
+    expect(work.sessions.map((entry) => [entry.id, entry.unpaid])).toEqual([["this-morning", true]]);
+  });
+
+  test("a lesson pack and a pro season span many sessions, so they are never left to mark", () => {
+    const past = "2026-10-01T15:00:00.000Z";
+    const sales = [
+      sale({ id: "pack", item: "lessonPack", dueAt: past }),
+      sale({ id: "pack-unpaid", item: "lessonPack", status: "pending", paidOn: null, dueAt: past }),
+      sale({ id: "pro", item: "proSeason", dueAt: past }),
+      sale({ id: "pro-unpaid", item: "proSeason", status: "pending", paidOn: null, dueAt: past }),
+      sale({ id: "pack-next", item: "lessonPack", dueAt: "2026-10-14T20:00:00.000Z" }),
+      sale({ id: "pro-next", item: "proSeason", dueAt: "2026-10-15T20:00:00.000Z" }),
+      sale({ id: "lesson", item: "lesson", dueAt: past }),
+    ];
+    const work = pendingWork(sales, NOW);
+    expect(ids(work.toMark)).toEqual(["lesson"]);
+    // Sí figuran como próximas sesiones cuando su fecha cae en los próximos 7 días.
+    expect(ids(work.sessions)).toEqual(["pack-next", "pro-next"]);
+  });
+
+  test("sessions to mark go oldest first, paid and unpaid together, then by id", () => {
     const sales = [
       sale({ id: "c", item: "lesson", dueAt: "2026-10-10T12:00:00.000Z" }),
       sale({ id: "b", item: "tournament", dueAt: "2026-10-02T12:00:00.000Z" }),
       sale({ id: "a", item: "vodLive", dueAt: "2026-10-02T12:00:00.000Z" }),
-      sale({ id: "z", item: "lessonPack", dueAt: "2025-01-02T12:00:00.000Z" }),
+      sale({ id: "z", item: "lesson", dueAt: "2025-01-02T12:00:00.000Z" }),
+      sale({ id: "y", item: "lesson", status: "pending", paidOn: null, dueAt: "2025-06-01T12:00:00.000Z" }),
     ];
-    expect(ids(pendingWork(sales, NOW).toMark)).toEqual(["z", "a", "b", "c"]);
+    expect(ids(pendingWork(sales, NOW).toMark)).toEqual(["z", "y", "a", "b", "c"]);
   });
 
   test("every row says what was sold and to whom", () => {

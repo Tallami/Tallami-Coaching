@@ -220,6 +220,33 @@ describe("loadMetricSales", () => {
     ]);
   });
 
+  test("an unpaid session from the past is loaded and left to mark as unpaid, except packs", async () => {
+    const own = await createTestDb();
+    const { id: customerId } = await createCustomer(own, { name: "Gala", country: "AR" });
+    const unpaidPast = (item: "lesson" | "lessonPack") => ({
+      customerId,
+      item,
+      currency: "USD",
+      amountMinor: 4000,
+      arsPerUnit: "1500.0000",
+      arsPerUsd: "1500.0000",
+      rateSource: "fixed",
+      amountArsMinor: 6_000_000,
+      amountUsdMinor: 4000,
+      paymentMethod: "transfer",
+      status: "pending",
+      paidOn: null,
+      dueAt: new Date("2026-10-01T18:00:00.000Z"),
+      invoiceStatus: "not_required",
+    });
+    const [lesson] = await own.insert(sales).values(unpaidPast("lesson")).returning({ id: sales.id });
+    await own.insert(sales).values(unpaidPast("lessonPack"));
+
+    const work = pendingWork(await loadMetricSales(own, NOW), NOW);
+
+    expect(work.toMark.map((entry) => [entry.id, entry.unpaid])).toEqual([[lesson.id, true]]);
+  });
+
   test("unpaid sales change no income number", async () => {
     const loaded = await loadMetricSales(db, NOW);
     const incomeOnly = loaded.filter(isIncome);

@@ -162,8 +162,12 @@ describe("session tokens", () => {
     // Payload cambiado (vence en un año) con la firma de antes.
     const stretched = encodePart({ ...decodePart(payload), exp: 4_102_444_800 });
     expect(await verifySessionToken(`${header}.${stretched}.${signature}`)).toBe(false);
-    // Firma alterada.
-    const flipped = signature.endsWith("A") ? `${signature.slice(0, -1)}B` : `${signature.slice(0, -1)}A`;
+    // Firma alterada. Se cambia un carácter del medio: los dos últimos bits del último
+    // carácter base64url de una firma de 32 bytes son relleno, y cambiarlo (A por B) no
+    // cambia los bytes, así que la prueba pasaría sin alterar nada.
+    const middle = Math.floor(signature.length / 2);
+    const flipped = `${signature.slice(0, middle)}${signature[middle] === "A" ? "B" : "A"}${signature.slice(middle + 1)}`;
+    expect(flipped).not.toBe(signature);
     expect(await verifySessionToken(`${header}.${payload}.${flipped}`)).toBe(false);
     // Vencido.
     expect(await verifySessionToken(await signToken({ expiresInSeconds: -10 }))).toBe(false);

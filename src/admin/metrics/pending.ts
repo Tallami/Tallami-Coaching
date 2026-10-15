@@ -7,8 +7,11 @@
 // - Sesiones: las de servicios en vivo, cobradas o sin cobrar (`pending`), desde
 //   las 00:00 de hoy en Argentina hasta dentro de 7 días. Una sesión sin cobrar
 //   igual se agenda: sale marcada para que se cobre antes de darla.
-// - Para marcar: sesiones cobradas cuyo día ya pasó y siguen sin marcarse como
-//   entregadas. Las sin cobrar no entran: no hay nada que marcar.
+// - Para marcar: sesiones cuyo día ya pasó (antes de las 00:00 de hoy) y siguen
+//   sin marcarse como entregadas, cobradas o no. Las que nunca se cobraron salen
+//   con `unpaid: true`: hay que cobrarlas o cancelarlas. El pack de clases y la
+//   Temporada Pro son de varias sesiones: una fecha no alcanza para decir que
+//   ya se dieron, así que no se piden marcar (sí figuran como próximas sesiones).
 // - Las canceladas y reembolsadas nunca generan trabajo.
 
 import { argentinaLocalToDate } from "@/admin/dates";
@@ -27,6 +30,9 @@ const SESSION_ITEMS: ReadonlySet<SaleItem> = new Set([
   "tournament",
   "proSeason",
 ]);
+
+/** Servicios de varias sesiones: no se marcan como hechos con una sola fecha. */
+const MULTI_SESSION_ITEMS: ReadonlySet<SaleItem> = new Set(["lessonPack", "proSeason"]);
 
 /** Cuántos días hacia adelante cuentan como "próximos" para las sesiones. */
 const SESSION_WINDOW_DAYS = 7;
@@ -55,6 +61,8 @@ export interface UpcomingSession extends PendingSaleRef {
 
 export interface SessionToMark extends PendingSaleRef {
   dueAt: string;
+  /** La venta nunca se cobró (estado pendiente): hay que cobrarla o cancelarla. */
+  unpaid: boolean;
 }
 
 export interface UninvoicedTotals {
@@ -73,7 +81,11 @@ export interface PendingWork {
   deliveries: PendingDelivery[];
   /** Sesiones sin entregar desde las 00:00 de hoy hasta dentro de 7 días, cobradas o no, por fecha. */
   sessions: UpcomingSession[];
-  /** Sesiones cobradas de un día anterior a hoy que siguen sin marcarse como hechas, la más vieja primero. */
+  /**
+   * Sesiones (sin el pack de clases ni la Temporada Pro) de un día anterior a
+   * hoy que siguen sin marcarse como hechas, cobradas o sin cobrar, la más
+   * vieja primero.
+   */
   toMark: SessionToMark[];
   /** Ventas de ingreso ya fechadas con la factura pendiente (no cuentan las "no requiere"). */
   uninvoiced: UninvoicedTotals;
@@ -166,13 +178,18 @@ export function pendingWork(sales: readonly MetricSale[], now: Date): PendingWor
   const toMark = open
     .filter(
       ({ sale, dueMs }) =>
-        sale.status === "paid" &&
+        (sale.status === "paid" || sale.status === "pending") &&
         SESSION_ITEMS.has(sale.item) &&
+        !MULTI_SESSION_ITEMS.has(sale.item) &&
         dueMs !== null &&
         dueMs < startOfTodayMs,
     )
     .sort(byDueThenId)
-    .map(({ sale }) => ({ ...ref(sale), dueAt: sale.dueAt as string }));
+    .map(({ sale }) => ({
+      ...ref(sale),
+      dueAt: sale.dueAt as string,
+      unpaid: sale.status === "pending",
+    }));
 
   // Una venta con fecha de cobro futura todavía no cuenta como cobrada.
   const uninvoiced = sales.filter(
