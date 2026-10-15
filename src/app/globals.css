@@ -20,6 +20,8 @@
   --color-ink-2: #4a5563;
   --color-rule: #c9d0c6;
   --color-zone: #2457c5;
+  /* El azul de los gráficos más claro (3,4:1 sobre blanco): barras de un período todavía abierto. */
+  --color-zone-soft: #6689d6;
 
   --container-wrap: 1180px;
   --spacing-gutter: clamp(16px, 4vw, 40px);
@@ -37,6 +39,8 @@
   --color-info-tint: #dde7fb;
   --color-warn-ink: #5c4300;
   --color-warn-tint: #fff0c2;
+  /* Relleno de aviso en los gráficos (5:1 sobre blanco); el texto usa warn-ink. */
+  --color-warn: #a15c00;
   --color-neutral-tint: #e4e7e2;
 }
 

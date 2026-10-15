@@ -1,9 +1,9 @@
-// Datos de prueba del acceso al panel que usa la configuración de Playwright
+// Datos de prueba del acceso al panel que usan las configuraciones de Playwright
 // para arrancar el servidor. Son valores de prueba: no valen en ningún otro
 // entorno. Los tests e2e usan `tests/helpers/admin.ts`, que importa esto.
 //
-// Este archivo no importa `@playwright/test`: la configuración lo carga en el
-// proceso principal y en cada worker.
+// Este archivo no importa `@playwright/test`: las configuraciones lo cargan en
+// el proceso principal y en cada worker.
 
 import { mkdirSync, rmSync } from "node:fs";
 import os from "node:os";
@@ -17,32 +17,50 @@ export const ADMIN_TEST_SESSION_SECRET =
 
 /** Base PGlite de los e2e: una carpeta temporal que se borra al arrancar. */
 const E2E_PGLITE_DIR = path.join(os.tmpdir(), "tallami-coaching-e2e-pglite");
+/** Base PGlite de los e2e con datos de ejemplo (`playwright.demo.config.ts`): otra carpeta, también se borra al arrancar. */
+const E2E_DEMO_PGLITE_DIR = path.join(os.tmpdir(), "tallami-coaching-e2e-demo-pglite");
 
 /**
  * Borra la base de los e2e anteriores. Solo en el proceso principal de
  * Playwright: los workers también cargan la configuración y no pueden borrar
  * la base mientras el servidor la usa.
  */
-function resetE2eDatabase(): string {
+function resetPgliteDir(dir: string): string {
   if (process.env.TEST_WORKER_INDEX === undefined) {
     try {
-      rmSync(E2E_PGLITE_DIR, { recursive: true, force: true });
-      mkdirSync(path.dirname(E2E_PGLITE_DIR), { recursive: true });
+      rmSync(dir, { recursive: true, force: true });
+      mkdirSync(path.dirname(dir), { recursive: true });
     } catch (error) {
       // Un servidor viejo puede tener la carpeta abierta (Windows): se sigue
       // con lo que haya, el panel migra la base al abrirla.
       console.warn("No se pudo borrar la base de los e2e:", error);
     }
   }
-  return E2E_PGLITE_DIR;
+  return dir;
 }
 
-/** Variables de entorno con las que Playwright arranca el servidor del panel. */
-export async function adminServerEnv(): Promise<Record<string, string>> {
+/** Variables de entorno de un servidor del panel de prueba, con su base en `pgliteDir` (vacía al arrancar). */
+async function serverEnv(pgliteDir: string): Promise<Record<string, string>> {
   return {
     ADMIN_PASSWORD_HASH: await hashPassword(ADMIN_TEST_PASSWORD),
     ADMIN_SESSION_SECRET: ADMIN_TEST_SESSION_SECRET,
-    PGLITE_DIR: resetE2eDatabase(),
+    PGLITE_DIR: resetPgliteDir(pgliteDir),
     EXCHANGE_RATE_SOURCE: "fixed",
   };
+}
+
+/** Variables de entorno con las que Playwright arranca el servidor del panel. */
+export function adminServerEnv(): Promise<Record<string, string>> {
+  return serverEnv(E2E_PGLITE_DIR);
+}
+
+/**
+ * Lo mismo para el servidor de los datos de ejemplo: su propia carpeta de base,
+ * vacía al arrancar (el comando de la configuración la siembra antes de
+ * levantar el servidor; la base del servidor principal no se toca) y sin
+ * `DATABASE_URL` aunque el entorno de quien corre los tests la tenga: esos
+ * datos nunca van a una base remota.
+ */
+export async function demoServerEnv(): Promise<Record<string, string>> {
+  return { ...(await serverEnv(E2E_DEMO_PGLITE_DIR)), DATABASE_URL: "" };
 }

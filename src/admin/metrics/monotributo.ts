@@ -4,7 +4,7 @@
 
 import { percent, sumMinor } from "./math";
 import { isIncome, type MetricSale } from "./metric-sale";
-import { addDays, addMonths, isInRange, todayInArgentina } from "./period";
+import { addDays, addMonths, isInRange, todayInArgentina, type DateRange } from "./period";
 
 /** La categoría y el tope anual vigentes, como los guarda la configuración (Tarea 9). */
 export interface MonotributoSettings {
@@ -28,19 +28,24 @@ export interface MonotributoStatus {
 
 const MONTHS_IN_YEAR = 12;
 
+/** Los 12 meses móviles que mira el monotributo: del día siguiente a hoy hace un año a hoy (Argentina). */
+export function monotributoWindow(now: Date): DateRange {
+  const today = todayInArgentina(now);
+  return { from: addDays(addMonths(today, -MONTHS_IN_YEAR), 1), to: today };
+}
+
 /**
- * Los ingresos en pesos de los últimos 12 meses móviles: desde el día siguiente
- * a hoy hace un año hasta hoy (en Argentina), por día de cobro. Las ventas con
- * fecha futura todavía no cuentan. Sin una configuración con tope válido (un
- * entero seguro mayor a cero) se devuelve solo el total.
+ * Los ingresos en pesos de los últimos 12 meses móviles (`monotributoWindow`),
+ * por día de cobro. Las ventas con fecha futura todavía no cuentan. Sin una
+ * configuración con tope válido (un entero seguro mayor a cero) se devuelve
+ * solo el total.
  */
 export function monotributoStatus(
   sales: readonly MetricSale[],
   settings: MonotributoSettings | null,
   now: Date,
 ): MonotributoStatus {
-  const today = todayInArgentina(now);
-  const window = { from: addDays(addMonths(today, -MONTHS_IN_YEAR), 1), to: today };
+  const window = monotributoWindow(now);
   const last12ArsMinor = sumMinor(
     sales
       .filter(isIncome)

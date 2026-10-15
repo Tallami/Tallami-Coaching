@@ -14,7 +14,8 @@ import {
 const LOGIN_URL = /\/admin\/login(\?|$)/;
 const LOCKED_AFTER = 5;
 const SESSION_SECONDS = 12 * 60 * 60;
-const PANEL_MARKER = "Ingresaste con tu contraseña.";
+/** La línea bajo el título del resumen: solo aparece con la sesión iniciada. */
+const PANEL_MARKER = "Cuánto ganás, qué se vende y qué tenés pendiente.";
 
 /** El aviso del formulario (la página tiene otro `role="alert"`: el anunciador de rutas de Next). */
 function loginAlert(page: Page) {
@@ -248,7 +249,7 @@ test.describe("login", () => {
   test("right password opens the panel and logout closes it", async ({ context, page }) => {
     await loginAsAdmin(page);
 
-    await expect(page.getByRole("heading", { name: "Panel", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Resumen", exact: true })).toBeVisible();
     await expect(page.getByText(PANEL_MARKER)).toBeVisible();
 
     // Con la sesión iniciada el login no pide la contraseña de nuevo.

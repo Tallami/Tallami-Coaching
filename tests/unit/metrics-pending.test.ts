@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { monotributoStatus } from "@/admin/metrics/monotributo";
+import { monotributoStatus, monotributoWindow } from "@/admin/metrics/monotributo";
 import { pendingWork } from "@/admin/metrics/pending";
 import { NOW, ids, sale } from "../helpers/metric-sales";
 
@@ -457,6 +457,15 @@ describe("monotributo", () => {
       capArsMinor: 100_000_000,
       usedPct: 90,
       remainingArsMinor: 10_000_000,
+    });
+  });
+
+  test("the window is the day after today a year ago up to today, in Argentina", () => {
+    expect(monotributoWindow(NOW)).toEqual({ from: "2025-10-14", to: "2026-10-13" });
+    // 31/10 a las 22:30 en Argentina ya es 1/11 en UTC: la ventana es la del 31/10.
+    expect(monotributoWindow(new Date("2026-11-01T01:30:00.000Z"))).toEqual({
+      from: "2025-11-01",
+      to: "2026-10-31",
     });
   });
 
