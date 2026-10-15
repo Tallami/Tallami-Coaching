@@ -1,7 +1,17 @@
 import { beforeAll, describe, expect, test } from "vitest";
 import { createCustomer } from "@/admin/customers/repository";
-import { computeKpis } from "@/admin/metrics/kpis";
+import { isIncome, computeKpis } from "@/admin/metrics/kpis";
 import { loadMetricSales } from "@/admin/metrics/load";
+import { monotributoStatus } from "@/admin/metrics/monotributo";
+import { pendingWork } from "@/admin/metrics/pending";
+import { PERIODS, periodRange } from "@/admin/metrics/period";
+import {
+  incomeByCountry,
+  incomeByItem,
+  incomeByPaymentMethod,
+  itemsWithoutSales,
+  monthlyIncome,
+} from "@/admin/metrics/series";
 import type { Db } from "@/db/client";
 import { sales, type NewSale } from "@/db/schema";
 import { createTestDb } from "../helpers/db";
@@ -85,8 +95,25 @@ describe("loadMetricSales", () => {
     // Darío: solo una venta vieja y entregada, y una cancelada: no entra nada.
     await addSale("dario-old-delivered", "Dario", { paidOn: "2023-01-01", ...DELIVERED });
     await addSale("dario-cancelled", "Dario", { paidOn: "2026-09-01", status: "cancelled" });
-    // Edu: una pendiente, una reembolsada y una sesión cobrada sin facturar.
+    // Edu: una pendiente sin fecha, una reembolsada, una sesión cobrada sin facturar y
+    // dos sesiones sin cobrar (una pendiente de hacer y otra ya hecha).
     await addSale("edu-pending", "Edu", { status: "pending", paidOn: null });
+    await addSale("edu-unpaid-session", "Edu", {
+      status: "pending",
+      paidOn: null,
+      item: "lesson",
+      dueAt: new Date("2026-10-16T18:00:00.000Z"),
+      invoiceStatus: "pending",
+      amountMinor: 99_900,
+      amountUsdMinor: 99_900,
+      amountArsMinor: 149_850_000,
+    });
+    await addSale("edu-unpaid-done", "Edu", {
+      status: "pending",
+      paidOn: null,
+      dueAt: new Date("2026-10-16T18:00:00.000Z"),
+      deliveredAt: new Date("2026-10-16T19:00:00.000Z"),
+    });
     await addSale("edu-refunded", "Edu", { status: "refunded", paidOn: "2026-09-02" });
     await addSale("edu-session", "Edu", {
       paidOn: "2026-10-10",
@@ -114,6 +141,7 @@ describe("loadMetricSales", () => {
         "fran-october",
         "ana-october",
         "edu-session",
+        "edu-unpaid-session", // sin cobrar y con fecha: sin día de cobro, va al final
       ].map(idOf),
     );
   });
@@ -126,7 +154,8 @@ describe("loadMetricSales", () => {
       "bruno-older", // vieja, entregada y sin factura que emitir
       "dario-old-delivered", // vieja y Darío no compró en la ventana
       "dario-cancelled",
-      "edu-pending",
+      "edu-pending", // sin cobrar y sin fecha de sesión
+      "edu-unpaid-done", // sin cobrar pero ya hecha
       "edu-refunded",
       "fran-2023-july", // vieja y no es la primera de Fran
     ]) {
@@ -141,6 +170,7 @@ describe("loadMetricSales", () => {
     expect(byId.get(idOf("edu-session"))).toEqual({
       id: idOf("edu-session"),
       customerId: customerIds.get("Edu"),
+      customerName: "Edu",
       item: "vodLive",
       status: "paid",
       paidOn: "2026-10-10",
@@ -164,6 +194,56 @@ describe("loadMetricSales", () => {
       amountArsMinor: 18_000_000,
       invoiceStatus: "pending",
     });
+  });
+
+  test("an unpaid sale with a date comes with what the pending list needs", async () => {
+    const loaded = await loadMetricSales(db, NOW);
+    expect(loaded.find((entry) => entry.id === idOf("edu-unpaid-session"))).toEqual({
+      id: idOf("edu-unpaid-session"),
+      customerId: customerIds.get("Edu"),
+      customerName: "Edu",
+      item: "lesson",
+      status: "pending",
+      paidOn: null,
+      dueAt: "2026-10-16T18:00:00.000Z",
+      deliveredAt: null,
+      amountArsMinor: 149_850_000,
+      amountUsdMinor: 99_900,
+      paymentMethod: "transfer",
+      country: "AR",
+      invoiceStatus: "pending",
+    });
+    const sessions = pendingWork(loaded, NOW).sessions;
+    expect(sessions.map((session) => [session.id, session.unpaid, session.customerName])).toEqual([
+      [idOf("edu-session"), false, "Edu"],
+      [idOf("edu-unpaid-session"), true, "Edu"],
+    ]);
+  });
+
+  test("unpaid sales change no income number", async () => {
+    const loaded = await loadMetricSales(db, NOW);
+    const incomeOnly = loaded.filter(isIncome);
+    expect(loaded.length).toBeGreaterThan(incomeOnly.length);
+    expect(loaded.some((entry) => entry.status === "pending")).toBe(true);
+
+    for (const period of PERIODS) {
+      expect(computeKpis(loaded, period, NOW), period).toEqual(computeKpis(incomeOnly, period, NOW));
+      const range = periodRange(period, NOW);
+      expect(incomeByItem(loaded, range), period).toEqual(incomeByItem(incomeOnly, range));
+      expect(incomeByPaymentMethod(loaded, range), period).toEqual(
+        incomeByPaymentMethod(incomeOnly, range),
+      );
+      expect(incomeByCountry(loaded, range), period).toEqual(incomeByCountry(incomeOnly, range));
+    }
+    expect(monthlyIncome(loaded, 24, NOW)).toEqual(monthlyIncome(incomeOnly, 24, NOW));
+    expect(itemsWithoutSales(loaded, 90, NOW)).toEqual(itemsWithoutSales(incomeOnly, 90, NOW));
+    const settings = { category: "A", annualCapArsMinor: 1_000_000_000, validFrom: "2026-08-01" };
+    expect(monotributoStatus(loaded, settings, NOW)).toEqual(
+      monotributoStatus(incomeOnly, settings, NOW),
+    );
+    expect(pendingWork(loaded, NOW).uninvoiced).toEqual(pendingWork(incomeOnly, NOW).uninvoiced);
+    // El monto de la sesión sin cobrar (999 dólares) no aparece en ningún lado.
+    expect(computeKpis(loaded, "thisMonth", NOW).incomeUsdMinor).toBe(12_000);
   });
 
   test("amounts come back as numbers", async () => {

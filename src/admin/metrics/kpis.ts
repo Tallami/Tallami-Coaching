@@ -17,8 +17,10 @@ export interface Kpis {
   /** Ingresos del período en centavos de peso. */
   incomeArsMinor: number;
   /**
-   * Variación porcentual del ingreso en dólares contra el período anterior,
-   * con un decimal (50 es +50 %), o `null` si el anterior no tuvo ingresos.
+   * Variación porcentual del ingreso en dólares contra el mismo tramo del
+   * período anterior (`previousPeriodRange`: el 1 al 13 de octubre contra el 1
+   * al 13 de septiembre), con un decimal (50 es +50 %), o `null` si el anterior
+   * no tuvo ingresos.
    */
   incomeUsdDeltaPct: number | null;
   salesCount: number;

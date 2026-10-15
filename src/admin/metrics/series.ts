@@ -36,7 +36,8 @@ export interface MonthlyIncome {
 /**
  * Ingresos de cada uno de los últimos `months` meses, del más viejo al actual,
  * con los meses sin ventas en cero. El mes de una venta es el de su día de
- * cobro; las de meses futuros no entran.
+ * cobro; una venta con fecha futura no entra hasta ese día (ni en el mes
+ * actual ni en los que vienen).
  */
 export function monthlyIncome(
   sales: readonly MetricSale[],
@@ -46,7 +47,8 @@ export function monthlyIncome(
   if (!Number.isInteger(months) || months < 0) {
     throw new RangeError(`La cantidad de meses tiene que ser un entero desde 0, pero llegó ${months}.`);
   }
-  const currentMonth = firstOfMonth(todayInArgentina(now));
+  const today = todayInArgentina(now);
+  const currentMonth = firstOfMonth(today);
   const buckets = Array.from({ length: months }, (_, index) => ({
     month: monthOf(addMonths(currentMonth, index - (months - 1))),
     usd: [] as number[],
@@ -55,6 +57,7 @@ export function monthlyIncome(
   const byMonth = new Map(buckets.map((bucket) => [bucket.month, bucket]));
 
   for (const sale of sales.filter(isIncome)) {
+    if (sale.paidOn > today) continue;
     const bucket = byMonth.get(monthOf(sale.paidOn));
     if (bucket) {
       bucket.usd.push(sale.amountUsdMinor);
@@ -177,9 +180,9 @@ export function incomeByCountry(sales: readonly MetricSale[], range: DateRange):
 
 /**
  * Los servicios del catálogo (sin "Otro") que no vendieron en los últimos
- * `days` días, en el orden del catálogo. La ventana va del día `days - 1`
- * anterior a hoy en adelante: 90 días contando hoy, y una venta con fecha
- * futura cuenta como venta del servicio.
+ * `days` días, en el orden del catálogo. La ventana son los `days` días que
+ * terminan hoy (90 días contando hoy); una venta con fecha futura todavía no
+ * cuenta como venta del servicio.
  */
 export function itemsWithoutSales(
   sales: readonly MetricSale[],
@@ -189,9 +192,13 @@ export function itemsWithoutSales(
   if (!Number.isInteger(days) || days < 1) {
     throw new RangeError(`Los días tienen que ser un entero desde 1, pero llegó ${days}.`);
   }
-  const firstDay = addDays(todayInArgentina(now), -(days - 1));
+  const today = todayInArgentina(now);
+  const window = { from: addDays(today, -(days - 1)), to: today };
   const sold = new Set(
-    sales.filter(isIncome).filter((sale) => sale.paidOn >= firstDay).map((sale) => sale.item),
+    sales
+      .filter(isIncome)
+      .filter((sale) => isInRange(sale.paidOn, window))
+      .map((sale) => sale.item),
   );
   return SALE_ITEMS.filter((item) => item !== "other" && !sold.has(item));
 }

@@ -1,16 +1,21 @@
-// Lo que no hay que olvidarse: entregas por vencer o vencidas, sesiones de los
-// próximos 7 días y ventas cobradas sin facturar.
+// Lo que no hay que olvidarse: entregas por vencer o vencidas, sesiones de hoy
+// y de los próximos 7 días, sesiones pasadas que faltan marcar como hechas y
+// ventas cobradas sin facturar.
 //
-// Trabajo pendiente = venta cobrada (`paid`) a la que todavía le falta lo que
-// se prometió: sin fecha de entrega (`deliveredAt`) y sin pasar a "entregada".
-// Las pendientes de cobro, canceladas y reembolsadas no generan trabajo: la
-// sesión o la entrega de una venta que no se cobró (o se devolvió) no se hace
-// hasta que se cobre, y se ven en la lista de ventas con su estado.
+// - Entregas: ventas cobradas (`paid`) de VOD grabado o plan de juego a las que
+//   todavía les falta la entrega (`deliveredAt` vacío).
+// - Sesiones: las de servicios en vivo, cobradas o sin cobrar (`pending`), desde
+//   las 00:00 de hoy en Argentina hasta dentro de 7 días. Una sesión sin cobrar
+//   igual se agenda: sale marcada para que se cobre antes de darla.
+// - Para marcar: sesiones cobradas cuyo día ya pasó y siguen sin marcarse como
+//   entregadas. Las sin cobrar no entran: no hay nada que marcar.
+// - Las canceladas y reembolsadas nunca generan trabajo.
 
 import { argentinaLocalToDate } from "@/admin/dates";
 import type { SaleItem } from "@/admin/catalog";
 import { sumMinor } from "./math";
 import { isIncome, type MetricSale } from "./metric-sale";
+import { todayInArgentina } from "./period";
 
 /** Servicios que se entregan: un trabajo hecho a distancia con fecha de entrega. */
 const DELIVERY_ITEMS: ReadonlySet<SaleItem> = new Set(["vodRecorded", "gamePlan"]);
@@ -27,16 +32,28 @@ const SESSION_ITEMS: ReadonlySet<SaleItem> = new Set([
 const SESSION_WINDOW_DAYS = 7;
 const MS_PER_DAY = 86_400_000;
 
-export interface PendingDelivery {
+/** Qué se vendió y a quién: lo que necesita la lista para mostrar cada fila. */
+export interface PendingSaleRef {
   id: string;
+  item: SaleItem;
+  customerId: string;
+  customerName: string;
+}
+
+export interface PendingDelivery extends PendingSaleRef {
   /** Entrega comprometida tal como llegó en la venta, o `null` si no tiene (o no se puede leer). */
   dueAt: string | null;
   /** La fecha comprometida ya pasó (la que vence ahora mismo todavía no). */
   overdue: boolean;
 }
 
-export interface UpcomingSession {
-  id: string;
+export interface UpcomingSession extends PendingSaleRef {
+  dueAt: string;
+  /** La venta todavía no se cobró (estado pendiente). */
+  unpaid: boolean;
+}
+
+export interface SessionToMark extends PendingSaleRef {
   dueAt: string;
 }
 
@@ -54,9 +71,11 @@ export interface PendingWork {
    * quedan primero) y, al final, los que no tienen fecha.
    */
   deliveries: PendingDelivery[];
-  /** Sesiones cobradas desde ahora hasta dentro de 7 días, por fecha. */
+  /** Sesiones sin entregar desde las 00:00 de hoy hasta dentro de 7 días, cobradas o no, por fecha. */
   sessions: UpcomingSession[];
-  /** Ventas de ingreso con la factura pendiente (no cuentan las "no requiere"). */
+  /** Sesiones cobradas de un día anterior a hoy que siguen sin marcarse como hechas, la más vieja primero. */
+  toMark: SessionToMark[];
+  /** Ventas de ingreso ya fechadas con la factura pendiente (no cuentan las "no requiere"). */
   uninvoiced: UninvoicedTotals;
 }
 
@@ -77,16 +96,26 @@ function instantMs(value: string | null): number | null {
   return Number.isNaN(ms) ? null : ms;
 }
 
+/** El instante en que empieza ese día de Argentina (00:00, UTC-3). */
+function startOfArgentinaDayMs(day: string): number {
+  const start = argentinaLocalToDate(`${day}T00:00`);
+  if (!start) throw new RangeError(`Día inválido: "${day}".`);
+  return start.getTime();
+}
+
+/** Una venta sin entregar con su fecha ya leída. */
 interface OpenSale {
   sale: MetricSale;
   dueMs: number | null;
 }
 
-/** Ventas cobradas a las que les falta entregar. */
-function openSales(sales: readonly MetricSale[]): OpenSale[] {
-  return sales
-    .filter((sale) => isIncome(sale) && sale.status === "paid" && sale.deliveredAt === null)
-    .map((sale) => ({ sale, dueMs: instantMs(sale.dueAt) }));
+function ref(sale: MetricSale): PendingSaleRef {
+  return {
+    id: sale.id,
+    item: sale.item,
+    customerId: sale.customerId,
+    customerName: sale.customerName,
+  };
 }
 
 /** Por fecha (las sin fecha al final) y, a igual fecha, por id. */
@@ -100,15 +129,20 @@ function byDueThenId(a: OpenSale, b: OpenSale): number {
 }
 
 export function pendingWork(sales: readonly MetricSale[], now: Date): PendingWork {
+  const today = todayInArgentina(now);
   const nowMs = now.getTime();
+  const startOfTodayMs = startOfArgentinaDayMs(today);
   const windowEndMs = nowMs + SESSION_WINDOW_DAYS * MS_PER_DAY;
-  const open = openSales(sales);
+
+  const open: OpenSale[] = sales
+    .filter((sale) => sale.deliveredAt === null)
+    .map((sale) => ({ sale, dueMs: instantMs(sale.dueAt) }));
 
   const deliveries = open
-    .filter(({ sale }) => DELIVERY_ITEMS.has(sale.item))
+    .filter(({ sale }) => sale.status === "paid" && DELIVERY_ITEMS.has(sale.item))
     .sort(byDueThenId)
     .map(({ sale, dueMs }) => ({
-      id: sale.id,
+      ...ref(sale),
       dueAt: dueMs === null ? null : sale.dueAt,
       overdue: dueMs !== null && dueMs < nowMs,
     }));
@@ -116,15 +150,38 @@ export function pendingWork(sales: readonly MetricSale[], now: Date): PendingWor
   const sessions = open
     .filter(
       ({ sale, dueMs }) =>
-        SESSION_ITEMS.has(sale.item) && dueMs !== null && dueMs >= nowMs && dueMs <= windowEndMs,
+        (sale.status === "paid" || sale.status === "pending") &&
+        SESSION_ITEMS.has(sale.item) &&
+        dueMs !== null &&
+        dueMs >= startOfTodayMs &&
+        dueMs <= windowEndMs,
     )
     .sort(byDueThenId)
-    .map(({ sale }) => ({ id: sale.id, dueAt: sale.dueAt as string }));
+    .map(({ sale }) => ({
+      ...ref(sale),
+      dueAt: sale.dueAt as string,
+      unpaid: sale.status === "pending",
+    }));
 
-  const uninvoiced = sales.filter((sale) => isIncome(sale) && sale.invoiceStatus === "pending");
+  const toMark = open
+    .filter(
+      ({ sale, dueMs }) =>
+        sale.status === "paid" &&
+        SESSION_ITEMS.has(sale.item) &&
+        dueMs !== null &&
+        dueMs < startOfTodayMs,
+    )
+    .sort(byDueThenId)
+    .map(({ sale }) => ({ ...ref(sale), dueAt: sale.dueAt as string }));
+
+  // Una venta con fecha de cobro futura todavía no cuenta como cobrada.
+  const uninvoiced = sales.filter(
+    (sale) => isIncome(sale) && sale.paidOn <= today && sale.invoiceStatus === "pending",
+  );
   return {
     deliveries,
     sessions,
+    toMark,
     uninvoiced: {
       count: uninvoiced.length,
       arsMinor: sumMinor(uninvoiced.map((sale) => sale.amountArsMinor)),

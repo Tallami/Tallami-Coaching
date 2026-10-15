@@ -3,11 +3,21 @@ import { monotributoStatus } from "@/admin/metrics/monotributo";
 import { pendingWork } from "@/admin/metrics/pending";
 import { NOW, ids, sale } from "../helpers/metric-sales";
 
+// NOW es el martes 13/10/2026 a las 15:00 en Argentina. Ese día empezó a las
+// 03:00 UTC (2026-10-13T03:00:00.000Z) y los próximos 7 días terminan en
+// 2026-10-20T18:00:00.000Z.
+const START_OF_TODAY = "2026-10-13T03:00:00.000Z";
+
 describe("pending work", () => {
   test("pending work: overdue deliveries, sessions in 7 days, uninvoiced totals", () => {
     const sales = [
-      // Entregas.
-      sale({ id: "vod-overdue", item: "vodRecorded", dueAt: "2026-10-12T18:00:00.000Z" }),
+      // Entregas: cobradas, VOD grabado o plan de juego, sin entregar.
+      sale({
+        id: "vod-overdue",
+        item: "vodRecorded",
+        customerId: "bruno",
+        dueAt: "2026-10-12T18:00:00.000Z",
+      }),
       sale({ id: "plan-soon", item: "gamePlan", dueAt: "2026-10-16T15:00:00.000Z" }),
       sale({ id: "plan-no-date", item: "gamePlan", dueAt: null }),
       sale({
@@ -24,40 +34,68 @@ describe("pending work", () => {
         deliveredAt: "2026-10-09T18:00:00.000Z",
       }),
       // Entregada según su estado aunque falte la fecha de entrega: no queda nada por hacer.
-      sale({ id: "vod-delivered-no-date", item: "vodRecorded", status: "delivered", deliveredAt: null }),
+      sale({ id: "vod-delivered-no-date", item: "vodRecorded", status: "delivered" }),
       sale({
         id: "vod-cancelled",
         item: "vodRecorded",
         status: "cancelled",
         dueAt: "2026-10-01T18:00:00.000Z",
       }),
+      // Sin cobrar no es una entrega pendiente (todavía no hay nada que entregar).
       sale({
-        id: "plan-pending",
+        id: "plan-unpaid",
         item: "gamePlan",
         status: "pending",
         paidOn: null,
         dueAt: "2026-10-01T18:00:00.000Z",
       }),
-      // Sesiones.
+
+      // Sesiones: de hoy (desde las 00:00 de Argentina) a dentro de 7 días, cobradas o sin cobrar.
       sale({ id: "lesson-tomorrow", item: "lesson", dueAt: "2026-10-14T20:00:00.000Z" }),
-      sale({ id: "live-in-7-days", item: "vodLive", dueAt: "2026-10-20T18:00:00.000Z" }),
-      sale({ id: "cup-too-far", item: "tournament", dueAt: "2026-10-20T18:00:01.000Z" }),
-      sale({ id: "pack-this-morning", item: "lessonPack", dueAt: "2026-10-13T12:00:00.000Z" }),
-      sale({ id: "pro-right-now", item: "proSeason", dueAt: NOW.toISOString() }),
-      sale({
-        id: "lesson-cancelled",
-        item: "lesson",
-        status: "cancelled",
-        dueAt: "2026-10-14T20:00:00.000Z",
-      }),
       sale({
         id: "lesson-unpaid",
         item: "lesson",
+        customerId: "carla",
         status: "pending",
         paidOn: null,
         dueAt: "2026-10-14T20:00:00.000Z",
       }),
+      sale({ id: "live-in-7-days", item: "vodLive", dueAt: "2026-10-20T18:00:00.000Z" }),
+      sale({ id: "cup-too-far", item: "tournament", dueAt: "2026-10-20T18:00:01.000Z" }),
+      // Más temprano hoy: sigue en la lista de sesiones.
+      sale({ id: "pack-this-morning", item: "lessonPack", dueAt: "2026-10-13T12:00:00.000Z" }),
+      sale({ id: "pro-right-now", item: "proSeason", dueAt: NOW.toISOString() }),
+      sale({ id: "lesson-cancelled", item: "lesson", status: "cancelled", dueAt: "2026-10-14T20:00:00.000Z" }),
       sale({ id: "lesson-undated", item: "lesson", dueAt: null }),
+      sale({
+        id: "lesson-done",
+        item: "lesson",
+        dueAt: "2026-10-14T20:00:00.000Z",
+        deliveredAt: "2026-10-13T12:00:00.000Z",
+      }),
+
+      // Para marcar: cobradas, sin entregar y con la sesión en un día anterior a hoy.
+      sale({ id: "mark-yesterday", item: "lessonPack", dueAt: "2026-10-12T20:00:00.000Z" }),
+      sale({
+        id: "mark-old",
+        item: "tournament",
+        customerId: "dario",
+        dueAt: "2026-09-01T15:00:00.000Z",
+      }),
+      sale({
+        id: "mark-unpaid",
+        item: "lesson",
+        status: "pending",
+        paidOn: null,
+        dueAt: "2026-10-12T20:00:00.000Z",
+      }),
+      sale({
+        id: "mark-done",
+        item: "lesson",
+        dueAt: "2026-10-12T20:00:00.000Z",
+        deliveredAt: "2026-10-12T21:00:00.000Z",
+      }),
+
       // Sin facturar: ingresos con la factura pendiente (cuenta cualquiera, entregada o no).
       sale({ id: "unbilled-1", item: "other", dollars: 40, invoiceStatus: "pending" }),
       sale({
@@ -82,16 +120,188 @@ describe("pending work", () => {
     const work = pendingWork(sales, NOW);
 
     expect(work.deliveries).toEqual([
-      { id: "vod-overdue", dueAt: "2026-10-12T18:00:00.000Z", overdue: true },
-      { id: "plan-soon", dueAt: "2026-10-16T15:00:00.000Z", overdue: false },
-      { id: "plan-no-date", dueAt: null, overdue: false },
+      {
+        id: "vod-overdue",
+        item: "vodRecorded",
+        customerId: "bruno",
+        customerName: "Bruno",
+        dueAt: "2026-10-12T18:00:00.000Z",
+        overdue: true,
+      },
+      {
+        id: "plan-soon",
+        item: "gamePlan",
+        customerId: "ana",
+        customerName: "Ana",
+        dueAt: "2026-10-16T15:00:00.000Z",
+        overdue: false,
+      },
+      {
+        id: "plan-no-date",
+        item: "gamePlan",
+        customerId: "ana",
+        customerName: "Ana",
+        dueAt: null,
+        overdue: false,
+      },
     ]);
     expect(work.sessions).toEqual([
-      { id: "pro-right-now", dueAt: "2026-10-13T18:00:00.000Z" },
-      { id: "lesson-tomorrow", dueAt: "2026-10-14T20:00:00.000Z" },
-      { id: "live-in-7-days", dueAt: "2026-10-20T18:00:00.000Z" },
+      {
+        id: "pack-this-morning",
+        item: "lessonPack",
+        customerId: "ana",
+        customerName: "Ana",
+        dueAt: "2026-10-13T12:00:00.000Z",
+        unpaid: false,
+      },
+      {
+        id: "pro-right-now",
+        item: "proSeason",
+        customerId: "ana",
+        customerName: "Ana",
+        dueAt: "2026-10-13T18:00:00.000Z",
+        unpaid: false,
+      },
+      {
+        id: "lesson-tomorrow",
+        item: "lesson",
+        customerId: "ana",
+        customerName: "Ana",
+        dueAt: "2026-10-14T20:00:00.000Z",
+        unpaid: false,
+      },
+      {
+        id: "lesson-unpaid",
+        item: "lesson",
+        customerId: "carla",
+        customerName: "Carla",
+        dueAt: "2026-10-14T20:00:00.000Z",
+        unpaid: true,
+      },
+      {
+        id: "live-in-7-days",
+        item: "vodLive",
+        customerId: "ana",
+        customerName: "Ana",
+        dueAt: "2026-10-20T18:00:00.000Z",
+        unpaid: false,
+      },
+    ]);
+    expect(work.toMark).toEqual([
+      {
+        id: "mark-old",
+        item: "tournament",
+        customerId: "dario",
+        customerName: "Dario",
+        dueAt: "2026-09-01T15:00:00.000Z",
+      },
+      {
+        id: "mark-yesterday",
+        item: "lessonPack",
+        customerId: "ana",
+        customerName: "Ana",
+        dueAt: "2026-10-12T20:00:00.000Z",
+      },
     ]);
     expect(work.uninvoiced).toEqual({ count: 2, arsMinor: 10_500_000, usdMinor: 7000 });
+  });
+
+  test("a session earlier today is still a session until the Argentine day ends", () => {
+    const sales = [
+      sale({ id: "first-minute", item: "lesson", dueAt: START_OF_TODAY }),
+      sale({ id: "this-morning", item: "lesson", dueAt: "2026-10-13T12:00:00.000Z" }),
+      sale({ id: "last-night", item: "lesson", dueAt: "2026-10-13T02:59:59.000Z" }),
+    ];
+
+    const during = pendingWork(sales, NOW);
+    expect(ids(during.sessions)).toEqual(["first-minute", "this-morning"]);
+    expect(ids(during.toMark)).toEqual(["last-night"]);
+
+    // 23:59:59 del 13 en Argentina: todo sigue igual.
+    const lastSecond = pendingWork(sales, new Date("2026-10-14T02:59:59.000Z"));
+    expect(ids(lastSecond.sessions)).toEqual(["first-minute", "this-morning"]);
+    expect(ids(lastSecond.toMark)).toEqual(["last-night"]);
+
+    // 00:00 del 14: lo de ayer pasa a "para marcar".
+    const midnight = pendingWork(sales, new Date("2026-10-14T03:00:00.000Z"));
+    expect(ids(midnight.sessions)).toEqual([]);
+    expect(ids(midnight.toMark)).toEqual(["last-night", "first-minute", "this-morning"]);
+  });
+
+  test("an unpaid session is listed as unpaid, and a paid one is not", () => {
+    const sales = [
+      sale({ id: "paid", item: "lesson", dueAt: "2026-10-15T12:00:00.000Z" }),
+      sale({
+        id: "unpaid",
+        item: "lesson",
+        status: "pending",
+        paidOn: null,
+        dueAt: "2026-10-15T12:00:00.000Z",
+      }),
+    ];
+    expect(pendingWork(sales, NOW).sessions.map((session) => [session.id, session.unpaid])).toEqual([
+      ["paid", false],
+      ["unpaid", true],
+    ]);
+  });
+
+  test("only paid sessions are left to mark, never the unpaid, cancelled or refunded ones", () => {
+    const past = "2026-10-01T15:00:00.000Z";
+    const sales = [
+      sale({ id: "paid", item: "lesson", dueAt: past }),
+      sale({ id: "unpaid", item: "lesson", status: "pending", paidOn: null, dueAt: past }),
+      sale({ id: "cancelled", item: "lesson", status: "cancelled", dueAt: past }),
+      sale({ id: "refunded", item: "lesson", status: "refunded", dueAt: past }),
+      sale({ id: "delivered", item: "lesson", status: "delivered", dueAt: past }),
+      sale({ id: "marked", item: "lesson", dueAt: past, deliveredAt: "2026-10-01T16:00:00.000Z" }),
+      sale({ id: "undated", item: "lesson", dueAt: null }),
+      // Los VOD grabados y planes de juego son entregas, no sesiones.
+      sale({ id: "delivery", item: "vodRecorded", dueAt: past }),
+      sale({ id: "other", item: "other", dueAt: past }),
+    ];
+    const work = pendingWork(sales, NOW);
+    expect(ids(work.toMark)).toEqual(["paid"]);
+    expect(ids(work.deliveries)).toEqual(["delivery"]);
+  });
+
+  test("sessions to mark go oldest first, then by id", () => {
+    const sales = [
+      sale({ id: "c", item: "lesson", dueAt: "2026-10-10T12:00:00.000Z" }),
+      sale({ id: "b", item: "tournament", dueAt: "2026-10-02T12:00:00.000Z" }),
+      sale({ id: "a", item: "vodLive", dueAt: "2026-10-02T12:00:00.000Z" }),
+      sale({ id: "z", item: "lessonPack", dueAt: "2025-01-02T12:00:00.000Z" }),
+    ];
+    expect(ids(pendingWork(sales, NOW).toMark)).toEqual(["z", "a", "b", "c"]);
+  });
+
+  test("every row says what was sold and to whom", () => {
+    const sales = [
+      sale({
+        id: "delivery",
+        item: "gamePlan",
+        customerId: "c-1",
+        customerName: "Carla Díaz",
+        dueAt: "2026-10-16T12:00:00.000Z",
+      }),
+      sale({
+        id: "session",
+        item: "vodLive",
+        customerId: "c-2",
+        customerName: "Matías Núñez",
+        dueAt: "2026-10-15T12:00:00.000Z",
+      }),
+      sale({
+        id: "to-mark",
+        item: "tournament",
+        customerId: "c-3",
+        customerName: "Julián",
+        dueAt: "2026-10-01T12:00:00.000Z",
+      }),
+    ];
+    const work = pendingWork(sales, NOW);
+    expect(work.deliveries[0]).toMatchObject({ item: "gamePlan", customerId: "c-1", customerName: "Carla Díaz" });
+    expect(work.sessions[0]).toMatchObject({ item: "vodLive", customerId: "c-2", customerName: "Matías Núñez" });
+    expect(work.toMark[0]).toMatchObject({ item: "tournament", customerId: "c-3", customerName: "Julián" });
   });
 
   test("a delivery due exactly now is not overdue yet", () => {
@@ -129,6 +339,8 @@ describe("pending work", () => {
       // 13/10 16:00 en Argentina: dentro de una hora.
       sale({ id: "soon", item: "gamePlan", dueAt: "2026-10-13T16:00" }),
       sale({ id: "session", item: "lesson", dueAt: "2026-10-13T16:00" }),
+      // 12/10 23:00 en Argentina: ayer.
+      sale({ id: "yesterday", item: "lesson", dueAt: "2026-10-12T23:00" }),
     ];
     const work = pendingWork(sales, NOW);
     expect(work.deliveries.map((delivery) => [delivery.id, delivery.overdue])).toEqual([
@@ -136,30 +348,37 @@ describe("pending work", () => {
       ["soon", false],
     ]);
     expect(ids(work.sessions)).toEqual(["session"]);
+    expect(ids(work.toMark)).toEqual(["yesterday"]);
   });
 
   test("a due date that is not a date is treated as having none", () => {
     const sales = [
       sale({ id: "broken", item: "gamePlan", dueAt: "mañana" }),
       sale({ id: "broken-session", item: "lesson", dueAt: "mañana" }),
+      sale({ id: "date-only", item: "lesson", dueAt: "2026-10-14" }),
     ];
     const work = pendingWork(sales, NOW);
-    expect(work.deliveries).toEqual([{ id: "broken", dueAt: null, overdue: false }]);
+    expect(work.deliveries.map((delivery) => [delivery.id, delivery.dueAt])).toEqual([
+      ["broken", null],
+    ]);
     expect(work.sessions).toEqual([]);
+    expect(work.toMark).toEqual([]);
   });
 
   test("with nothing pending everything is empty", () => {
     expect(pendingWork([], NOW)).toEqual({
       deliveries: [],
       sessions: [],
+      toMark: [],
       uninvoiced: { count: 0, arsMinor: 0, usdMinor: 0 },
     });
   });
 
-  test("uninvoiced covers every income sale, whatever its date", () => {
+  test("uninvoiced covers every collected sale, whatever its age, but not future-dated ones", () => {
     const sales = [
       sale({ paidOn: "2024-01-15", dollars: 10, invoiceStatus: "pending" }),
       sale({ paidOn: "2026-10-13", dollars: 20, invoiceStatus: "pending" }),
+      sale({ paidOn: "2026-10-14", dollars: 640, invoiceStatus: "pending" }),
     ];
     expect(pendingWork(sales, NOW).uninvoiced).toEqual({
       count: 2,

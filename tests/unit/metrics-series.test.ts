@@ -19,6 +19,7 @@ describe("monthly series", () => {
       sale({ paidOn: "2026-10-13", dollars: 40 }),
       sale({ paidOn: "2025-10-31", dollars: 999 }), // hace 13 meses: afuera
       sale({ paidOn: "2026-11-01", dollars: 999 }), // el mes que viene: afuera
+      sale({ paidOn: "2026-10-14", dollars: 999 }), // mañana: no cuenta hasta ese día
     ];
 
     const series = monthlyIncome(sales, 12, NOW);
@@ -206,9 +207,13 @@ describe("income by service, payment method and country", () => {
     expect(itemsWithoutSales(sales, 23, NOW)).toContain("gamePlan");
   });
 
-  test("a sale dated in the future still counts as a sale of that service", () => {
-    const sales = [sale({ item: "tournament", paidOn: "2026-10-20" })];
-    expect(itemsWithoutSales(sales, 90, NOW)).not.toContain("tournament");
+  test("a sale dated in the future does not count as a sale of that service yet", () => {
+    const sales = [sale({ item: "tournament", paidOn: "2026-10-14" })];
+    expect(itemsWithoutSales(sales, 90, NOW)).toContain("tournament");
+    // Mañana ya es una venta del servicio.
+    expect(itemsWithoutSales(sales, 90, new Date("2026-10-14T15:00:00.000Z"))).not.toContain(
+      "tournament",
+    );
   });
 
   test.each([0, -5, 2.5])("rejects %s days", (days) => {

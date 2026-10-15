@@ -6,11 +6,17 @@ import type { MetricSale } from "@/admin/metrics/metric-sale";
 // "Ahora" de los tests de métricas: martes 13/10/2026, 15:00 en Argentina (UTC-3).
 export const NOW = new Date("2026-10-13T18:00:00.000Z");
 export const ARS_PER_USD = 1500;
+/** Octubre entero: un rango cualquiera para los desgloses, que reciben el rango que se les pase. */
 export const THIS_MONTH = { from: "2026-10-01", to: "2026-10-31" };
 
 export type SaleOverrides = Partial<MetricSale> & { dollars?: number };
 
 let sequence = 0;
+
+/** "ana" → "Ana": el nombre que lleva una venta cuando el test no fija otro. */
+function nameOf(customerId: string): string {
+  return customerId.charAt(0).toUpperCase() + customerId.slice(1);
+}
 
 /**
  * Una venta cobrada de 40 dólares el 5/10/2026, ya facturada; cada test cambia
@@ -18,9 +24,11 @@ let sequence = 0;
  */
 export function sale({ dollars = 40, ...overrides }: SaleOverrides = {}): MetricSale {
   sequence += 1;
+  const customerId = overrides.customerId ?? "ana";
   return {
     id: `sale-${String(sequence).padStart(3, "0")}`,
-    customerId: "ana",
+    customerId,
+    customerName: nameOf(customerId),
     item: "lesson",
     status: "paid",
     paidOn: "2026-10-05",

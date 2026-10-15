@@ -8,12 +8,15 @@
 //    total de pendientes) o cobradas y sin entregar (entregas y sesiones);
 // 3. de cada alumno que compró en la ventana, su primera compra de ingreso si
 //    es más vieja (para que "alumnos nuevos" y "recompra" no tomen por nuevo a
-//    quien compró hace tres años).
+//    quien compró hace tres años);
+// 4. las ventas pendientes de cobro que tienen fecha (`dueAt`) y todavía no se
+//    entregaron: las sesiones agendadas que aún no se cobraron. Ningún número de
+//    ingreso las lee (`isIncome` las descarta); solo las usa la lista de pendientes.
 //
-// Las pendientes de cobro, canceladas y reembolsadas no se traen: ninguna
-// métrica las lee (las funciones puras igual las ignoran).
+// Las canceladas, las reembolsadas y las pendientes sin fecha no se traen:
+// ninguna métrica las lee (las funciones puras igual las ignoran).
 
-import { and, asc, eq, gte, inArray, isNull, lt, or } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNotNull, isNull, lt, or } from "drizzle-orm";
 import {
   INCOME_STATUSES,
   type InvoiceStatus,
@@ -32,6 +35,7 @@ const HISTORY_MONTHS = 24;
 const metricColumns = {
   id: sales.id,
   customerId: sales.customerId,
+  customerName: customers.name,
   item: sales.item,
   status: sales.status,
   paidOn: sales.paidOn,
@@ -48,6 +52,7 @@ const metricColumns = {
 interface RawMetricRow {
   id: string;
   customerId: string;
+  customerName: string;
   item: string;
   status: string;
   paidOn: string | null;
@@ -69,6 +74,7 @@ function toMetricSale(row: RawMetricRow): MetricSale {
   return {
     id: row.id,
     customerId: row.customerId,
+    customerName: row.customerName,
     item: row.item as SaleItem,
     status: row.status as SaleStatus,
     paidOn: row.paidOn,
@@ -89,8 +95,8 @@ function historyStart(now: Date): string {
 
 /**
  * Las ventas que leen las métricas, de la más vieja a la más nueva (a igual día,
- * por id), con el país de cada alumno. Ver el encabezado del archivo para saber
- * cuáles se traen.
+ * por id; las sin día de cobro, al final), con el nombre y el país de cada
+ * alumno. Ver el encabezado del archivo para saber cuáles se traen.
  */
 export async function loadMetricSales(db: Db, now: Date): Promise<MetricSale[]> {
   const windowStart = historyStart(now);
@@ -101,13 +107,17 @@ export async function loadMetricSales(db: Db, now: Date): Promise<MetricSale[]> 
     .from(sales)
     .innerJoin(customers, eq(sales.customerId, customers.id))
     .where(
-      and(
-        isIncomeSale,
-        or(
-          gte(sales.paidOn, windowStart),
-          eq(sales.invoiceStatus, "pending"),
-          and(eq(sales.status, "paid"), isNull(sales.deliveredAt)),
+      or(
+        and(
+          isIncomeSale,
+          or(
+            gte(sales.paidOn, windowStart),
+            eq(sales.invoiceStatus, "pending"),
+            and(eq(sales.status, "paid"), isNull(sales.deliveredAt)),
+          ),
         ),
+        // Sesiones agendadas que todavía no se cobraron.
+        and(eq(sales.status, "pending"), isNotNull(sales.dueAt), isNull(sales.deliveredAt)),
       ),
     );
 
@@ -138,9 +148,12 @@ export async function loadMetricSales(db: Db, now: Date): Promise<MetricSale[]> 
   return [...byId.values()].sort(compareOldestFirst);
 }
 
+/** Por día de cobro (las que no tienen, al final) y, a igual día, por id. */
 function compareOldestFirst(a: MetricSale, b: MetricSale): number {
-  const dayA = a.paidOn ?? "";
-  const dayB = b.paidOn ?? "";
-  if (dayA !== dayB) return dayA < dayB ? -1 : 1;
+  if (a.paidOn !== b.paidOn) {
+    if (a.paidOn === null) return 1;
+    if (b.paidOn === null) return -1;
+    return a.paidOn < b.paidOn ? -1 : 1;
+  }
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }

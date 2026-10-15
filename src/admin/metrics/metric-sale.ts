@@ -13,6 +13,8 @@ import {
 export interface MetricSale {
   id: string;
   customerId: string;
+  /** Nombre del alumno, para las listas de pendientes. */
+  customerName: string;
   item: SaleItem;
   status: SaleStatus;
   /** Día de cobro (Argentina), "AAAA-MM-DD". */

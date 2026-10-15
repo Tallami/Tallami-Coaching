@@ -122,22 +122,23 @@ function lengthInDays(range: DateRange): number {
 }
 
 /**
- * El rango de un período, con "hoy" en Argentina. Los períodos de calendario
- * cubren el mes o el año entero aunque no hayan terminado (el último día puede
- * ser futuro): así "este mes" coincide con la última barra del gráfico mensual
- * y con "últimos 12 meses" (12 meses de calendario, el actual incluido).
+ * El rango de un período, con "hoy" en Argentina. Todos terminan hoy, salvo el
+ * mes pasado, que es el mes anterior entero: una venta con fecha futura no
+ * cuenta en ningún período hasta ese día, y la comparación con el período
+ * anterior es entre tramos de la misma duración (ver `previousPeriodRange`).
  *
- * - `thisMonth`: del 1.º al último día del mes en curso.
+ * - `thisMonth`: del 1.º del mes en curso a hoy.
  * - `lastMonth`: el mes anterior completo.
  * - `last30`: los 30 días que terminan hoy, hoy incluido.
- * - `last12`: del 1.º del mes de hace 11 meses al último día del mes en curso.
- * - `thisYear`: del 1 de enero al 31 de diciembre del año en curso.
+ * - `last12`: del 1.º del mes de hace 11 meses a hoy (12 meses de calendario,
+ *   el actual incluido: los mismos del gráfico mensual).
+ * - `thisYear`: del 1 de enero a hoy.
  */
 export function periodRange(period: Period, now: Date): DateRange {
   const today = todayInArgentina(now);
   switch (period) {
     case "thisMonth":
-      return { from: firstOfMonth(today), to: lastOfMonth(today) };
+      return { from: firstOfMonth(today), to: today };
     case "lastMonth": {
       const lastMonth = addMonths(firstOfMonth(today), -1);
       return { from: lastMonth, to: lastOfMonth(lastMonth) };
@@ -145,9 +146,9 @@ export function periodRange(period: Period, now: Date): DateRange {
     case "last30":
       return { from: addDays(today, -(LAST_30_DAYS - 1)), to: today };
     case "last12":
-      return { from: addMonths(firstOfMonth(today), -(MONTHS_IN_YEAR - 1)), to: lastOfMonth(today) };
+      return { from: addMonths(firstOfMonth(today), -(MONTHS_IN_YEAR - 1)), to: today };
     case "thisYear":
-      return { from: `${today.slice(0, 4)}-01-01`, to: `${today.slice(0, 4)}-12-31` };
+      return { from: `${today.slice(0, 4)}-01-01`, to: today };
   }
 }
 
@@ -163,10 +164,11 @@ function monthsIn(range: DateRange): number {
 }
 
 /**
- * El rango anterior, para comparar: termina el día antes de que empiece este.
- * Si son meses de calendario completos (un mes, 12 meses, un año), el anterior
- * es la misma cantidad de meses completos justo antes ("el mes anterior
- * completo"); en cualquier otro caso tiene la misma cantidad de días.
+ * El rango justo anterior a uno cualquiera: termina el día antes de que empiece
+ * este. Si son meses de calendario completos (un mes, 12 meses, un año), el
+ * anterior es la misma cantidad de meses completos; en cualquier otro caso
+ * tiene la misma cantidad de días. Para comparar un período del resumen se usa
+ * `previousPeriodRange`, que lo hace entre tramos equivalentes.
  */
 export function previousRange(range: DateRange): DateRange {
   if (range.from > range.to) {
@@ -180,14 +182,29 @@ export function previousRange(range: DateRange): DateRange {
 }
 
 /**
- * El rango anterior de un período. Igual que `previousRange(periodRange(...))`
- * salvo en "últimos 30 días", que siempre compara contra 30 días aunque justo
- * coincidan con un mes de calendario (30/11: del 1/11 al 30/11).
+ * El tramo con el que se compara un período: el mismo tramo del período
+ * anterior, así a mitad de mes no se compara contra un mes entero. Los meses
+ * más cortos recortan el día (31/3 se compara con el 1 al 28/2, o al 29/2 en
+ * año bisiesto).
+ *
+ * - `thisMonth`: del 1.º del mes anterior al mismo día del mes anterior.
+ * - `thisYear`: del 1 de enero del año anterior a la misma fecha del año anterior.
+ * - `last12`: los mismos 12 meses, un año atrás (los dos extremos, un año antes).
+ * - `lastMonth`: el mes anterior a ese, entero.
+ * - `last30`: los 30 días anteriores.
  */
 export function previousPeriodRange(period: Period, now: Date): DateRange {
+  const today = todayInArgentina(now);
   const range = periodRange(period, now);
-  if (period === "last30") {
-    return { from: addDays(range.from, -LAST_30_DAYS), to: addDays(range.from, -1) };
+  switch (period) {
+    case "thisMonth":
+      return { from: addMonths(range.from, -1), to: addMonths(today, -1) };
+    case "thisYear":
+    case "last12":
+      return { from: addMonths(range.from, -MONTHS_IN_YEAR), to: addMonths(range.to, -MONTHS_IN_YEAR) };
+    case "lastMonth":
+      return previousRange(range);
+    case "last30":
+      return { from: addDays(range.from, -LAST_30_DAYS), to: addDays(range.from, -1) };
   }
-  return previousRange(range);
 }
