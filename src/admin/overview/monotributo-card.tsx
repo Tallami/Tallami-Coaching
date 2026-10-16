@@ -23,7 +23,7 @@ const TONE_TEXT: Record<MeterTone, string> = {
  * de la categoría. Suma lo cobrado (por fecha de cobro) y compara con el tope
  * que cargó Tallami: no lo verifica con ARCA ni reemplaza al contador.
  */
-export function MonotributoCard({ data }: { data: OverviewData }) {
+export function MonotributoCard({ data }: { data: Pick<OverviewData, "monotributo"> }) {
   const { status, settings, window } = data.monotributo;
   const description = `Lo cobrado del ${formatDay(window.from)} al ${formatDay(window.to)} (hoy), por fecha de cobro.`;
 

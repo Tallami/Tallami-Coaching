@@ -5,8 +5,9 @@
 // Las funciones que escriben van en una transacción: un alumno nuevo y su
 // venta se guardan juntos o no se guarda nada.
 
-import { and, count, eq, gte, ilike, lte, or, type SQL } from "drizzle-orm";
+import { and, asc, count, eq, gte, ilike, inArray, lte, or, sql, type SQL } from "drizzle-orm";
 import {
+  INCOME_STATUSES,
   isDollarCurrency,
   type InvoiceStatus,
   type PaymentMethod,
@@ -195,4 +196,50 @@ export async function listSales(
       .where(where),
   ]);
   return { rows: rows.map(toSaleRow), total: totals.total };
+}
+
+/** Hay más ventas para exportar que las que entran en un archivo. */
+export class ExportTooLargeError extends Error {
+  constructor(readonly limit: number) {
+    super(`Hay más de ${limit} ventas para exportar.`);
+    this.name = "ExportTooLargeError";
+  }
+}
+
+export interface ExportOptions {
+  /** Cuántas ventas como mucho; si hay más, tira `ExportTooLargeError` en vez de entregar un archivo cortado. */
+  limit: number;
+  /**
+   * Solo lo cobrado hasta este día ("AAAA-MM-DD", inclusive): ventas cobradas o
+   * entregadas con fecha de cobro a más tardar ese día. Es el criterio de
+   * ingreso de los totales del panel; sin él se exporta todo lo que filtra la lista.
+   */
+  collectedBy?: string;
+}
+
+/**
+ * Las ventas que cumplen el filtro, todas (sin páginas), de la cobrada hace más
+ * tiempo a la más nueva; las que todavía no tienen fecha de cobro, al final.
+ * Es el orden de un libro de ventas, el contrario al de la lista.
+ */
+export async function listSalesForExport(
+  db: Db,
+  filter: SaleFilter,
+  options: ExportOptions,
+): Promise<SaleRow[]> {
+  const where = and(
+    ...filterConditions(filter),
+    options.collectedBy
+      ? and(inArray(sales.status, [...INCOME_STATUSES]), lte(sales.paidOn, options.collectedBy))
+      : undefined,
+  );
+  const rows = await db
+    .select(saleRowColumns)
+    .from(sales)
+    .innerJoin(customers, eq(sales.customerId, customers.id))
+    .where(where)
+    .orderBy(sql`${sales.paidOn} asc nulls last`, asc(sales.createdAt), asc(sales.id))
+    .limit(options.limit + 1);
+  if (rows.length > options.limit) throw new ExportTooLargeError(options.limit);
+  return rows.map(toSaleRow);
 }

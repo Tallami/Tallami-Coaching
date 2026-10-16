@@ -3,6 +3,7 @@ import {
   arsToUsdMinor,
   convertToArsMinor,
   formatMoney,
+  formatPlainAmount,
   formatRate,
   InvalidAmountError,
   InvalidRateError,
@@ -221,5 +222,32 @@ describe("formatRate", () => {
     expect(formatRate("12.1230")).toBe("12,123");
     expect(formatRate("1.0000")).toBe("1,00");
     expect(formatRate("1234567.0000")).toBe("1.234.567,00");
+  });
+});
+
+describe("formatPlainAmount", () => {
+  test("writes cents as a plain decimal with a comma and no thousands separator", () => {
+    expect(formatPlainAmount(123456)).toBe("1234,56");
+    expect(formatPlainAmount(4000)).toBe("40,00");
+    expect(formatPlainAmount(5)).toBe("0,05");
+    expect(formatPlainAmount(0)).toBe("0,00");
+    expect(formatPlainAmount(2_111_369_700)).toBe("21113697,00");
+    expect(formatPlainAmount(Number.MAX_SAFE_INTEGER)).toBe("90071992547409,91");
+  });
+
+  test("keeps the sign of a negative amount", () => {
+    expect(formatPlainAmount(-123456)).toBe("-1234,56");
+    expect(formatPlainAmount(-5)).toBe("-0,05");
+  });
+
+  test("what it writes is read back by parseAmountToMinor", () => {
+    for (const minor of [1, 99, 100, 123456, 2_111_369_700]) {
+      expect(parseAmountToMinor(formatPlainAmount(minor))).toBe(minor);
+    }
+  });
+
+  test("refuses an amount that is not a whole number of cents", () => {
+    expect(() => formatPlainAmount(1.5)).toThrow(RangeError);
+    expect(() => formatPlainAmount(Number.NaN)).toThrow(RangeError);
   });
 });

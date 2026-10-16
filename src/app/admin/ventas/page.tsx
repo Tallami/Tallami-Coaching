@@ -47,9 +47,19 @@ export default async function SalesPage(props: PageProps<"/admin/ventas">) {
         title="Ventas"
         description="Todo lo que cobraste, con su valor en pesos y en dólares."
         actions={
-          <Button asChild>
-            <Link href={`${SALES_PATH}/nueva`}>Nueva venta</Link>
-          </Button>
+          <>
+            {/* Un archivo, no una página: un enlace común (con `Link` Next intentaría navegar a él). */}
+            {total > 0 ? (
+              <Button asChild variant="ink-outline">
+                <a href={`${SALES_PATH}/exportar${salesQueryString(filter)}`} download>
+                  Exportar CSV
+                </a>
+              </Button>
+            ) : null}
+            <Button asChild>
+              <Link href={`${SALES_PATH}/nueva`}>Nueva venta</Link>
+            </Button>
+          </>
         }
       />
       {savedMessage ? (

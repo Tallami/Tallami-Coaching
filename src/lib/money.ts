@@ -127,6 +127,19 @@ export function formatMoney(
 }
 
 /**
+ * Un monto en unidades menores como número plano con coma decimal y sin
+ * separador de miles ("1234,56"): lo que se escribe en un campo para
+ * editarlo o en un CSV que Excel en español tiene que reconocer como número.
+ * `parseAmountToMinor` lo lee de vuelta.
+ */
+export function formatPlainAmount(minor: number): string {
+  assertWholeMinor(minor);
+  const abs = BigInt(Math.abs(minor));
+  const body = `${abs / CENTS_PER_UNIT},${(abs % CENTS_PER_UNIT).toString().padStart(2, "0")}`;
+  return minor < 0 ? `-${body}` : body;
+}
+
+/**
  * Un tipo de cambio guardado ("1400.5000") como se lee en es-AR: "1.400,50".
  * Muestra al menos 2 decimales y hasta 4 si hacen falta ("301,5651").
  */

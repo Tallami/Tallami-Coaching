@@ -4,7 +4,7 @@ import { defineConfig, devices } from "@playwright/test";
 import { demoServerEnv } from "./tests/helpers/admin-server";
 
 // Segundo servidor de Playwright, para los tests que verifican totales (el
-// resumen y la página Servicios): el mismo build que el servidor principal pero con su propia base
+// resumen, la página Servicios y Facturación): el mismo build que el servidor principal pero con su propia base
 // PGlite, cargada con `buildDemoData(hoy en Argentina)` (alumnos, ventas y clics
 // de ejemplo) antes de arrancar.
 // Nadie escribe en esa base: los tests son de solo lectura, así los números
@@ -28,7 +28,11 @@ const NEEDS_BUILD =
 
 export default defineConfig({
   testDir: "./tests/e2e",
-  testMatch: ["**/admin-overview.spec.ts", "**/admin-services-demo.spec.ts"],
+  testMatch: [
+    "**/admin-overview.spec.ts",
+    "**/admin-services-demo.spec.ts",
+    "**/admin-billing-demo.spec.ts",
+  ],
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,

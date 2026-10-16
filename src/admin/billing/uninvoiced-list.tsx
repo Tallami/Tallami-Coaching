@@ -1,0 +1,382 @@
+"use client";
+
+import Link from "next/link";
+import {
+  useActionState,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  useTransition,
+  type FormEvent,
+} from "react";
+import { INITIAL_INVOICING_FORM_STATE, type InvoicingAction } from "@/admin/billing/form-state";
+import type { UninvoicedGroupView, UninvoicedRowView } from "@/admin/billing/uninvoiced-views";
+import { INVOICE_TYPES } from "@/admin/catalog";
+import { sumMinor } from "@/admin/metrics/math";
+import { Field } from "@/admin/ui/field";
+import { Notice } from "@/admin/ui/notice";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { formatMoney } from "@/lib/money";
+import { cn } from "@/lib/utils";
+
+interface UninvoicedListProps {
+  groups: readonly UninvoicedGroupView[];
+  /** Hoy en Argentina, "AAAA-MM-DD": la fecha con que arranca la factura. */
+  today: string;
+  /** Marca las ventas elegidas; ante un problema devuelve el estado con los errores. */
+  action: InvoicingAction;
+}
+
+const SALES_PATH = "/admin/ventas";
+
+// Un snapshot que siempre es `true` en el navegador y `false` al renderizar en
+// el servidor: dice si la página ya está lista para usarse.
+const subscribeNever = () => () => {};
+const isHydrated = () => true;
+const isNotHydrated = () => false;
+
+const INVOICE_TYPE_LABELS: Record<(typeof INVOICE_TYPES)[number], string> = {
+  C: "Factura C",
+  E: "Factura E",
+};
+
+const checkboxClasses = "size-5 cursor-pointer accent-zone";
+
+interface TickProps {
+  label: string;
+  checked: boolean;
+  indeterminate?: boolean;
+  onChange: () => void;
+  /** Solo las casillas de una venta viajan con el formulario. */
+  name?: string;
+  value?: string;
+  className?: string;
+}
+
+/** Una casilla con un área de toque de 44 px; "a medias" cuando se eligió solo una parte del grupo. */
+function Tick({ label, checked, indeterminate = false, onChange, name, value, className }: TickProps) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate;
+  }, [indeterminate]);
+
+  return (
+    <label className="-m-2 flex size-11 cursor-pointer items-center justify-center">
+      <input
+        ref={ref}
+        type="checkbox"
+        name={name}
+        value={value}
+        aria-label={label}
+        checked={checked}
+        onChange={onChange}
+        className={cn(checkboxClasses, className)}
+      />
+    </label>
+  );
+}
+
+const numberCell = "text-right whitespace-nowrap tabular-nums";
+
+function SaleRowView({
+  row,
+  checked,
+  onToggle,
+}: {
+  row: UninvoicedRowView;
+  checked: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <TableRow className={cn(checked && "bg-gold/20")}>
+      <TableCell className="w-12 pr-0">
+        <Tick
+          name="ids"
+          value={row.id}
+          label={`Elegir la venta de ${row.customerName}, ${row.item}, cobrada el ${row.paidOn}`}
+          checked={checked}
+          onChange={onToggle}
+        />
+      </TableCell>
+      <TableCell className="whitespace-nowrap">{row.paidOn}</TableCell>
+      <TableCell>
+        <Link
+          href={`${SALES_PATH}/${row.id}`}
+          prefetch={false}
+          className="rounded-[2px] font-bold underline decoration-ink-2/50 underline-offset-4 hover:decoration-ink"
+        >
+          {row.customerName}
+        </Link>
+        {row.customerDiscord || row.customerCountry ? (
+          <div className="mt-0.5 flex items-center gap-2 text-[0.875rem] text-ink-2">
+            {row.customerDiscord ? <span>{row.customerDiscord}</span> : null}
+            {row.customerCountry ? <Badge variant="outline">{row.customerCountry}</Badge> : null}
+          </div>
+        ) : null}
+      </TableCell>
+      <TableCell>
+        <span className="font-semibold">{row.item}</span>
+        {row.description ? (
+          <div className="mt-0.5 max-w-[16rem] text-[0.875rem] text-ink-2">{row.description}</div>
+        ) : null}
+      </TableCell>
+      <TableCell className={cn(numberCell, "font-bold")}>{row.charged}</TableCell>
+      <TableCell className={numberCell}>{row.ars}</TableCell>
+      <TableCell className={numberCell}>{row.usd}</TableCell>
+    </TableRow>
+  );
+}
+
+/** El texto de lo elegido, con sus totales para que se vea cuánto se está por marcar. */
+function selectionSummary(rows: readonly UninvoicedRowView[]): string {
+  if (rows.length === 0) return "Elegí las ventas que querés marcar.";
+  const ars = formatMoney(sumMinor(rows.map((row) => row.arsMinor)), "ARS");
+  const usd = formatMoney(sumMinor(rows.map((row) => row.usdMinor)), "USD");
+  const noun = rows.length === 1 ? "venta elegida" : "ventas elegidas";
+  return `${rows.length} ${noun}: ${ars} (${usd})`;
+}
+
+/**
+ * Las ventas por facturar, por mes, y el formulario para marcar las que se
+ * eligen: como facturadas (con el tipo, el número y la fecha de la factura) o
+ * como "no requiere factura". Lo elegido y lo escrito viven en el estado y se
+ * mandan a la acción como un `FormData` común; la validación es del servidor.
+ *
+ * El envío se hace a mano (`onSubmit`) y no con `<form action>`: React reinicia
+ * el formulario después de cada acción y se perdería lo que se eligió y se
+ * escribió justo cuando hay un error. El botón espera a que la página esté
+ * lista. Al marcar, la acción redirige y la página trae la lista nueva (la
+ * página pasa un `key` nuevo para que esta lista vuelva a armarse vacía).
+ */
+export function UninvoicedList({ groups, today, action }: UninvoicedListProps) {
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [values, setValues] = useState({ type: "", number: "", issuedOn: today });
+  const [state, dispatch, isSaving] = useActionState(action, INITIAL_INVOICING_FORM_STATE);
+  const [, startTransition] = useTransition();
+  const [handledState, setHandledState] = useState(state);
+  const [editedFields, setEditedFields] = useState<ReadonlySet<string>>(new Set());
+  const formRef = useRef<HTMLFormElement>(null);
+  const summaryRef = useRef<HTMLDivElement>(null);
+  const hydrated = useSyncExternalStore(subscribeNever, isHydrated, isNotHydrated);
+
+  // Una respuesta nueva del servidor: los errores vuelven a valer.
+  if (state !== handledState) {
+    setHandledState(state);
+    setEditedFields(new Set());
+  }
+
+  // Lo que se corrigió después del error deja de mostrarse como error.
+  const errors = Object.fromEntries(
+    Object.entries(state.fieldErrors).filter(([field]) => !editedFields.has(field)),
+  );
+
+  useEffect(() => {
+    if (state === INITIAL_INVOICING_FORM_STATE) return;
+    const target =
+      formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]') ?? summaryRef.current;
+    target?.focus();
+  }, [state]);
+
+  const allRows = groups.flatMap((group) => group.rows);
+  const chosenRows = allRows.filter((row) => selected.has(row.id));
+
+  function markEdited(field: string) {
+    setEditedFields((current) => new Set([...current, field]));
+  }
+
+  function select(ids: readonly string[], on: boolean) {
+    setSelected((current) => {
+      const next = new Set(current);
+      for (const id of ids) {
+        if (on) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+    markEdited("ids");
+  }
+
+  function update(patch: Partial<typeof values>) {
+    setValues((current) => ({ ...current, ...patch }));
+    for (const field of Object.keys(patch)) markEdited(field);
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    // El botón que se tocó (`intent`) viaja con el formulario.
+    const submitter = (event.nativeEvent as SubmitEvent).submitter;
+    const formData = new FormData(event.currentTarget, submitter);
+    startTransition(() => dispatch(formData));
+  }
+
+  const everyRowChosen = allRows.length > 0 && chosenRows.length === allRows.length;
+  const isBusy = !hydrated || isSaving;
+
+  return (
+    <form
+      ref={formRef}
+      onSubmit={handleSubmit}
+      noValidate
+      aria-label="Marcar ventas como facturadas"
+      data-hydrated={hydrated ? "true" : "false"}
+      className="mt-5"
+    >
+      <div ref={summaryRef} tabIndex={-1} className="outline-offset-0 empty:hidden">
+        {state.formError ? (
+          <Notice tone="error" className="mb-4 border-l-8">
+            {state.formError}
+          </Notice>
+        ) : null}
+        {errors.ids ? (
+          <p id="ids-error" className="mb-4 text-[0.9375rem] leading-snug font-bold text-danger-ink">
+            {errors.ids}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="border-2 border-ink bg-white">
+        <Table
+          className="min-w-[56rem]"
+          containerProps={{ role: "region", "aria-label": "Ventas sin facturar", tabIndex: 0 }}
+        >
+          <TableHeader>
+            <TableRow className="border-b-0 hover:bg-transparent focus-within:bg-transparent">
+              <TableHead className="w-12 pr-0">
+                <Tick
+                  label="Elegir todas las ventas sin facturar"
+                  checked={everyRowChosen}
+                  indeterminate={chosenRows.length > 0 && !everyRowChosen}
+                  onChange={() => select(allRows.map((row) => row.id), !everyRowChosen)}
+                  className="accent-gold"
+                />
+              </TableHead>
+              <TableHead>Cobro</TableHead>
+              <TableHead>Alumno</TableHead>
+              <TableHead>Servicio</TableHead>
+              <TableHead className="text-right">Cobrado</TableHead>
+              <TableHead className="text-right">En pesos</TableHead>
+              <TableHead className="text-right">En dólares</TableHead>
+            </TableRow>
+          </TableHeader>
+          {groups.map((group) => {
+            const ids = group.rows.map((row) => row.id);
+            const chosenInGroup = ids.filter((id) => selected.has(id)).length;
+            const allChosen = chosenInGroup === ids.length;
+            return (
+              <TableBody key={group.month} data-testid="uninvoiced-month" data-month={group.month}>
+                <TableRow className="border-t-2 border-ink bg-neutral-tint hover:bg-neutral-tint focus-within:bg-neutral-tint">
+                  <TableCell className="w-12 pr-0">
+                    <Tick
+                      label={`Elegir todas las ventas de ${group.label}`}
+                      checked={allChosen}
+                      indeterminate={chosenInGroup > 0 && !allChosen}
+                      onChange={() => select(ids, !allChosen)}
+                    />
+                  </TableCell>
+                  <TableCell colSpan={3} className="py-2.5">
+                    <span className="text-[1.125rem] leading-tight font-extrabold [font-stretch:75%]">
+                      {group.label}
+                    </span>
+                    <span className="ml-3 text-[0.9375rem] text-ink-2">
+                      {group.count === 1 ? "1 venta" : `${group.count} ventas`}
+                    </span>
+                  </TableCell>
+                  <TableCell className="py-2.5" />
+                  <TableCell className={cn(numberCell, "py-2.5 font-bold")}>{group.ars}</TableCell>
+                  <TableCell className={cn(numberCell, "py-2.5 font-bold")}>{group.usd}</TableCell>
+                </TableRow>
+                {group.rows.map((row) => (
+                  <SaleRowView
+                    key={row.id}
+                    row={row}
+                    checked={selected.has(row.id)}
+                    onToggle={() => select([row.id], !selected.has(row.id))}
+                  />
+                ))}
+              </TableBody>
+            );
+          })}
+        </Table>
+      </div>
+
+      <div className="mt-4 border-2 border-l-[6px] border-ink border-l-gold bg-paper p-4 min-[901px]:sticky min-[901px]:bottom-3 min-[901px]:z-10 narrow:p-3">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-x-6 gap-y-4 narrow:grid-cols-1">
+          <p
+            role="status"
+            data-testid="selection-summary"
+            className="col-span-2 text-[1.0625rem] font-bold narrow:col-span-1"
+          >
+            {selectionSummary(chosenRows)}
+          </p>
+          <div className="grid grid-cols-[9rem_minmax(0,1fr)_11rem] gap-4 narrow:grid-cols-1">
+            <Field id="invoice-type" label="Tipo de factura" error={errors.type}>
+              {(control) => (
+                <NativeSelect
+                  {...control}
+                  name="type"
+                  value={values.type}
+                  onChange={(event) => update({ type: event.target.value })}
+                >
+                  <NativeSelectOption value="">Elegí uno</NativeSelectOption>
+                  {INVOICE_TYPES.map((type) => (
+                    <NativeSelectOption key={type} value={type}>
+                      {INVOICE_TYPE_LABELS[type]}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              )}
+            </Field>
+            <Field
+              id="invoice-number"
+              label="Número de factura"
+              hint="Como en ARCA: 00003-00000045."
+              error={errors.number}
+            >
+              {(control) => (
+                <Input
+                  {...control}
+                  name="number"
+                  autoComplete="off"
+                  maxLength={30}
+                  value={values.number}
+                  onChange={(event) => update({ number: event.target.value })}
+                />
+              )}
+            </Field>
+            <Field id="invoice-issued-on" label="Fecha de la factura" error={errors.issuedOn}>
+              {(control) => (
+                <Input
+                  {...control}
+                  type="date"
+                  name="issuedOn"
+                  value={values.issuedOn}
+                  onChange={(event) => update({ issuedOn: event.target.value })}
+                />
+              )}
+            </Field>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button type="submit" name="intent" value="invoiced" disabled={isBusy}>
+              {isSaving ? "Guardando…" : "Marcar como facturadas"}
+            </Button>
+            <Button type="submit" name="intent" value="not_required" variant="ink-outline" disabled={isBusy}>
+              {isSaving ? "Guardando…" : "No requiere factura"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </form>
+  );
+}
