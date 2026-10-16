@@ -49,8 +49,9 @@ export function ExportCard({ defaults }: { defaults: DateRange }) {
         </Button>
       </form>
       <p className="mt-4 text-[0.875rem] leading-snug text-ink-2">
-        Trae cada venta cobrada con su valor en pesos y en dólares, el tipo de cambio y los datos de la factura. Por
-        defecto, los 12 meses del monotributo. Confirmá con tu contador qué tipo de cambio corresponde.
+        Trae cada venta cobrada con su valor en pesos y en dólares, el tipo de cambio de la moneda cobrada, la
+        cotización del dólar (con su fuente y su fecha) y los datos de la factura. Por defecto, los 12 meses del
+        monotributo. Confirmá con tu contador qué tipo de cambio corresponde.
       </p>
       <p className="mt-2 text-[0.875rem] leading-snug text-ink-2">
         Para otras ventas, con otros filtros, usá «Exportar CSV» en{" "}

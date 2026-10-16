@@ -1,5 +1,10 @@
 import { describe, expect, test } from "vitest";
-import { invoicingNotice, invoicingResultPath } from "@/admin/billing/saved-notice";
+import {
+  invoiceUndoNotice,
+  invoiceUndoPath,
+  invoicingNotice,
+  invoicingResultPath,
+} from "@/admin/billing/saved-notice";
 
 describe("invoicingNotice", () => {
   test.each([
@@ -48,5 +53,53 @@ describe("invoicingResultPath", () => {
     const query = new URLSearchParams(invoicingResultPath("invoiced", 3).split("?")[1]);
 
     expect(invoicingNotice(Object.fromEntries(query))).toBe("3 ventas marcadas como facturadas.");
+  });
+});
+
+describe("invoiceUndoNotice", () => {
+  test("says that the sale is pending again, and that it could not be done", () => {
+    expect(invoiceUndoNotice({ factura: "pendiente" })).toEqual({
+      tone: "ok",
+      text: expect.stringContaining("volvió a pendiente"),
+    });
+    expect(invoiceUndoNotice({ factura: "no-se-pudo" })).toEqual({
+      tone: "error",
+      text: expect.stringContaining("no tenía factura"),
+    });
+  });
+
+  test.each([
+    [{}],
+    [{ factura: "otra-cosa" }],
+    [{ factura: "__proto__" }],
+    [{ factura: "constructor" }],
+    [{ factura: "toString" }],
+    [{ factura: "hasOwnProperty" }],
+    [{ factura: "" }],
+    [{ factura: undefined }],
+  ])("shows nothing for %j", (params) => {
+    expect(invoiceUndoNotice(params)).toBeNull();
+  });
+
+  test("the first value wins when the parameter repeats", () => {
+    expect(invoiceUndoNotice({ factura: ["pendiente", "no-se-pudo"] })?.tone).toBe("ok");
+    expect(invoiceUndoNotice({ factura: ["nada", "pendiente"] })).toBeNull();
+  });
+});
+
+describe("invoiceUndoPath", () => {
+  const ID = "8f4f3f64-7c5c-4a43-9d4c-3f6a3a2f1b10";
+
+  test("goes back to the sale with what happened", () => {
+    expect(invoiceUndoPath(ID, "done")).toBe(`/admin/ventas/${ID}?factura=pendiente`);
+    expect(invoiceUndoPath(ID, "refused")).toBe(`/admin/ventas/${ID}?factura=no-se-pudo`);
+  });
+
+  test("what it writes is what the notice reads", () => {
+    for (const outcome of ["done", "refused"] as const) {
+      const query = new URLSearchParams(invoiceUndoPath(ID, outcome).split("?")[1]);
+
+      expect(invoiceUndoNotice(Object.fromEntries(query))).not.toBeNull();
+    }
   });
 });

@@ -23,7 +23,7 @@ import { formatDay } from "@/admin/dates";
 import type { SaleRow } from "@/admin/sales/sale-row";
 import { formatPlainAmount } from "@/lib/money";
 
-const BOM = "﻿";
+const BOM = "\uFEFF";
 const SEPARATOR = ";";
 const LINE_BREAK = "\r\n";
 
@@ -39,7 +39,9 @@ export const CSV_HEADERS = [
   "Pesos",
   "Dólares",
   "Tipo de cambio",
+  "Cotización del dólar",
   "Fuente",
+  "Fecha de cotización",
   "Medio de pago",
   "Estado",
   "Factura",
@@ -90,8 +92,10 @@ function saleCells(sale: SaleRow): CsvCell[] {
     amount(sale.amountMinor),
     amount(sale.amountArsMinor),
     amount(sale.amountUsdMinor),
+    plainRate(sale.arsPerUnit),
     plainRate(sale.arsPerUsd),
     text(RATE_SOURCE_LABELS[sale.rateSource]),
+    day(sale.rateQuotedOn),
     text(PAYMENT_LABELS[sale.paymentMethod]),
     text(STATUS_LABELS[sale.status]),
     text(INVOICE_STATUS_LABELS[sale.invoiceStatus]),
@@ -107,9 +111,16 @@ function line(cells: readonly CsvCell[]): string {
 
 /**
  * Las ventas como CSV: una línea de encabezados y una línea por venta, en el
- * orden que se pasa. "Tipo de cambio" son los pesos por dólar de la venta, el
- * valor con el que se pasa entre Pesos y Dólares; para una venta en dólares es
- * también el que lleva el Monto a Pesos.
+ * orden que se pasa. Las dos cotizaciones se escriben por separado para que
+ * cada cuenta cierre a la vista:
+ *
+ * - "Tipo de cambio": pesos por unidad de la moneda cobrada (1 para una venta
+ *   en pesos), así Monto x Tipo de cambio = Pesos;
+ * - "Cotización del dólar": pesos por dólar, así Pesos / Cotización = Dólares
+ *   (al centavo).
+ *
+ * "Fecha de cotización" es el día de la cotización usada (puede ser anterior al
+ * cobro: fin de semana o feriado); queda vacía si el valor se cargó a mano.
  */
 export function salesToCsv(rows: readonly SaleRow[]): string {
   const lines = [line(CSV_HEADERS.map((header) => text(header))), ...rows.map((sale) => line(saleCells(sale)))];

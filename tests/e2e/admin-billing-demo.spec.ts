@@ -156,7 +156,7 @@ test.describe("billing with the demo data", () => {
       sumMinor(collectedSales.map((sale) => sale.amountUsdMinor)),
     );
     // Solo lo cobrado, y de la más vieja a la más nueva.
-    expect(new Set(rows.map((cells) => cells[12]))).toEqual(new Set(["Cobrada", "Entregada"]));
+    expect(new Set(rows.map((cells) => cells[14]))).toEqual(new Set(["Cobrada", "Entregada"]));
     const dates = rows.map((cells) => cells[0].split("/").reverse().join("-"));
     expect([...dates].sort()).toEqual(dates);
 
@@ -172,23 +172,44 @@ test.describe("billing with the demo data", () => {
     const issuedRows = parseCsv(await issued.text()).slice(1);
     expect(issuedRows.length).toBeGreaterThan(0);
     for (const cells of issuedRows) {
-      expect(cells[13]).toBe("Facturada");
-      expect(["C", "E"]).toContain(cells[14]);
-      expect(cells[15]).toMatch(/^\d{4}-\d{8}$/);
-      expect(cells[16]).toMatch(/^\d{2}\/\d{2}\/\d{4}$/);
+      expect(cells[15]).toBe("Facturada");
+      expect(["C", "E"]).toContain(cells[16]);
+      expect(cells[17]).toMatch(/^\d{4}-\d{8}$/);
+      expect(cells[18]).toMatch(/^\d{2}\/\d{2}\/\d{4}$/);
     }
   });
 
   test("the sales export has every sale, whatever its status, and filters like the list", async ({ page }) => {
     const all = parseCsv(await (await page.request.get("/admin/ventas/exportar")).text()).slice(1);
     expect(all).toHaveLength(data.sales.length);
-    expect(new Set(all.map((cells) => cells[12]))).toEqual(
+    expect(new Set(all.map((cells) => cells[14]))).toEqual(
       new Set(data.sales.map((sale) => STATUS_LABELS[sale.status as SaleStatus])),
     );
 
     const cancelled = parseCsv(await (await page.request.get("/admin/ventas/exportar?estado=cancelled")).text()).slice(1);
     expect(cancelled).toHaveLength(data.sales.filter((sale) => sale.status === "cancelled").length);
-    expect(new Set(cancelled.map((cells) => cells[12]))).toEqual(new Set(["Cancelada"]));
+    expect(new Set(cancelled.map((cells) => cells[14]))).toEqual(new Set(["Cancelada"]));
+  });
+
+  test("the sale page shows the invoice of an invoiced sale and offers to undo it (read only: nothing is clicked)", async ({
+    page,
+  }) => {
+    const issued = data.sales.find((sale) => sale.invoiceStatus === "issued");
+    const notRequired = data.sales.find((sale) => sale.invoiceStatus === "not_required" && sale.status !== "cancelled");
+    expect(issued?.invoiceNumber).toBeTruthy();
+    expect(notRequired).toBeDefined();
+
+    await page.goto(`/admin/ventas/${issued!.id}`);
+    const panel = page.getByTestId("invoice-panel");
+    await expect(panel).toContainText("Facturada");
+    await expect(panel).toContainText(`Factura ${issued!.invoiceType}`);
+    await expect(panel).toContainText(issued!.invoiceNumber!);
+    await expect(panel).toContainText(issued!.invoicedOn!.split("-").reverse().join("/"));
+    await expect(panel.getByRole("button", { name: "Volver a pendiente" })).toBeVisible();
+
+    await page.goto(`/admin/ventas/${notRequired!.id}`);
+    await expect(page.getByTestId("invoice-panel")).toContainText("No requiere");
+    await expect(page.getByTestId("invoice-panel").getByRole("button", { name: "Volver a pendiente" })).toBeVisible();
   });
 
   test("the sales list offers the export with the filter that is on", async ({ page }) => {

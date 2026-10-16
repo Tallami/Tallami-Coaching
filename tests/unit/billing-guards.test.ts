@@ -6,7 +6,10 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { requireAdmin } from "@/admin/auth/require-admin";
+import { eq } from "drizzle-orm";
+import { getSale } from "@/admin/sales/repository";
 import { getDb } from "@/db/client";
+import { sales } from "@/db/schema";
 import { createTestDb } from "../helpers/db";
 import { seedSale } from "../helpers/sales-db";
 
@@ -62,6 +65,27 @@ describe("without a session nothing reads or writes", () => {
     expect(getDb).not.toHaveBeenCalled();
   });
 
+  test("the undo of an invoice", async () => {
+    withoutSession();
+    const { markInvoicePendingAction } = await import("@/app/admin/ventas/actions");
+
+    await expect(markInvoicePendingAction("8f4f3f64-7c5c-4a43-9d4c-3f6a3a2f1b10")).rejects.toThrow(NO_SESSION);
+    expect(getDb).not.toHaveBeenCalled();
+  });
+
+  test("the sale page, which has the invoice panel", async () => {
+    withoutSession();
+    const { default: EditSalePage } = await import("@/app/admin/ventas/[id]/page");
+
+    await expect(
+      EditSalePage({
+        params: Promise.resolve({ id: "8f4f3f64-7c5c-4a43-9d4c-3f6a3a2f1b10" }),
+        searchParams: Promise.resolve({}),
+      } as never),
+    ).rejects.toThrow(NO_SESSION);
+    expect(getDb).not.toHaveBeenCalled();
+  });
+
   test("the billing page", async () => {
     withoutSession();
     const { default: BillingPage } = await import("@/app/admin/facturacion/page");
@@ -108,5 +132,51 @@ describe("with a session the downloads are the real files", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("Content-Disposition")).toMatch(/^attachment; filename="facturacion_/);
     expect(await response.text()).toContain("Con sesión cobrada");
+  });
+});
+
+describe("the undo of an invoice with a session", () => {
+  const INVOICED = {
+    invoiceStatus: "issued",
+    invoiceType: "C",
+    invoiceNumber: "00003-00000045",
+    invoicedOn: "2026-10-12",
+  } as const;
+
+  async function openDb() {
+    const db = await createTestDb();
+    vi.mocked(requireAdmin).mockResolvedValue(undefined);
+    vi.mocked(getDb).mockResolvedValue(db);
+    return db;
+  }
+
+  test("returns the sale to pending and goes back to it with a notice", async () => {
+    const db = await openDb();
+    const id = await seedSale(db);
+    await db.update(sales).set(INVOICED).where(eq(sales.id, id));
+    const { markInvoicePendingAction } = await import("@/app/admin/ventas/actions");
+
+    await expect(markInvoicePendingAction(id)).rejects.toThrow(`NEXT_REDIRECT /admin/ventas/${id}?factura=pendiente`);
+
+    expect(requireAdmin).toHaveBeenCalledOnce();
+    expect(await getSale(db, id)).toMatchObject({ invoiceStatus: "pending", invoiceNumber: null, invoiceType: null });
+  });
+
+  test("a sale that has no invoice to undo goes back with a notice and nothing changes", async () => {
+    const db = await openDb();
+    const id = await seedSale(db);
+    const { markInvoicePendingAction } = await import("@/app/admin/ventas/actions");
+
+    await expect(markInvoicePendingAction(id)).rejects.toThrow(`NEXT_REDIRECT /admin/ventas/${id}?factura=no-se-pudo`);
+
+    expect((await getSale(db, id))?.invoiceStatus).toBe("pending");
+  });
+
+  test("an id that is not a uuid never reaches the database", async () => {
+    vi.mocked(requireAdmin).mockResolvedValue(undefined);
+    const { markInvoicePendingAction } = await import("@/app/admin/ventas/actions");
+
+    await expect(markInvoicePendingAction("x'; drop table sales; --")).rejects.toThrow("NEXT_REDIRECT /admin/ventas");
+    expect(getDb).not.toHaveBeenCalled();
   });
 });

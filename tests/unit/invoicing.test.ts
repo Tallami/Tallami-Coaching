@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { describe, expect, test } from "vitest";
 import {
   InvalidInvoiceError,
@@ -5,6 +6,7 @@ import {
   MAX_INVOICE_BATCH,
   listUninvoicedSales,
   markInvoiceNotRequired,
+  markInvoicePending,
   markInvoiced,
 } from "@/admin/billing/invoicing";
 import { sumMinor } from "@/admin/metrics/math";
@@ -12,6 +14,7 @@ import { loadMetricSales } from "@/admin/metrics/load";
 import { pendingWork } from "@/admin/metrics/pending";
 import { getSale } from "@/admin/sales/repository";
 import type { Db } from "@/db/client";
+import { sales } from "@/db/schema";
 import { createTestDb } from "../helpers/db";
 import { seedSale } from "../helpers/sales-db";
 
@@ -19,6 +22,10 @@ import { seedSale } from "../helpers/sales-db";
 const NOW = new Date("2026-10-13T18:00:00.000Z");
 const INVOICE = { type: "C", number: "00003-00000045", issuedOn: "2026-10-13" } as const;
 const UNKNOWN_ID = "00000000-0000-4000-8000-000000000000";
+
+async function updateSaleStatus(db: Db, id: string, status: string) {
+  await db.update(sales).set({ status }).where(eq(sales.id, id));
+}
 
 async function invoiceOf(db: Db, id: string) {
   const sale = await getSale(db, id);
@@ -363,5 +370,122 @@ describe("listUninvoicedSales", () => {
 
   test("is empty without sales", async () => {
     expect(await listUninvoicedSales(await createTestDb(), NOW)).toEqual({ rows: [], truncated: false });
+  });
+});
+
+describe("markInvoicePending", () => {
+  test("returns an invoiced sale to pending and clears the invoice data", async () => {
+    const db = await createTestDb();
+    const id = await seedSale(db);
+    await markInvoiced(db, [id], INVOICE, NOW);
+    expect((await invoiceOf(db, id)).status).toBe("issued");
+
+    await expect(markInvoicePending(db, id)).resolves.toEqual({ updated: 1 });
+
+    expect(await invoiceOf(db, id)).toEqual(PENDING_INVOICE);
+  });
+
+  test("returns a sale marked as not requiring an invoice to pending", async () => {
+    const db = await createTestDb();
+    const id = await seedSale(db);
+    await markInvoiceNotRequired(db, [id], NOW);
+
+    await markInvoicePending(db, id);
+
+    expect(await invoiceOf(db, id)).toEqual(PENDING_INVOICE);
+  });
+
+  test("refuses a sale that is already pending, and one that does not exist", async () => {
+    const db = await createTestDb();
+    const id = await seedSale(db);
+
+    await expect(markInvoicePending(db, id)).rejects.toBeInstanceOf(InvoiceNotAllowedError);
+    await expect(markInvoicePending(db, UNKNOWN_ID)).rejects.toBeInstanceOf(InvoiceNotAllowedError);
+    expect(await invoiceOf(db, id)).toEqual(PENDING_INVOICE);
+  });
+
+  test.each([["no-es-un-id"], ["x'; drop table sales; --"], [""], ["__proto__"]])(
+    "an id that is not a uuid (%j) is refused before it reaches the database",
+    async (id) => {
+      await expect(markInvoicePending(await createTestDb(), id)).rejects.toBeInstanceOf(InvalidInvoiceError);
+    },
+  );
+
+  test("only touches that sale: the others keep their invoice", async () => {
+    const db = await createTestDb();
+    const undone = await seedSale(db);
+    const kept = await seedSale(db);
+    await markInvoiced(db, [undone, kept], INVOICE, NOW);
+
+    await markInvoicePending(db, undone);
+
+    expect((await invoiceOf(db, undone)).status).toBe("pending");
+    expect(await invoiceOf(db, kept)).toEqual({
+      status: "issued",
+      type: "C",
+      number: "00003-00000045",
+      on: "2026-10-13",
+    });
+  });
+
+  test("does not touch the payment, the status or the amounts", async () => {
+    const db = await createTestDb();
+    const id = await seedSale(db, { status: "delivered" });
+    const before = await getSale(db, id);
+    await markInvoiced(db, [id], INVOICE, NOW);
+
+    await markInvoicePending(db, id);
+
+    expect(await getSale(db, id)).toMatchObject({
+      status: "delivered",
+      paidOn: before?.paidOn,
+      amountMinor: before?.amountMinor,
+      amountArsMinor: before?.amountArsMinor,
+      amountUsdMinor: before?.amountUsdMinor,
+    });
+  });
+
+  test("the sale is back in the list to invoice, and in the pending total of the overview", async () => {
+    const db = await createTestDb();
+    const id = await seedSale(db, { paidOn: "2026-10-05", amount: "40" });
+    await markInvoiced(db, [id], INVOICE, NOW);
+    expect((await listUninvoicedSales(db, NOW)).rows).toEqual([]);
+    expect(pendingWork(await loadMetricSales(db, NOW), NOW).uninvoiced.count).toBe(0);
+
+    await markInvoicePending(db, id);
+
+    const { rows } = await listUninvoicedSales(db, NOW);
+    expect(rows.map((row) => row.id)).toEqual([id]);
+    const overview = pendingWork(await loadMetricSales(db, NOW), NOW).uninvoiced;
+    expect(overview).toEqual({ count: 1, arsMinor: 6_000_000, usdMinor: 4000 });
+  });
+
+  test("fixing a typo is undo and mark again: the new number replaces the wrong one", async () => {
+    const db = await createTestDb();
+    const id = await seedSale(db);
+    await markInvoiced(db, [id], { ...INVOICE, number: "00003-0000045" }, NOW);
+
+    await markInvoicePending(db, id);
+    await markInvoiced(db, [id], { type: "E", number: "00003-00000045", issuedOn: "2026-10-12" }, NOW);
+
+    expect(await invoiceOf(db, id)).toEqual({
+      status: "issued",
+      type: "E",
+      number: "00003-00000045",
+      on: "2026-10-12",
+    });
+  });
+
+  test("a cancelled sale that had an invoice can also be returned to pending", async () => {
+    const db = await createTestDb();
+    const id = await seedSale(db);
+    await markInvoiced(db, [id], INVOICE, NOW);
+    await updateSaleStatus(db, id, "cancelled");
+
+    await markInvoicePending(db, id);
+
+    expect((await invoiceOf(db, id)).status).toBe("pending");
+    // Sigue sin aparecer para facturar: una venta cancelada no es ingreso.
+    expect((await listUninvoicedSales(db, NOW)).rows).toEqual([]);
   });
 });

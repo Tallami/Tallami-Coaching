@@ -4,6 +4,7 @@ import { describe, expect, test } from "vitest";
 import { buildBilling, type BillingData } from "@/admin/billing/billing-data";
 import { BillingView } from "@/admin/billing/billing-view";
 import { INITIAL_INVOICING_FORM_STATE } from "@/admin/billing/form-state";
+import { CONFIRM_NOT_REQUIRED_ABOVE } from "@/admin/billing/uninvoiced-list";
 import type { MetricSale } from "@/admin/metrics/metric-sale";
 import type { MonotributoSettings } from "@/admin/metrics/monotributo";
 import { NOW, sale } from "../helpers/metric-sales";
@@ -163,6 +164,17 @@ describe("BillingView", () => {
     expect(markup).toContain('name="intent"');
   });
 
+  test("asks to confirm before marking many sales as not requiring an invoice, with a native dialog", () => {
+    const markup = render(build({ rows: [saleRow()] }));
+
+    expect(CONFIRM_NOT_REQUIRED_ABOVE).toBe(5);
+    expect(markup).toContain("<dialog");
+    expect(markup).toContain('aria-labelledby="bulk-confirm-title"');
+    expect(markup).toContain("Sí, marcar");
+    expect(markup).toContain("Cancelar");
+    expect(markup).toContain("volver a pendiente");
+  });
+
   test("warns when the list was cut", () => {
     const markup = render(build({ rows: [saleRow()], truncated: true }));
 
@@ -207,5 +219,8 @@ describe("BillingView", () => {
     expect(markup).toContain('name="hasta"');
     expect(markup).toContain('name="factura"');
     expect(markup).toContain("Descargar CSV");
+    // Dice qué dos cotizaciones trae el archivo.
+    expect(markup).toContain("el tipo de cambio de la moneda cobrada, la");
+    expect(markup).toContain("cotización del dólar (con su fuente y su fecha)");
   });
 });

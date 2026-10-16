@@ -38,7 +38,9 @@ const CSV_HEADER_LINE = [
   "Pesos",
   "Dólares",
   "Tipo de cambio",
+  "Cotización del dólar",
   "Fuente",
+  "Fecha de cotización",
   "Medio de pago",
   "Estado",
   "Factura",
@@ -334,7 +336,8 @@ test.describe("exports", () => {
     expect(rows[0]).toEqual(CSV_HEADER_LINE);
     // Solo la venta filtrada, con los números listos para Excel.
     expect(rows).toHaveLength(2);
-    expect(rows[1].slice(1)).toEqual([
+    // Hasta la fuente de la cotización: en pesos, 40 dólares a 1.500 (Tipo de cambio y Cotización del dólar).
+    expect(rows[1].slice(1, 12)).toEqual([
       student,
       "",
       "Clase 1 a 1",
@@ -344,15 +347,13 @@ test.describe("exports", () => {
       "60000,00",
       "40,00",
       "1500,00",
+      "1500,00",
       "valor fijo de prueba",
-      "Transferencia",
-      "Cobrada",
-      "Sin facturar",
-      "",
-      "",
-      "",
     ]);
+    // Después de la fecha de cotización: medio de pago, estado y la factura (todavía sin datos).
+    expect(rows[1].slice(13)).toEqual(["Transferencia", "Cobrada", "Sin facturar", "", "", ""]);
     expect(rows[1][0]).toMatch(/^\d{2}\/\d{2}\/\d{4}$/);
+    expect(rows[1][12]).toMatch(/^\d{2}\/\d{2}\/\d{4}$/);
   });
 
   test("the export link carries the filters of the list and the file respects them", async ({ page }) => {
@@ -440,7 +441,7 @@ test.describe("exports", () => {
     const rows = parseCsv(await response.text()).slice(1);
     expect(rows.map((cells) => cells[1]).sort()).toEqual([collected, invoiced].sort());
     const invoicedRow = rows.find((cells) => cells[1] === invoiced)!;
-    expect(invoicedRow.slice(13)).toEqual(["Facturada", "E", number, "02/10/2026"]);
+    expect(invoicedRow.slice(15)).toEqual(["Facturada", "E", number, "02/10/2026"]);
     expect(response.headers()["content-disposition"]).toMatch(/^attachment; filename="facturacion_inicio_a_/);
 
     // Con el estado de la factura como filtro.
@@ -622,5 +623,235 @@ test.describe("settings", () => {
     const button = page.getByRole("button", { name: "Guardar configuración" });
     await whenInteractive(button);
     await expect(button).toBeEnabled();
+  });
+});
+
+/** Marca una venta como facturada desde Facturación y espera a volver. */
+async function invoiceOne(
+  page: Page,
+  student: string,
+  invoice: { type: "C" | "E"; number: string; issuedOn?: string },
+): Promise<void> {
+  await openBilling(page);
+  await pickerOf(page, student).check();
+  await page.getByLabel("Tipo de factura").selectOption(invoice.type);
+  await page.getByLabel("Número de factura").fill(invoice.number);
+  if (invoice.issuedOn) await page.getByLabel("Fecha de la factura").fill(invoice.issuedOn);
+  await mark(page, "Marcar como facturadas");
+  await expect(page).toHaveURL(/guardada=facturadas&cantidad=1$/);
+}
+
+/** La dirección de la ficha de una venta, buscándola en la lista de Ventas por el nombre del alumno. */
+async function saleHref(page: Page, student: string): Promise<string> {
+  await page.goto(`/admin/ventas?q=${encodeURIComponent(student)}`);
+  const href = await rowOf(page, student).getByRole("link", { name: student }).getAttribute("href");
+  expect(href).toMatch(/^\/admin\/ventas\/[0-9a-f-]{36}$/);
+  return href!;
+}
+
+test.describe("undoing an invoice", () => {
+  test.beforeEach(async ({ page }) => {
+    await loginAsAdmin(page);
+  });
+
+  test("an invoiced sale shows its invoice on its page and goes back to pending", async ({ page }) => {
+    const student = uniqueName("Rosa deshace");
+    const wrong = uniqueInvoiceNumber();
+    const right = uniqueInvoiceNumber();
+    await createSale(page, { student });
+    await invoiceOne(page, student, { type: "C", number: wrong, issuedOn: "2026-10-02" });
+    await expect(rowOf(page, student)).toHaveCount(0);
+
+    // La ficha muestra la factura, solo para leer.
+    await page.goto(await saleHref(page, student));
+    const panel = page.getByTestId("invoice-panel");
+    await expect(panel).toContainText("Facturada");
+    await expect(panel).toContainText("Factura C");
+    await expect(panel).toContainText(wrong);
+    await expect(panel).toContainText("02/10/2026");
+
+    await panel.getByRole("button", { name: "Volver a pendiente" }).click();
+
+    await expect(page).toHaveURL(/\/admin\/ventas\/[0-9a-f-]{36}\?factura=pendiente$/);
+    await expect(page.getByRole("status").filter({ hasText: "La venta volvió a pendiente" })).toBeVisible();
+    await expect(panel).toContainText("Sin facturar");
+    await expect(panel).not.toContainText(wrong);
+    await expect(panel.getByRole("button", { name: "Volver a pendiente" })).toHaveCount(0);
+
+    // Vuelve a estar en Facturación, y se corrige: deshacer y marcar de nuevo.
+    await invoiceOne(page, student, { type: "E", number: right });
+    await page.goto(await saleHref(page, student));
+    await expect(page.getByTestId("invoice-panel")).toContainText(right);
+    await expect(page.getByTestId("invoice-panel")).not.toContainText(wrong);
+    await expect(page.getByTestId("invoice-panel")).toContainText("Factura E");
+  });
+
+  test("a sale marked as not requiring an invoice can go back to pending and is listed again", async ({ page }) => {
+    const student = uniqueName("Silvia deshace");
+    await createSale(page, { student });
+    await openBilling(page);
+    await pickerOf(page, student).check();
+    await mark(page, "No requiere factura");
+    await expect(page).toHaveURL(/guardada=sin-factura/);
+    await expect(rowOf(page, student)).toHaveCount(0);
+
+    await page.goto(await saleHref(page, student));
+    const panel = page.getByTestId("invoice-panel");
+    await expect(panel).toContainText("No requiere");
+    await panel.getByRole("button", { name: "Volver a pendiente" }).click();
+    await expect(page).toHaveURL(/\?factura=pendiente$/);
+
+    await openBilling(page);
+    await expect(rowOf(page, student)).toHaveCount(1);
+  });
+
+  test("the panel of a sale that is not invoiced has nothing to undo, and the sale page keeps working", async ({
+    page,
+  }) => {
+    const student = uniqueName("Tomas sin factura");
+    await createSale(page, { student });
+    const href = await saleHref(page, student);
+
+    await page.goto(href);
+
+    const panel = page.getByTestId("invoice-panel");
+    await expect(panel).toContainText("Sin facturar");
+    await expect(panel.getByRole("link", { name: "Facturación" })).toHaveAttribute("href", "/admin/facturacion");
+    await expect(panel.getByRole("button")).toHaveCount(0);
+    // El formulario de la venta sigue ahí.
+    await expect(page.getByRole("button", { name: "Guardar cambios" })).toBeVisible();
+  });
+
+  test("undoing from a stale page says there was no invoice to remove and changes nothing else", async ({
+    context,
+    page,
+  }) => {
+    const student = uniqueName("Ursula vieja");
+    await createSale(page, { student });
+    await invoiceOne(page, student, { type: "C", number: uniqueInvoiceNumber() });
+    const href = await saleHref(page, student);
+    await page.goto(href);
+    await expect(page.getByTestId("invoice-panel")).toContainText("Facturada");
+
+    // Desde otra pestaña, alguien ya la devolvió a pendiente.
+    const other = await context.newPage();
+    await other.goto(href);
+    await other.getByTestId("invoice-panel").getByRole("button", { name: "Volver a pendiente" }).click();
+    await expect(other).toHaveURL(/\?factura=pendiente$/);
+    await other.close();
+
+    await page.getByTestId("invoice-panel").getByRole("button", { name: "Volver a pendiente" }).click();
+
+    await expect(page).toHaveURL(/\?factura=no-se-pudo$/);
+    await expect(page.getByRole("alert").filter({ hasText: "no tenía factura para quitar" })).toBeVisible();
+    await expect(page.getByTestId("invoice-panel")).toContainText("Sin facturar");
+  });
+
+  test("a hand-typed notice on the sale page shows nothing strange", async ({ page }) => {
+    const student = uniqueName("Vera aviso");
+    await createSale(page, { student });
+    const href = await saleHref(page, student);
+
+    for (const query of [
+      "factura=__proto__",
+      "factura=constructor",
+      "factura=%00",
+      "factura=%3Cscript%3E",
+      "__proto__=1",
+    ]) {
+      const response = await page.goto(`${href}?${query}`);
+
+      expect(response?.status(), query).toBe(200);
+      await expect(page.getByRole("heading", { name: "Editar venta" }), query).toBeVisible();
+      await expect(page.getByRole("status").filter({ hasText: "volvió a pendiente" }), query).toHaveCount(0);
+    }
+  });
+
+  test("the sale page with the invoice panel passes the automated accessibility checks", async ({ page }) => {
+    const student = uniqueName("Wanda accesible");
+    await createSale(page, { student });
+    await invoiceOne(page, student, { type: "C", number: uniqueInvoiceNumber() });
+    await page.goto(await saleHref(page, student));
+    await expect(page.getByTestId("invoice-panel")).toContainText("Facturada");
+
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+      .analyze();
+
+    expect(results.violations.map(({ id, nodes }) => ({ id, targets: nodes.map((n) => n.target) }))).toEqual([]);
+  });
+});
+
+test.describe("confirming a big batch of not-required invoices", () => {
+  const BATCH = 6;
+
+  test.beforeEach(async ({ page }) => {
+    await loginAsAdmin(page);
+  });
+
+  /** Carga `BATCH` ventas de alumnos con nombre único, abre Facturación y las elige todas. */
+  async function pickBatch(page: Page, prefix: string): Promise<string[]> {
+    const students = Array.from({ length: BATCH }, () => uniqueName(prefix));
+    for (const student of students) await createSale(page, { student });
+    await openBilling(page);
+    for (const student of students) await pickerOf(page, student).check();
+    return students;
+  }
+
+  test("asks first when more than 5 are chosen: Escape cancels, and 5 or fewer go straight through", async ({
+    page,
+  }) => {
+    const students = await pickBatch(page, "Lote cancelado");
+    const notRequired = page.getByRole("button", { name: "No requiere factura", exact: true });
+
+    await notRequired.click();
+
+    const dialog = page.getByRole("dialog", { name: `¿Marcar ${BATCH} ventas como «No requiere factura»?` });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText("Salen de la lista de pendientes");
+    // Nada cambió ni se fue de la página, y el foco arranca en lo que no hace nada.
+    await expect(page).toHaveURL(/\/admin\/facturacion$/);
+    await expect(dialog.getByRole("button", { name: "Cancelar" })).toBeFocused();
+
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(notRequired).toBeFocused();
+    for (const student of students) await expect(rowOf(page, student)).toHaveCount(1);
+
+    // Con 5 elegidas ya no pregunta.
+    await pickerOf(page, students[0]).uncheck();
+    await notRequired.click();
+    await expect(page).toHaveURL(/guardada=sin-factura&cantidad=\d+$/);
+    await expect(rowOf(page, students[1])).toHaveCount(0);
+    await expect(rowOf(page, students[0])).toHaveCount(1);
+  });
+
+  test("confirming from the dialog marks every chosen sale, and the dialog is keyboard and screen reader friendly", async ({
+    page,
+  }) => {
+    const students = await pickBatch(page, "Lote confirmado");
+    await page.getByRole("button", { name: "No requiere factura", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: /¿Marcar \d+ ventas como «No requiere factura»\?/ });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toHaveAttribute("aria-describedby", "bulk-confirm-description");
+
+    // Con Tab el foco da vueltas por el diálogo (o sale al navegador): nunca cae en la página de atrás.
+    for (let press = 0; press < 6; press += 1) {
+      await page.keyboard.press("Tab");
+      const inDialogOrBrowser = await dialog.evaluate(
+        (element) => document.activeElement === document.body || element.contains(document.activeElement),
+      );
+      expect(inDialogOrBrowser).toBe(true);
+    }
+    const audit = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+      .analyze();
+    expect(audit.violations.map(({ id, nodes }) => ({ id, targets: nodes.map((n) => n.target) }))).toEqual([]);
+
+    await dialog.getByRole("button", { name: /^Sí, marcar \d+ ventas$/ }).click();
+
+    await expect(page).toHaveURL(/guardada=sin-factura&cantidad=\d+$/);
+    for (const student of students) await expect(rowOf(page, student)).toHaveCount(0);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
   });
 });

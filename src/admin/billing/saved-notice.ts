@@ -36,3 +36,48 @@ export function invoicingNotice(params: SearchParams): string | null {
   }
   return null;
 }
+
+/** Qué pasó al volver una venta a pendiente: lo que lleva la dirección de la ficha de la venta. */
+export type InvoiceUndoOutcome = "done" | "refused";
+
+export interface InvoiceUndoNotice {
+  tone: "ok" | "error";
+  text: string;
+}
+
+/**
+ * Los avisos de la ficha de la venta, por el valor de `?factura=`. Es un `Map`:
+ * lo que llega de la dirección es texto del usuario y `__proto__` o
+ * `constructor` no tienen que encontrar nada.
+ */
+const UNDO_NOTICES: ReadonlyMap<string, InvoiceUndoNotice> = new Map([
+  [
+    "pendiente",
+    {
+      tone: "ok",
+      text: "La venta volvió a pendiente y ya no tiene los datos de la factura. Marcala de nuevo en Facturación cuando corresponda.",
+    },
+  ],
+  [
+    "no-se-pudo",
+    {
+      tone: "error",
+      text: "La venta no tenía factura para quitar: ya estaba pendiente o no existe.",
+    },
+  ],
+]);
+
+const UNDO_PARAM_BY_OUTCOME: Record<InvoiceUndoOutcome, string> = {
+  done: "pendiente",
+  refused: "no-se-pudo",
+};
+
+/** La dirección de la venta `id` a la que vuelve la acción de volver a pendiente. */
+export function invoiceUndoPath(id: string, outcome: InvoiceUndoOutcome): string {
+  return `/admin/ventas/${id}?factura=${UNDO_PARAM_BY_OUTCOME[outcome]}`;
+}
+
+/** El aviso de la ficha de la venta para los parámetros de la dirección, o `null` si no hay nada que avisar. */
+export function invoiceUndoNotice(params: SearchParams): InvoiceUndoNotice | null {
+  return UNDO_NOTICES.get(firstValue(params.factura) ?? "") ?? null;
+}

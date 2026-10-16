@@ -9,6 +9,7 @@ import {
   useSyncExternalStore,
   useTransition,
   type FormEvent,
+  type MouseEvent,
 } from "react";
 import { INITIAL_INVOICING_FORM_STATE, type InvoicingAction } from "@/admin/billing/form-state";
 import type { UninvoicedGroupView, UninvoicedRowView } from "@/admin/billing/uninvoiced-views";
@@ -40,6 +41,14 @@ interface UninvoicedListProps {
 }
 
 const SALES_PATH = "/admin/ventas";
+
+/**
+ * Con más ventas elegidas que estas, "No requiere factura" pide confirmar: saca
+ * de la lista todas las ventas de una vez (con "Elegir todas", hasta mil) y un
+ * clic de más no se tiene que pagar con una lista vacía. Se puede deshacer, pero
+ * de a una venta por vez.
+ */
+export const CONFIRM_NOT_REQUIRED_ABOVE = 5;
 
 // Un snapshot que siempre es `true` en el navegador y `false` al renderizar en
 // el servidor: dice si la página ya está lista para usarse.
@@ -168,6 +177,8 @@ export function UninvoicedList({ groups, today, action }: UninvoicedListProps) {
   const [handledState, setHandledState] = useState(state);
   const [editedFields, setEditedFields] = useState<ReadonlySet<string>>(new Set());
   const formRef = useRef<HTMLFormElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
   const hydrated = useSyncExternalStore(subscribeNever, isHydrated, isNotHydrated);
 
@@ -218,7 +229,17 @@ export function UninvoicedList({ groups, today, action }: UninvoicedListProps) {
     // El botón que se tocó (`intent`) viaja con el formulario.
     const submitter = (event.nativeEvent as SubmitEvent).submitter;
     const formData = new FormData(event.currentTarget, submitter);
+    // Si se confirmó desde el diálogo, se cierra: el resultado se ve en la lista.
+    if (dialogRef.current?.open) dialogRef.current.close();
     startTransition(() => dispatch(formData));
+  }
+
+  /** "No requiere factura" con muchas ventas elegidas: antes de marcar, el diálogo pide confirmar. */
+  function askToConfirm(event: MouseEvent<HTMLButtonElement>) {
+    if (chosenRows.length <= CONFIRM_NOT_REQUIRED_ABOVE) return;
+    event.preventDefault();
+    dialogRef.current?.showModal();
+    cancelRef.current?.focus();
   }
 
   const everyRowChosen = allRows.length > 0 && chosenRows.length === allRows.length;
@@ -371,12 +392,54 @@ export function UninvoicedList({ groups, today, action }: UninvoicedListProps) {
             <Button type="submit" name="intent" value="invoiced" disabled={isBusy}>
               {isSaving ? "Guardando…" : "Marcar como facturadas"}
             </Button>
-            <Button type="submit" name="intent" value="not_required" variant="ink-outline" disabled={isBusy}>
+            <Button
+              type="submit"
+              name="intent"
+              value="not_required"
+              variant="ink-outline"
+              disabled={isBusy}
+              onClick={askToConfirm}
+            >
               {isSaving ? "Guardando…" : "No requiere factura"}
             </Button>
           </div>
         </div>
       </div>
+
+      {/* Dentro del formulario, así su botón de confirmar manda el mismo `intent` que el de la barra. */}
+      <dialog
+        ref={dialogRef}
+        aria-labelledby="bulk-confirm-title"
+        aria-describedby="bulk-confirm-description"
+        onClick={(event) => {
+          // Un clic en el fondo oscuro (fuera del recuadro) cierra, igual que Escape.
+          if (event.target === dialogRef.current) dialogRef.current?.close();
+        }}
+        className="m-auto w-[min(32rem,calc(100vw-2rem))] border-2 border-ink bg-white p-0 text-ink backdrop:bg-stage/70"
+      >
+        <div className="p-5">
+          <h3 id="bulk-confirm-title" className="text-[1.375rem] leading-tight font-extrabold [font-stretch:75%]">
+            {`¿Marcar ${chosenRows.length} ventas como «No requiere factura»?`}
+          </h3>
+          <p id="bulk-confirm-description" className="mt-2 text-ink-2">
+            Salen de la lista de pendientes y no se facturan. Si fue un error, podés volver a pendiente cada una desde
+            su ficha en Ventas, de a una por vez.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 border-t-2 border-ink bg-paper px-5 py-4">
+          <Button
+            ref={cancelRef}
+            type="button"
+            variant="ink-outline"
+            onClick={() => dialogRef.current?.close()}
+          >
+            Cancelar
+          </Button>
+          <Button type="submit" name="intent" value="not_required" disabled={isBusy}>
+            {`Sí, marcar ${chosenRows.length} ventas`}
+          </Button>
+        </div>
+      </dialog>
     </form>
   );
 }

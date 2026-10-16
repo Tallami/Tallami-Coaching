@@ -3,7 +3,7 @@
 // Quita el BOM del principio. No valida: lee lo que escribe `salesToCsv`.
 
 export function parseCsv(text: string, separator = ";"): string[][] {
-  const body = text.startsWith("﻿") ? text.slice(1) : text;
+  const body = text.startsWith("\uFEFF") ? text.slice(1) : text;
   const rows: string[][] = [];
   let row: string[] = [];
   let cell = "";

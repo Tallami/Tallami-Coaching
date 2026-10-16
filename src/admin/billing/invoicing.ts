@@ -22,6 +22,7 @@ import { fieldErrorsOf } from "@/admin/form-errors";
 import { saleRowColumns, toSaleRow, type SaleRow } from "@/admin/sales/sale-row";
 import type { Db } from "@/db/client";
 import { customers, sales } from "@/db/schema";
+import { isUuid } from "@/db/uuid";
 
 export { MAX_INVOICE_BATCH } from "@/admin/billing/schema";
 
@@ -47,10 +48,11 @@ export class InvalidInvoiceError extends Error {
 
 /** Alguna venta elegida no se puede marcar (ya tiene factura, no está cobrada o no existe). No se cambió ninguna. */
 export class InvoiceNotAllowedError extends Error {
-  constructor(readonly rejected: number) {
-    super(
-      `${rejected === 1 ? "Una de las ventas elegidas ya no se puede marcar" : `${rejected} de las ventas elegidas ya no se pueden marcar`}: ya tiene factura, no está cobrada o no existe. No se cambió ninguna; recargá la página y elegí de nuevo.`,
-    );
+  constructor(
+    readonly rejected: number,
+    message: string = `${rejected === 1 ? "Una de las ventas elegidas ya no se puede marcar" : `${rejected} de las ventas elegidas ya no se pueden marcar`}: ya tiene factura, no está cobrada o no existe. No se cambió ninguna; recargá la página y elegí de nuevo.`,
+  ) {
+    super(message);
     this.name = "InvoiceNotAllowedError";
   }
 }
@@ -124,6 +126,29 @@ export async function markInvoiceNotRequired(
     { invoiceStatus: "not_required", invoiceType: null, invoiceNumber: null, invoicedOn: null },
     todayInArgentina(now),
   );
+}
+
+/**
+ * Devuelve una venta facturada (o marcada "no requiere factura") a pendiente y
+ * borra los datos de su factura: tipo, número y fecha. Es el deshacer de
+ * `markInvoiced` y de `markInvoiceNotRequired`; para corregir un número mal
+ * escrito se deshace y se vuelve a marcar. No toca el cobro ni los montos.
+ * Tira `InvoiceNotAllowedError` si la venta ya está pendiente o no existe, e
+ * `InvalidInvoiceError` si el id no es un uuid (nunca llega a la base).
+ */
+export async function markInvoicePending(db: Db, id: string): Promise<{ updated: number }> {
+  if (!isUuid(id)) {
+    throw new InvalidInvoiceError({ ids: "La venta no es válida. Recargá la página y volvé a intentar." });
+  }
+  const updated = await db
+    .update(sales)
+    .set({ invoiceStatus: "pending", invoiceType: null, invoiceNumber: null, invoicedOn: null })
+    .where(and(eq(sales.id, id.toLowerCase()), inArray(sales.invoiceStatus, ["issued", "not_required"])))
+    .returning({ id: sales.id });
+  if (updated.length === 0) {
+    throw new InvoiceNotAllowedError(1, "Esa venta no tenía factura para quitar: ya estaba pendiente o no existe.");
+  }
+  return { updated: updated.length };
 }
 
 /**

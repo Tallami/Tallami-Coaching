@@ -48,7 +48,7 @@ describe("salesToCsv", () => {
   test("csv uses semicolons, comma decimals and a BOM", () => {
     const csv = salesToCsv([row()]);
 
-    expect(csv.startsWith("﻿")).toBe(true);
+    expect(csv.startsWith("\uFEFF")).toBe(true);
     const [headers, data] = parseCsv(csv);
     expect(headers).toEqual([
       "Fecha de cobro",
@@ -61,7 +61,9 @@ describe("salesToCsv", () => {
       "Pesos",
       "Dólares",
       "Tipo de cambio",
+      "Cotización del dólar",
       "Fuente",
+      "Fecha de cotización",
       "Medio de pago",
       "Estado",
       "Factura",
@@ -69,6 +71,7 @@ describe("salesToCsv", () => {
       "Número",
       "Fecha de factura",
     ]);
+    expect(headers).toHaveLength(19);
     expect(CSV_HEADERS).toEqual(headers);
     expect(data).toEqual([
       "12/10/2026",
@@ -81,7 +84,9 @@ describe("salesToCsv", () => {
       "180000,00",
       "120,00",
       "1500,00",
+      "1500,00",
       "BCRA (oficial)",
+      "09/10/2026",
       "Mercado Pago",
       "Cobrada",
       "Sin facturar",
@@ -111,17 +116,85 @@ describe("salesToCsv", () => {
     expect(data[6]).toBe("1234567,89");
     expect(data[7]).toBe("34567890,12");
     expect(data[8]).toBe("23045,26");
-    // La cotización guarda hasta 4 decimales y se escribe sin ceros de más.
-    expect(data[9]).toBe("1500,50");
-    for (const cell of [data[6], data[7], data[8], data[9]]) {
+    // Las cotizaciones guardan hasta 4 decimales y se escriben sin ceros de más.
+    expect(data[9]).toBe("280,00");
+    expect(data[10]).toBe("1500,50");
+    for (const cell of [data[6], data[7], data[8], data[9], data[10]]) {
       expect(cell).toMatch(/^\d+,\d{2,4}$/);
     }
   });
 
   test("an exchange rate keeps its 4 decimals when it needs them", () => {
-    const [, data] = parseCsv(salesToCsv([row({ arsPerUsd: "301.5651" })]));
+    const [, data] = parseCsv(salesToCsv([row({ arsPerUnit: "12.3400", arsPerUsd: "301.5651" })]));
 
-    expect(data[9]).toBe("301,5651");
+    expect(data[9]).toBe("12,34");
+    expect(data[10]).toBe("301,5651");
+  });
+
+  test("a BRL sale explains each rate: Monto x Tipo de cambio = Pesos and Pesos / Cotización del dólar = Dólares", () => {
+    const [, data] = parseCsv(
+      salesToCsv([
+        row({
+          currency: "BRL",
+          amountMinor: 10_000,
+          arsPerUnit: "280.0000",
+          arsPerUsd: "1500.0000",
+          amountArsMinor: 2_800_000,
+          amountUsdMinor: 1867,
+          rateQuotedOn: "2026-10-09",
+        }),
+      ]),
+    );
+
+    const [currency, monto, pesos, dolares, tipoDeCambio, cotizacion] = [
+      data[5],
+      data[6],
+      data[7],
+      data[8],
+      data[9],
+      data[10],
+    ];
+    expect(currency).toBe("BRL");
+    // Los números del archivo, leídos como los lee Excel en español (coma decimal).
+    const asNumber = (cell: string) => Number(cell.replace(",", "."));
+    expect(asNumber(monto) * asNumber(tipoDeCambio)).toBeCloseTo(asNumber(pesos), 2);
+    // El dólar del día se redondea al centavo: la cuenta cierra con menos de un centavo de diferencia.
+    expect(Math.abs(asNumber(pesos) / asNumber(cotizacion) - asNumber(dolares))).toBeLessThan(0.01);
+    expect([monto, pesos, dolares, tipoDeCambio, cotizacion]).toEqual([
+      "100,00",
+      "28000,00",
+      "18,67",
+      "280,00",
+      "1500,00",
+    ]);
+  });
+
+  test("a peso sale has a Tipo de cambio of 1 and still gives the dollar rate it was converted with", () => {
+    const [, data] = parseCsv(
+      salesToCsv([
+        row({
+          currency: "ARS",
+          amountMinor: 6_000_000,
+          arsPerUnit: "1.0000",
+          arsPerUsd: "1500.0000",
+          amountArsMinor: 6_000_000,
+          amountUsdMinor: 4000,
+        }),
+      ]),
+    );
+
+    expect(data.slice(5, 11)).toEqual(["ARS", "60000,00", "60000,00", "40,00", "1,00", "1500,00"]);
+  });
+
+  test("the quote date is the day of the rate used, and empty for a rate typed by hand", () => {
+    const quoted = parseCsv(salesToCsv([row({ rateQuotedOn: "2026-10-09" })]))[1];
+    const manual = parseCsv(salesToCsv([row({ rateSource: "manual", rateQuotedOn: null })]))[1];
+
+    // Una cotización de un viernes puede usarse para un cobro del lunes: la fecha de cotización no es la de cobro.
+    expect(quoted[11]).toBe("BCRA (oficial)");
+    expect(quoted[12]).toBe("09/10/2026");
+    expect(manual[11]).toBe("cargado a mano");
+    expect(manual[12]).toBe("");
   });
 
   test("an invoiced sale writes its type, number and date as dd/mm/yyyy", () => {
@@ -136,14 +209,14 @@ describe("salesToCsv", () => {
       ]),
     );
 
-    expect(data.slice(13)).toEqual(["Facturada", "E", "00003-00000045", "02/10/2026"]);
+    expect(data.slice(15)).toEqual(["Facturada", "E", "00003-00000045", "02/10/2026"]);
   });
 
   test("a sale without a payment date leaves the cell empty", () => {
     const [, data] = parseCsv(salesToCsv([row({ status: "pending", paidOn: null })]));
 
     expect(data[0]).toBe("");
-    expect(data[12]).toBe("Pendiente");
+    expect(data[14]).toBe("Pendiente");
   });
 
   test("writes one line per sale, in the order given, with CRLF line breaks", () => {
@@ -248,7 +321,7 @@ describe("csvFilename", () => {
 
 describe("csvResponse", () => {
   test("is a download, not cached, typed as csv and not sniffable", async () => {
-    const response = csvResponse("﻿hola;mundo\r\n", "ventas_inicio_a_2026-10-15.csv");
+    const response = csvResponse("\uFEFFhola;mundo\r\n", "ventas_inicio_a_2026-10-15.csv");
 
     expect(response.status).toBe(200);
     expect(response.headers.get("Content-Type")).toBe("text/csv; charset=utf-8");

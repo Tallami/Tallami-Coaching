@@ -185,7 +185,7 @@ describe("billingExportResponse", () => {
     expect(students(rows)).toEqual(["Entregada", "Facturada", "Sin factura", "Cobrada"]);
     // Trae los datos de la factura para el contador.
     const invoiced = rows.find((cells) => cells[1] === "Facturada") as string[];
-    expect(invoiced.slice(13)).toEqual(["Facturada", "C", "00003-00000045", "13/10/2026"]);
+    expect(invoiced.slice(15)).toEqual(["Facturada", "C", "00003-00000045", "13/10/2026"]);
   });
 
   test("respects the invoice state and the dates, and ignores a status filter", async () => {
