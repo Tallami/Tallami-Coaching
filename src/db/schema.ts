@@ -26,6 +26,7 @@ import {
   check,
   date,
   index,
+  integer,
   jsonb,
   numeric,
   pgTable,
@@ -207,6 +208,23 @@ export const interestEvents = pgTable(
     index("interest_events_created_at_idx").on(t.createdAt),
     index("interest_events_ip_hash_created_at_idx").on(t.ipHash, t.createdAt),
   ],
+).enableRLS();
+
+/**
+ * Clics que el registro descartó en silencio por pasarse del tope de todo el
+ * sitio (por minuto o por hora, ver `src/admin/interest/record.ts`), contados por
+ * día de Argentina. Es un solo número por día, sin datos de nadie: la página
+ * Servicios lo muestra como "N clics descartados por exceso". Se borra a los 400
+ * días junto con los clics.
+ */
+export const interestDrops = pgTable(
+  "interest_drops",
+  {
+    /** Día de Argentina, "AAAA-MM-DD". */
+    day: date("day").primaryKey(),
+    dropped: integer("dropped").notNull(),
+  },
+  (t) => [check("interest_drops_dropped_positive", sql`${t.dropped} > 0`)],
 ).enableRLS();
 
 export type Customer = typeof customers.$inferSelect;

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { PERIOD_LABELS } from "@/admin/metrics/period";
 import { formatRangeLabel } from "@/admin/overview/labels";
 import { PeriodSelector } from "@/admin/overview/period-selector";
-import { clicksCountText, salesCountText } from "@/admin/services/labels";
+import { clicksCountText, droppedClicksText, salesCountText } from "@/admin/services/labels";
 import type { ServicesReport } from "@/admin/services/report";
 import { ServicesTable } from "@/admin/services/services-table";
 import { EmptyState } from "@/admin/ui/empty-state";
@@ -32,8 +32,9 @@ function Notes() {
           pack (sus columnas de ventas e ingresos son solo las de la clase).
         </li>
         <li>
-          Los clics son anónimos (sin cookies ni datos personales). Se descartan los bots y las ráfagas de una misma
-          conexión, así que son una guía y no un conteo exacto de personas.
+          Los clics son anónimos (sin cookies ni datos personales). Se descartan los bots, las ráfagas de una misma
+          conexión y todo lo que pase de 200 clics por minuto o de 2.000 por hora entre todos (si pasó en el período,
+          arriba figura cuántos), así que son una guía y no un conteo exacto de personas.
         </li>
         <li>
           Los gráficos muestran los dólares cobrados por mes en los últimos 6 meses, el último todavía abierto.
@@ -89,6 +90,11 @@ function ServicesBody({ report }: { report: ServicesReport }) {
           {PERIOD_LABELS[period]}, {formatRangeLabel(range, today)}: {salesCountText(totals.sales)} por{" "}
           {formatMoney(totals.incomeUsdMinor, "USD")} y {clicksCountText(totals.clicks)}.
         </p>
+        {report.droppedClicks > 0 ? (
+          <p data-testid="services-dropped" className="mt-1 mb-1 text-[0.9375rem] text-ink-2">
+            {droppedClicksText(report.droppedClicks)}.
+          </p>
+        ) : null}
         <p className="mb-4 max-w-3xl text-[0.9375rem] text-ink-2">
           Para cada servicio, conversión: ventas cobradas ÷ clics en Reservar del mismo período.
         </p>

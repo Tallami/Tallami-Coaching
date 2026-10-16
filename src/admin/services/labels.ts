@@ -27,3 +27,8 @@ export function salesCountText(count: number): string {
 export function clicksCountText(count: number): string {
   return `${count} ${count === 1 ? "clic" : "clics"} en Reservar`;
 }
+
+/** "1 clic descartado por exceso", "12 clics descartados por exceso". */
+export function droppedClicksText(count: number): string {
+  return `${count} ${count === 1 ? "clic descartado" : "clics descartados"} por exceso`;
+}

@@ -5,8 +5,9 @@
 // `delete` sobre el índice de `created_at`.
 
 import { lt } from "drizzle-orm";
+import { todayInArgentina } from "@/admin/dates";
 import type { Db } from "@/db/client";
-import { interestEvents } from "@/db/schema";
+import { interestDrops, interestEvents } from "@/db/schema";
 
 /** Días que se conserva un clic. */
 export const INTEREST_RETENTION_DAYS = 400;
@@ -15,10 +16,14 @@ export const PURGE_EVERY_MS = 60 * 60 * 1000;
 
 const DAY_MS = 86_400_000;
 
-/** Borra los clics de más de `INTEREST_RETENTION_DAYS` días (el que cumple justo 400 se queda). */
+/**
+ * Borra los clics de más de `INTEREST_RETENTION_DAYS` días (el que cumple justo 400
+ * se queda) y la cuenta de clics descartados de los días anteriores a ese corte.
+ */
 export async function purgeOldInterest(db: Db, now: Date): Promise<void> {
   const cutoff = new Date(now.getTime() - INTEREST_RETENTION_DAYS * DAY_MS);
   await db.delete(interestEvents).where(lt(interestEvents.createdAt, cutoff));
+  await db.delete(interestDrops).where(lt(interestDrops.day, todayInArgentina(cutoff)));
 }
 
 // Por base de datos y no global: así cada base de los tests lleva su propia cuenta y, en el

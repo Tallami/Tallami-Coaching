@@ -61,7 +61,9 @@ export interface ServicesReport {
   /** Los meses de la tendencia, "AAAA-MM", del más viejo al actual. */
   trendMonths: string[];
   totals: { sales: number; incomeUsdMinor: number; clicks: number };
-  /** Hay alguna venta cargada o algún clic en el período: si no, la página invita a cargar la primera venta. */
+  /** Clics que el registro descartó en el período por pasarse del tope de todo el sitio (por minuto o por hora); no están en `totals.clicks`. */
+  droppedClicks: number;
+  /** Hay alguna venta cargada o algún clic (o clic descartado) en el período: si no, la página invita a cargar la primera venta. */
   hasActivity: boolean;
 }
 
@@ -74,12 +76,16 @@ function lastSaleDay(income: readonly { paidOn: string }[], today: string): stri
   return last;
 }
 
-/** Arma la página Servicios del período con las ventas que leen las métricas y los clics del período. */
+/**
+ * Arma la página Servicios del período con las ventas que leen las métricas, los
+ * clics del período y cuántos clics se descartaron por exceso (cero si no se pasa).
+ */
 export function buildServicesReport(
   sales: readonly MetricSale[],
   clicks: readonly ItemClicks[],
   period: Period,
   now: Date,
+  droppedClicks = 0,
 ): ServicesReport {
   const today = todayInArgentina(now);
   const range = periodRange(period, now);
@@ -123,6 +129,7 @@ export function buildServicesReport(
     rows,
     trendMonths: rows[0].trend.map((month) => month.month),
     totals,
-    hasActivity: sales.length > 0 || totals.clicks > 0,
+    droppedClicks,
+    hasActivity: sales.length > 0 || totals.clicks > 0 || droppedClicks > 0,
   };
 }

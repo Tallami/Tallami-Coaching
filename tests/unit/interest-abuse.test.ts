@@ -3,7 +3,7 @@
 
 import { count } from "drizzle-orm";
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
-import { hashIp } from "@/admin/auth/session";
+import { loginIpHash } from "@/admin/auth/login-ip";
 import { handleInterestRequest } from "@/admin/interest/endpoint";
 import { interestIpHash, interestIpKey } from "@/admin/interest/ip-key";
 import {
@@ -107,11 +107,11 @@ describe("interestIpHash: a salt per day", () => {
   });
 
   test("is not the login's hash for the same ip, so it cannot be linked to login_attempts", () => {
-    const login = hashIp("203.0.113.9");
+    const login = loginIpHash("203.0.113.9");
     for (const day of ["2026-10-13", "2026-10-14"]) {
       expect(interestIpHash("203.0.113.9", day)).not.toBe(login);
     }
-    expect(interestIpHash("unknown", "2026-10-13")).not.toBe(hashIp("unknown"));
+    expect(interestIpHash("unknown", "2026-10-13")).not.toBe(loginIpHash("unknown"));
   });
 
   test("differs between visitors", () => {
@@ -127,7 +127,7 @@ describe("interestIpHash: a salt per day", () => {
     expect(rows[0].ipHash).toBe(interestIpHash("203.0.113.9", "2026-10-13"));
     expect(rows[1].ipHash).toBe(interestIpHash("203.0.113.9", "2026-10-14"));
     expect(rows[0].ipHash).not.toBe(rows[1].ipHash);
-    expect(rows.map((row) => row.ipHash)).not.toContain(hashIp("203.0.113.9"));
+    expect(rows.map((row) => row.ipHash)).not.toContain(loginIpHash("203.0.113.9"));
   });
 
   test("the day is Argentina's: 23:59:30 and 00:00:10 there fall on different days", async () => {

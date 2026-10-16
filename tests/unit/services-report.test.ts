@@ -36,6 +36,18 @@ describe("buildServicesReport", () => {
     }
   });
 
+  test("carries the clicks the registry dropped for being over the ceiling, zero by default", () => {
+    expect(buildServicesReport([], clicks(), "thisMonth", NOW).droppedClicks).toBe(0);
+    expect(buildServicesReport([], clicks(), "thisMonth", NOW, 37).droppedClicks).toBe(37);
+  });
+
+  test("dropped clicks count as activity, so the page never hides them behind the empty state", () => {
+    const report = buildServicesReport([], clicks(), "thisMonth", NOW, 5);
+
+    expect(report.hasActivity).toBe(true);
+    expect(report.totals.clicks).toBe(0);
+  });
+
   test("uses the range of the period and tells which day today is", () => {
     const report = buildServicesReport([], clicks(), "thisMonth", NOW);
 

@@ -167,6 +167,34 @@ describe("ServicesView", () => {
     expect(markup).toMatch(/11 clics/);
   });
 
+  describe("clicks dropped for being over the ceiling", () => {
+    function renderWithDropped(dropped: number): string {
+      const report = buildServicesReport(SALES, clicks({ lesson: 8, vodLive: 3 }), "thisMonth", NOW, dropped);
+      return renderToStaticMarkup(createElement(ServicesView, { report }));
+    }
+
+    test("says how many were dropped when there were some in the period", () => {
+      const markup = renderWithDropped(12);
+
+      expect(markup).toMatch(/data-testid="services-dropped"[^>]*>12 clics descartados por exceso/);
+    });
+
+    test("writes a single one in the singular", () => {
+      expect(renderWithDropped(1)).toMatch(/data-testid="services-dropped"[^>]*>1 clic descartado por exceso/);
+    });
+
+    test("says nothing when none were dropped", () => {
+      const markup = renderWithDropped(0);
+
+      expect(markup).not.toContain("services-dropped");
+      expect(markup).not.toContain("descartado");
+    });
+
+    test("explains the ceilings in the notes below the table", () => {
+      expect(render()).toContain("200 clics por minuto o de 2.000 por hora");
+    });
+  });
+
   test("keeps the period selector of the overview, pointing to this page", () => {
     const markup = render();
 

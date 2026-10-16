@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { requireAdmin } from "@/admin/auth/require-admin";
-import { interestByItem } from "@/admin/interest/query";
+import { interestByItem, interestDropsInRange } from "@/admin/interest/query";
 import { loadMetricSales } from "@/admin/metrics/load";
 import { periodRange } from "@/admin/metrics/period";
 import { parsePeriodParam } from "@/admin/overview/period-param";
@@ -20,11 +20,13 @@ export default async function ServicesPage(props: PageProps<"/admin/servicios">)
 
   const db = await getDb();
   const now = new Date();
-  const [sales, clicks] = await Promise.all([
+  const range = periodRange(period, now);
+  const [sales, clicks, droppedClicks] = await Promise.all([
     loadMetricSales(db, now),
-    interestByItem(db, periodRange(period, now)),
+    interestByItem(db, range),
+    interestDropsInRange(db, range),
   ]);
-  const report = buildServicesReport(sales, clicks, period, now);
+  const report = buildServicesReport(sales, clicks, period, now, droppedClicks);
 
   return (
     <AdminShell active="services">
