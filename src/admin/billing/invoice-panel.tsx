@@ -40,7 +40,7 @@ function WhyNoUndo({ sale }: { sale: InvoicePanelProps["sale"] }) {
       <>
         Como la venta está {STATUS_LABELS[sale.status].toLowerCase()}, no se vuelve a pendiente desde acá.
         {sale.invoiceStatus === "issued"
-          ? " Si la factura ya salió en ARCA, anularla es con una nota de crédito, que se hace en ARCA."
+          ? " Para anular una factura ya emitida hace falta una nota de crédito, y esa se hace en ARCA."
           : null}
       </>
     );
