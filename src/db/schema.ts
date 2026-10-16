@@ -7,6 +7,15 @@
 // `number` (los montos de este negocio entran de sobra en los 2^53 que
 // representa un `number`). Los tipos de cambio son `numeric(14,4)` y se leen
 // como texto decimal: la cuenta se hace con `BigInt`, nunca con decimales.
+//
+// Seguridad (RLS): Supabase publica las tablas de `public` en su Data API
+// (PostgREST) para los roles `anon` y `authenticated`. Toda tabla nueva termina
+// en `.enableRLS()`: con la RLS activada y sin políticas esos roles no leen ni
+// escriben nada, y la app no se entera, porque se conecta por `DATABASE_URL`
+// con el dueño de las tablas (`postgres`), que se salta la RLS. No se agrega
+// ninguna política: este panel no usa la Data API. Un test
+// (`tests/unit/db-rls.test.ts`) falla si una tabla del schema se olvida de la
+// RLS o si `npm run db:generate` no dejó su migración.
 
 import { sql, type SQL } from "drizzle-orm";
 import {
@@ -59,7 +68,7 @@ export const customers = pgTable("customers", {
   country: char("country", { length: 2 }),
   notes: text("notes"),
   createdAt: timestamptz("created_at").notNull().defaultNow(),
-});
+}).enableRLS();
 
 export const sales = pgTable(
   "sales",
@@ -135,7 +144,7 @@ export const sales = pgTable(
     index("sales_status_idx").on(t.status),
     index("sales_invoice_status_idx").on(t.invoiceStatus),
   ],
-);
+).enableRLS();
 
 /** Configuración clave-valor (categoría y tope del monotributo, etc.). */
 export const settings = pgTable("settings", {
@@ -145,7 +154,7 @@ export const settings = pgTable("settings", {
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date()),
-});
+}).enableRLS();
 
 /** Cotizaciones consultadas, para no repetir pedidos al BCRA. */
 export const exchangeRates = pgTable(
@@ -158,7 +167,7 @@ export const exchangeRates = pgTable(
     fetchedAt: timestamptz("fetched_at").notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.currency, t.quotedOn] })],
-);
+).enableRLS();
 
 /** Intentos de ingreso al panel; la IP se guarda solo como hash. */
 export const loginAttempts = pgTable(
@@ -170,7 +179,7 @@ export const loginAttempts = pgTable(
     createdAt: timestamptz("created_at").notNull().defaultNow(),
   },
   (t) => [index("login_attempts_ip_hash_created_at_idx").on(t.ipHash, t.createdAt)],
-);
+).enableRLS();
 
 /**
  * Un clic anónimo en un botón de reserva del sitio público (`/api/interest`):
@@ -198,7 +207,7 @@ export const interestEvents = pgTable(
     index("interest_events_created_at_idx").on(t.createdAt),
     index("interest_events_ip_hash_created_at_idx").on(t.ipHash, t.createdAt),
   ],
-);
+).enableRLS();
 
 export type Customer = typeof customers.$inferSelect;
 export type NewCustomer = typeof customers.$inferInsert;

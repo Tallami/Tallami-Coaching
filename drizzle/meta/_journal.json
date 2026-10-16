@@ -15,6 +15,13 @@
       "when": 1792112423417,
       "tag": "0001_interest_events",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792184892117,
+      "tag": "0002_rls_all_tables",
+      "breakpoints": true
     }
   ]
 }
