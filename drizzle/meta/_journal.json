@@ -8,6 +8,13 @@
       "when": 1791943734337,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792112423417,
+      "tag": "0001_interest_events",
+      "breakpoints": true
     }
   ]
 }

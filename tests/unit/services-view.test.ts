@@ -1,0 +1,231 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, test } from "vitest";
+import { SALE_ITEMS, SITE_BOOKING_ITEMS, type SaleItem } from "@/admin/catalog";
+import { MiniBars } from "@/admin/charts/mini-bars";
+import type { ItemClicks } from "@/admin/interest/query";
+import { buildServicesReport } from "@/admin/services/report";
+import { ServicesView } from "@/admin/services/services-view";
+import { NOW, sale } from "../helpers/metric-sales";
+
+function clicks(counts: Partial<Record<SaleItem, number>> = {}): ItemClicks[] {
+  return SITE_BOOKING_ITEMS.map((item) => ({ item, clicks: counts[item] ?? 0 }));
+}
+
+const SALES = [
+  sale({ item: "lesson", dollars: 40, paidOn: "2026-10-05" }),
+  sale({ item: "lesson", dollars: 40, paidOn: "2026-10-05" }),
+  sale({ item: "lesson", dollars: 40, paidOn: "2026-07-05" }),
+  sale({ item: "gamePlan", dollars: 120, paidOn: "2026-10-12" }),
+  sale({ item: "lessonPack", dollars: 140, paidOn: "2026-10-01" }),
+];
+
+function render(sales = SALES, counts: Partial<Record<SaleItem, number>> = { lesson: 8, vodLive: 3 }): string {
+  const report = buildServicesReport(sales, clicks(counts), "thisMonth", NOW);
+  return renderToStaticMarkup(createElement(ServicesView, { report }));
+}
+
+/** La fila de un servicio (el `<tr>` con su `data-item`). */
+function rowOf(markup: string, item: SaleItem): string {
+  const match = markup.match(new RegExp(`<tr[^>]*data-item="${item}"[^>]*>[\\s\\S]*?</tr>`));
+  if (!match) throw new Error(`Falta la fila de ${item}`);
+  return match[0];
+}
+
+/** El texto de una celda por su columna, sin etiquetas. */
+function cellOf(row: string, column: string): string {
+  const match = row.match(new RegExp(`<t[dh][^>]*data-col="${column}"[^>]*>([\\s\\S]*?)</t[dh]>`));
+  if (!match) throw new Error(`Falta la columna ${column}`);
+  return match[1]
+    .replace(/<svg[\s\S]*?<\/svg>/g, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+describe("ServicesView", () => {
+  test("has the columns of the brief, one row per catalog item", () => {
+    const markup = render();
+
+    for (const header of [
+      "Servicio",
+      "Ventas",
+      "Ingresos",
+      "Ticket promedio",
+      "% del total",
+      "Últimos 6 meses",
+      "Última venta",
+      "Clics en Reservar",
+      "Conversión",
+    ]) {
+      expect(markup, header).toContain(`>${header}</th>`);
+    }
+    expect(markup.match(/data-testid="service-row"/g)).toHaveLength(SALE_ITEMS.length);
+  });
+
+  test("explains how conversion is computed", () => {
+    expect(render()).toContain("conversión: ventas cobradas ÷ clics en Reservar");
+  });
+
+  test("writes each number of a row", () => {
+    const lesson = rowOf(render(), "lesson");
+
+    expect(cellOf(lesson, "item")).toBe("Clase 1 a 1");
+    expect(cellOf(lesson, "sales")).toBe("2");
+    expect(cellOf(lesson, "income")).toBe("USD 80,00");
+    expect(cellOf(lesson, "avg")).toBe("USD 40,00");
+    expect(cellOf(lesson, "share")).toBe("23,5 %");
+    expect(cellOf(lesson, "last")).toContain("05/10/2026");
+    expect(cellOf(lesson, "clicks")).toBe("8");
+    expect(cellOf(lesson, "conversion")).toBe("25 %");
+  });
+
+  test("shows a dash, never NaN or Infinity, when there is nothing to divide by", () => {
+    const markup = render();
+    const tournament = rowOf(markup, "tournament");
+
+    expect(cellOf(tournament, "sales")).toBe("0");
+    expect(cellOf(tournament, "avg")).toBe("—");
+    expect(cellOf(tournament, "last")).toBe("—");
+    expect(cellOf(tournament, "clicks")).toBe("0");
+    expect(cellOf(tournament, "conversion")).toBe("—");
+    expect(markup).not.toMatch(/NaN|Infinity|undefined|null/);
+  });
+
+  test("conversion with clicks but no sales is 0 %, not a dash", () => {
+    expect(cellOf(rowOf(render(), "vodLive"), "conversion")).toBe("0 %");
+  });
+
+  test("items without a button show a dash in clicks and conversion, and say why", () => {
+    const markup = render();
+    const pack = rowOf(markup, "lessonPack");
+
+    expect(cellOf(pack, "clicks")).toBe("—");
+    expect(cellOf(pack, "conversion")).toBe("—");
+    expect(cellOf(pack, "sales")).toBe("1");
+    expect(cellOf(rowOf(markup, "other"), "clicks")).toBe("—");
+    expect(markup).toContain("no tienen botón propio en el sitio");
+  });
+
+  test("conversion over 100 % is written as it is and the page explains why", () => {
+    const sales = [sale({ item: "tournament" }), sale({ item: "tournament" }), sale({ item: "tournament" })];
+
+    const markup = render(sales, { tournament: 2 });
+
+    expect(cellOf(rowOf(markup, "tournament"), "conversion")).toBe("150 %");
+    expect(markup).toContain("puede pasar de 100 %");
+  });
+
+  test("each row has a six-bar chart with a text alternative", () => {
+    const lesson = rowOf(render(), "lesson");
+
+    expect(lesson.match(/data-testid="mini-bar"/g)).toHaveLength(6);
+    expect(lesson).toContain('role="img"');
+    expect(lesson).toContain("mayo de 2026: USD 0,00");
+    expect(lesson).toContain("julio de 2026: USD 40,00");
+    expect(lesson).toContain("octubre de 2026: USD 80,00");
+    expect(lesson).toContain("mes en curso");
+  });
+
+  test("the last sale says how long ago it was", () => {
+    const gamePlan = cellOf(rowOf(render(), "gamePlan"), "last");
+
+    expect(gamePlan).toBe("12/10/2026 ayer");
+    expect(cellOf(rowOf(render(), "lesson"), "last")).toBe("05/10/2026 hace 8 días");
+  });
+
+  test("a summary line gives the period, the sales and the clicks", () => {
+    const markup = render();
+
+    expect(markup).toContain("Este mes");
+    expect(markup).toContain("1–13 oct.");
+    expect(markup).toMatch(/4 ventas/);
+    expect(markup).toMatch(/11 clics/);
+  });
+
+  test("keeps the period selector of the overview, pointing to this page", () => {
+    const markup = render();
+
+    expect(markup).toContain('aria-label="Período de los servicios"');
+    expect(markup).toContain('href="/admin/servicios"');
+    expect(markup).toContain('href="/admin/servicios?periodo=30-dias"');
+    expect(markup).toContain('aria-current="true"');
+  });
+
+  test("the table scrolls inside its own container", () => {
+    const markup = render();
+
+    expect(markup).toContain('data-slot="table-container"');
+    expect(markup).toContain('role="region"');
+    expect(markup).toContain('aria-label="Servicios: ventas, ingresos y clics"');
+    expect(markup).toContain('tabindex="0"');
+  });
+
+  test("without sales or clicks it invites to load the first sale instead of drawing zeros", () => {
+    const report = buildServicesReport([], clicks(), "thisMonth", NOW);
+    const markup = renderToStaticMarkup(createElement(ServicesView, { report }));
+
+    expect(markup).toContain("Todavía no hay ventas ni clics");
+    expect(markup).toContain('href="/admin/ventas/nueva"');
+    expect(markup).not.toContain("<table");
+  });
+
+  test("the period selector stays when there is nothing to show, so you can always go back to a period with data", () => {
+    const report = buildServicesReport([], clicks(), "lastMonth", NOW);
+    const markup = renderToStaticMarkup(createElement(ServicesView, { report }));
+
+    expect(markup).not.toContain("<table");
+    expect(markup).toContain('aria-label="Período de los servicios"');
+    expect(markup).toContain('href="/admin/servicios"');
+    expect(markup).toContain('aria-current="true"');
+  });
+
+  test("with clicks but no sales it still shows the table", () => {
+    const report = buildServicesReport([], clicks({ lesson: 4 }), "thisMonth", NOW);
+    const markup = renderToStaticMarkup(createElement(ServicesView, { report }));
+
+    expect(markup).toContain("<table");
+    expect(cellOf(rowOf(markup, "lesson"), "conversion")).toBe("0 %");
+  });
+});
+
+describe("MiniBars", () => {
+  const BARS = [
+    { key: "2026-08", name: "agosto de 2026", value: 4000, valueText: "USD 40,00" },
+    { key: "2026-09", name: "septiembre de 2026", value: 0, valueText: "USD 0,00" },
+    { key: "2026-10", name: "octubre de 2026", value: 8000, valueText: "USD 80,00", isPartial: true },
+  ];
+
+  function bars(data = BARS): string {
+    return renderToStaticMarkup(createElement(MiniBars, { bars: data, label: "Ingresos por mes", partialNote: "mes en curso" }));
+  }
+
+  test("is one image with a name that lists every month, and one titled bar per month", () => {
+    const markup = bars();
+
+    expect(markup).toContain('role="img"');
+    expect(markup).toContain(
+      'aria-label="Ingresos por mes: agosto de 2026 USD 40,00, septiembre de 2026 USD 0,00, octubre de 2026 USD 80,00 (mes en curso)"',
+    );
+    expect(markup.match(/data-testid="mini-bar"/g)).toHaveLength(3);
+    expect(markup).toContain("<title>octubre de 2026: USD 80,00 (mes en curso)</title>");
+  });
+
+  test("the tallest bar fills the height, the others are proportional and zero leaves a stub", () => {
+    const markup = bars();
+    const heights = [...markup.matchAll(/data-testid="mini-bar"[^>]*data-height="(\d+)"/g)].map((match) => Number(match[1]));
+
+    expect(heights).toHaveLength(3);
+    expect(heights[2]).toBeGreaterThan(heights[0]);
+    expect(heights[0]).toBeCloseTo(heights[2] / 2, 0);
+    expect(heights[1]).toBeGreaterThan(0);
+    expect(heights[1]).toBeLessThan(heights[0]);
+  });
+
+  test("a series of zeros still draws a baseline and no NaN", () => {
+    const markup = bars(BARS.map((bar) => ({ ...bar, value: 0, valueText: "USD 0,00" })));
+
+    expect(markup).not.toContain("NaN");
+    expect(markup.match(/data-testid="mini-bar"/g)).toHaveLength(3);
+  });
+});

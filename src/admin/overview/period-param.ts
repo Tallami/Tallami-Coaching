@@ -28,7 +28,12 @@ export function parsePeriodParam(value: string | string[] | undefined): Period {
   return (slug !== undefined ? PERIOD_BY_SLUG.get(slug) : undefined) ?? DEFAULT_PERIOD;
 }
 
-/** A dónde lleva el selector para ese período (el de por defecto queda sin parámetro). */
+/** A dónde lleva el selector de la página `basePath` para ese período (el de por defecto queda sin parámetro). */
+export function periodHref(basePath: string, period: Period): string {
+  return period === DEFAULT_PERIOD ? basePath : `${basePath}?periodo=${PERIOD_SLUGS[period]}`;
+}
+
+/** A dónde lleva el selector del Resumen para ese período. */
 export function overviewHref(period: Period): string {
-  return period === DEFAULT_PERIOD ? "/admin" : `/admin?periodo=${PERIOD_SLUGS[period]}`;
+  return periodHref("/admin", period);
 }

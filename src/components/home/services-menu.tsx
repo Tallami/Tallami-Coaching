@@ -9,6 +9,7 @@ import {
   type Service,
 } from "@/content/services";
 import { formatUsd } from "@/lib/format";
+import { BookingLink } from "./booking-link";
 import styles from "./services-menu.module.css";
 
 interface PriceRowProps {
@@ -60,7 +61,9 @@ async function ServiceItem({ service }: { service: Service }) {
       />
       <p>{description}</p>
       <Button asChild variant="ink-outline" size="sm">
-        <a href={bookingHref(id)}>{t(`items.${id}.cta`)}</a>
+        <BookingLink item={id} locale={locale} href={bookingHref(id)}>
+          {t(`items.${id}.cta`)}
+        </BookingLink>
       </Button>
     </li>
   );
@@ -80,7 +83,9 @@ async function ProSeasonCard() {
       />
       <p>{t("pro.description")}</p>
       <Button asChild>
-        <a href={bookingHref("proSeason")}>{t("pro.cta")}</a>
+        <BookingLink item="proSeason" locale={locale} href={bookingHref("proSeason")}>
+          {t("pro.cta")}
+        </BookingLink>
       </Button>
     </div>
   );

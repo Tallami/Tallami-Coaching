@@ -18,6 +18,37 @@ export const SALE_ITEMS = [
 ] as const;
 export type SaleItem = (typeof SALE_ITEMS)[number];
 
+/**
+ * Lo que el sitio público puede avisar con un clic en "Reservar" (`/api/interest`):
+ * todo lo que se vende menos "Otro", que no es un servicio con botón. El pack de
+ * clases está en la lista porque es un ítem del catálogo, aunque hoy el sitio no
+ * tenga un botón propio para él (ver `SITE_BOOKING_ITEMS`).
+ */
+export const INTEREST_ITEMS = [
+  "vodRecorded",
+  "vodLive",
+  "lesson",
+  "lessonPack",
+  "gamePlan",
+  "tournament",
+  "proSeason",
+] as const satisfies readonly Exclude<SaleItem, "other">[];
+export type InterestItem = (typeof INTEREST_ITEMS)[number];
+
+/**
+ * Los ítems que tienen un botón de reserva en el sitio público: los cinco
+ * servicios del menú y Temporada Pro (`src/components/home/services-menu.tsx`).
+ * Los demás ítems del catálogo no tienen clics que contar.
+ */
+export const SITE_BOOKING_ITEMS: readonly InterestItem[] = [
+  ...SERVICES.map((service) => service.id),
+  "proSeason",
+];
+
+/** Los idiomas del sitio (los mismos de `src/i18n/routing.ts`; un test cuida que no se separen). */
+export const INTEREST_LOCALES = ["es", "pt", "en"] as const;
+export type InterestLocale = (typeof INTEREST_LOCALES)[number];
+
 export const CURRENCIES = ["USD", "ARS", "BRL", "USDT"] as const;
 export type Currency = (typeof CURRENCIES)[number];
 

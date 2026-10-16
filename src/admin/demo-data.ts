@@ -18,6 +18,8 @@ import {
   type SaleItem,
   type SaleStatus,
 } from "@/admin/catalog";
+import { buildDemoInterest, type DemoInterestEvent } from "@/admin/demo-interest";
+import { createRandom, pickWeighted, type Random } from "@/admin/demo-random";
 import type { MonotributoSettings } from "@/admin/metrics/monotributo";
 import { addDays, addMonths, firstOfMonth, lastOfMonth } from "@/admin/metrics/period";
 import type { NewCustomer, NewSale } from "@/db/schema";
@@ -29,6 +31,8 @@ export type DemoSale = NewSale & { id: string };
 export interface DemoData {
   customers: DemoCustomer[];
   sales: DemoSale[];
+  /** Clics de ejemplo en los botones de reserva del sitio (ver `demo-interest.ts`). */
+  interest: DemoInterestEvent[];
 }
 
 /**
@@ -44,31 +48,6 @@ export const DEMO_MONOTRIBUTO_SETTINGS: MonotributoSettings = {
 // --- Números al azar con semilla fija --------------------------------------
 
 const SEED = 0x5eed_c0de;
-const TWO_POW_32 = 4_294_967_296;
-
-/** mulberry32: un generador chico y determinístico (mismo resultado en cualquier motor). */
-function createRandom(seed: number): () => number {
-  let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let t = state;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / TWO_POW_32;
-  };
-}
-
-type Random = () => number;
-
-function pickWeighted<T>(random: Random, options: readonly (readonly [T, number])[]): T {
-  const total = options.reduce((sum, [, weight]) => sum + weight, 0);
-  let roll = random() * total;
-  for (const [value, weight] of options) {
-    roll -= weight;
-    if (roll < 0) return value;
-  }
-  return options[options.length - 1][0];
-}
 
 // --- Alumnos ----------------------------------------------------------------
 
@@ -496,8 +475,9 @@ function withInvoices(drafts: readonly SaleDraft[], today: string, random: Rando
 
 /**
  * Los datos de ejemplo para un día "AAAA-MM-DD" (hoy en Argentina): 25 alumnos
- * y unas 120 ventas en 14 meses. Todos los servicios tienen ventas, salvo la
- * Temporada Pro, que no vendió en los últimos 90 días.
+ * y unas 120 ventas en 14 meses, más los clics en "Reservar" que las acompañan.
+ * Todos los servicios tienen ventas, salvo la Temporada Pro, que no vendió en
+ * los últimos 90 días.
  */
 export function buildDemoData(today: string): DemoData {
   const random = createRandom(SEED);
@@ -506,5 +486,11 @@ export function buildDemoData(today: string): DemoData {
   ).flat();
   const specs = [...history, ...scenarioSpecs(today)];
   const drafts = specs.map((spec) => toDraft(spec, random));
-  return { customers: buildCustomers(), sales: withInvoices(drafts, today, random) };
+  const demoSales = withInvoices(drafts, today, random);
+  return {
+    customers: buildCustomers(),
+    sales: demoSales,
+    // Con su propio generador: los clics no cambian ni una venta de ejemplo.
+    interest: buildDemoInterest(today, demoSales),
+  };
 }

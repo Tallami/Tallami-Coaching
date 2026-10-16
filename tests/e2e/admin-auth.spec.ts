@@ -61,7 +61,7 @@ async function submitPassword(page: Page, password: string): Promise<void> {
 }
 
 test.describe("without a session", () => {
-  for (const path of ["/admin", "/admin/ventas"]) {
+  for (const path of ["/admin", "/admin/ventas", "/admin/servicios"]) {
     test(`admin pages redirect to login without a session: ${path}`, async ({
       page,
       request,

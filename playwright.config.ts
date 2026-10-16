@@ -8,7 +8,7 @@ export default defineConfig({
   testDir: "./tests/e2e",
   // Los tests que verifican totales corren con los datos de ejemplo, en el
   // servidor de `playwright.demo.config.ts` (`npm run test:e2e` corre los dos).
-  testIgnore: "**/admin-overview.spec.ts",
+  testIgnore: ["**/admin-overview.spec.ts", "**/admin-services-demo.spec.ts"],
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,

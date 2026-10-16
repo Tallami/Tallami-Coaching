@@ -2,7 +2,10 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { eq } from "drizzle-orm";
 import { describe, expect, test } from "vitest";
+import { INTEREST_ITEMS } from "@/admin/catalog";
+import { dateToArgentinaLocal } from "@/admin/dates";
 import { DEMO_MONOTRIBUTO_SETTINGS, buildDemoData } from "@/admin/demo-data";
+import { interestByItem } from "@/admin/interest/query";
 import { computeKpis } from "@/admin/metrics/kpis";
 import { loadMetricSales } from "@/admin/metrics/load";
 import { monotributoStatus } from "@/admin/metrics/monotributo";
@@ -10,7 +13,7 @@ import { pendingWork } from "@/admin/metrics/pending";
 import { PERIODS, periodRange } from "@/admin/metrics/period";
 import { incomeByCountry, incomeByItem, incomeByPaymentMethod, itemsWithoutSales, monthlyIncome } from "@/admin/metrics/series";
 import { getMonotributoSettings } from "@/admin/settings/read";
-import { customers, sales, settings } from "@/db/schema";
+import { customers, interestEvents, sales, settings } from "@/db/schema";
 import { DemoSeedRefusedError, assertLocalDatabase, seedDemo } from "../../scripts/seed-demo";
 import { createTestDb } from "../helpers/db";
 import { demoMetricSales } from "../helpers/demo";
@@ -54,9 +57,14 @@ describe("seedDemo", () => {
 
     const inserted = await seedDemo(db, TODAY);
 
-    expect(inserted).toEqual({ customers: expected.customers.length, sales: expected.sales.length });
+    expect(inserted).toEqual({
+      customers: expected.customers.length,
+      sales: expected.sales.length,
+      interest: expected.interest.length,
+    });
     expect(await db.select().from(customers)).toHaveLength(expected.customers.length);
     expect(await db.select().from(sales)).toHaveLength(expected.sales.length);
+    expect(await db.select().from(interestEvents)).toHaveLength(expected.interest.length);
     expect(await getMonotributoSettings(db)).toEqual(DEMO_MONOTRIBUTO_SETTINGS);
   });
 
@@ -68,6 +76,7 @@ describe("seedDemo", () => {
     const expected = buildDemoData("2026-10-20");
     expect(await db.select().from(customers)).toHaveLength(expected.customers.length);
     expect(await db.select().from(sales)).toHaveLength(expected.sales.length);
+    expect(await db.select().from(interestEvents)).toHaveLength(expected.interest.length);
   });
 
   test("leaves what the owner loaded by hand, and a monotributo setting already there", async () => {
@@ -78,10 +87,17 @@ describe("seedDemo", () => {
       value: { category: "A", annualCapArsMinor: 1_000_000_000, validFrom: "2026-02-01" },
     });
 
+    const [realClick] = await db
+      .insert(interestEvents)
+      .values({ item: "lesson", locale: "es", ipHash: "hash-real" })
+      .returning({ id: interestEvents.id });
+
+    await seedDemo(db, TODAY);
     await seedDemo(db, TODAY);
 
     expect(await db.select().from(customers).where(eq(customers.id, mine.id))).toHaveLength(1);
     expect((await getMonotributoSettings(db))?.category).toBe("A");
+    expect(await db.select().from(interestEvents).where(eq(interestEvents.id, realClick.id))).toHaveLength(1);
   });
 
   test("the panel reads the same numbers from the database as from the demo data", async () => {
@@ -103,5 +119,24 @@ describe("seedDemo", () => {
       monotributoStatus(expected, DEMO_MONOTRIBUTO_SETTINGS, NOW),
     );
     expect(pendingWork(loaded, NOW)).toEqual(pendingWork(expected, NOW));
+  });
+
+  test("the clicks read from the database match the demo events, period by period", async () => {
+    const db = await createTestDb();
+    await seedDemo(db, TODAY);
+    const { interest } = buildDemoData(TODAY);
+
+    for (const period of PERIODS) {
+      const range = periodRange(period, NOW);
+      const expected = INTEREST_ITEMS.map((item) => ({
+        item,
+        clicks: interest.filter((event) => {
+          const day = dateToArgentinaLocal(event.createdAt as Date).slice(0, 10);
+          return event.item === item && day >= range.from && day <= range.to;
+        }).length,
+      }));
+
+      expect(await interestByItem(db, range), period).toEqual(expected);
+    }
   });
 });

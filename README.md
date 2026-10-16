@@ -25,10 +25,10 @@ La web queda en http://localhost:3000 (redirige a `/es`, `/pt` o `/en` según el
 | `npm run lint` | ESLint |
 | `npm run typecheck` | TypeScript sin emitir archivos (corré antes `npm run build` o `npx next typegen`) |
 | `npm run test` | Tests unitarios (Vitest) |
-| `npm run test:e2e` | Tests end to end (Playwright), en dos tandas: la web en el puerto 3100 (hace el build) y el resumen del panel con datos de ejemplo en el 3101 (reutiliza ese build). `test:e2e:main` y `test:e2e:demo` corren cada una por separado (la segunda siempre arma el build antes) |
+| `npm run test:e2e` | Tests end to end (Playwright), en dos tandas: la web en el puerto 3100 (hace el build) y el resumen y Servicios del panel con datos de ejemplo en el 3101 (reutiliza ese build). `test:e2e:main` y `test:e2e:demo` corren cada una por separado (la segunda siempre arma el build antes) |
 | `npm run db:generate` | Genera en `drizzle/` la migración SQL de los cambios hechos en `src/db/schema.ts` (la migración se sube al repo) |
 | `npm run db:migrate` | Aplica las migraciones de `drizzle/` a la base de `DATABASE_URL` (Supabase). La base local (PGlite) se migra sola al abrirse |
-| `npm run db:seed:demo` | Carga en la base local (PGlite) 25 alumnos y unas 120 ventas ficticias de los últimos 14 meses, para ver el resumen del panel con números. Se niega a correr si hay `DATABASE_URL`; se puede repetir (refresca las fechas) |
+| `npm run db:seed:demo` | Carga en la base local (PGlite) 25 alumnos, unas 120 ventas y unos 750 clics en "Reservar" ficticios de los últimos 14 meses, para ver el resumen y Servicios con números. Se niega a correr si hay `DATABASE_URL`; se puede repetir (refresca las fechas) |
 | `npm run admin:password` | Genera el hash de la contraseña del panel (`ADMIN_PASSWORD_HASH`) y un secreto para las sesiones (`ADMIN_SESSION_SECRET`). Ver "Panel de admin" |
 | `npm run players:photo -- <usuario>` | Baja la foto de perfil de X de un jugador a `src/assets/players/` |
 | `npm run tweets:record -- <id> [<id> …]` | Guarda la respuesta de X de uno o más tweets en `src/content/tweet-snapshots/` y rehace su índice (necesita internet) |
@@ -98,11 +98,24 @@ Localmente entrá por `http://localhost:3000/admin`, no por la IP de tu red: la 
 | Doble verificación | El `proxy` (`src/proxy.ts`) manda a `/admin/login` a quien no tenga sesión válida; además cada página y cada Server Action del panel llama a `requireAdmin()` (`src/admin/auth/require-admin.ts`). Una página o acción nueva sin esa llamada queda abierta: es obligatoria |
 | Redirecciones | `?next=` del login solo acepta rutas `/admin…` del mismo sitio |
 
+### Interés por servicio (clics en "Reservar")
+
+Los botones de reserva del sitio público (`BookingLink`, `src/components/home/booking-link.tsx`) avisan cada clic con `navigator.sendBeacon` a `POST /api/interest` y siguen siendo un enlace común: no cancelan nada, no agregan atributos al HTML y las páginas `/es`, `/pt` y `/en` siguen estáticas (el aviso solo sale al tocar, nunca al cargar). La página Servicios del panel (`/admin/servicios`) cuenta esos clics contra las ventas.
+
+| Qué | Cómo |
+| --- | --- |
+| Cuerpo | JSON `{ item, locale }`: `item` de `INTEREST_ITEMS` (`src/admin/catalog.ts`, todo menos "Otro") y `locale` `es`, `pt` o `en`. Cualquier otro campo o valor es un 400; sin eco de lo recibido |
+| Respuestas | `204` guardado (y también aceptado y descartado), `400` inválido, `413` más de 1 KB, `429` con `Retry-After: 60`, `405` otros métodos; siempre `Cache-Control: no-store` |
+| Descartes (204 sin guardar) | Bots por `user-agent` (lista corta en `src/admin/interest/bots.ts`), y sin `ADMIN_SESSION_SECRET` o sin base configurada: el sitio público nunca se rompe por esto |
+| Límite | 30 eventos por minuto por IP; la IP se guarda solo como hash con clave (el mismo `hashIp` del login), nunca en claro |
+| País | Del encabezado `x-vercel-ip-country`, solo si son dos letras mayúsculas |
+| Conversión | En Servicios: ventas cobradas ÷ clics en "Reservar" del mismo período; vacía (—) sin clics. Puede pasar de 100 %: también se vende por fuera del sitio |
+
 ### Tests del panel
 
 `npm run test:e2e` arranca el servidor con una contraseña y un secreto de prueba (`tests/helpers/admin-server.ts`), una base PGlite vacía en una carpeta temporal que se borra al iniciar, y `EXCHANGE_RATE_SOURCE=fixed` (cotizaciones fijas, sin llamar al BCRA; en producción de Vercel esa variable se ignora). Cada test navega con su propia IP, así los bloqueos de uno no afectan a los otros.
 
-Los tests que verifican totales (`tests/e2e/admin-overview.spec.ts`) corren aparte, con `playwright.demo.config.ts`: un segundo servidor en el puerto 3101, con el mismo build y su propia base PGlite que se siembra con `buildDemoData(hoy en Argentina)` antes de arrancar (`src/admin/demo-data.ts`). Nadie escribe en esa base, así los números esperados salen de los mismos datos con las mismas funciones que usa la página. `npm run test:e2e:demo` arma el build y corre solo esa tanda; con `npm run test:e2e` el build lo arma la primera.
+Los tests que verifican totales (`tests/e2e/admin-overview.spec.ts` y `tests/e2e/admin-services-demo.spec.ts`) corren aparte, con `playwright.demo.config.ts`: un segundo servidor en el puerto 3101, con el mismo build y su propia base PGlite que se siembra con `buildDemoData(hoy en Argentina)` antes de arrancar (`src/admin/demo-data.ts`). Nadie escribe en esa base, así los números esperados salen de los mismos datos con las mismas funciones que usa la página. `npm run test:e2e:demo` arma el build y corre solo esa tanda; con `npm run test:e2e` el build lo arma la primera.
 
 ## Deploy (Vercel)
 

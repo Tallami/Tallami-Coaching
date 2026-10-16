@@ -28,6 +28,8 @@ import {
 } from "drizzle-orm/pg-core";
 import {
   CURRENCIES,
+  INTEREST_ITEMS,
+  INTEREST_LOCALES,
   INVOICE_STATUSES,
   INVOICE_TYPES,
   PAYMENT_METHODS,
@@ -170,7 +172,35 @@ export const loginAttempts = pgTable(
   (t) => [index("login_attempts_ip_hash_created_at_idx").on(t.ipHash, t.createdAt)],
 );
 
+/**
+ * Un clic anónimo en un botón de reserva del sitio público (`/api/interest`):
+ * qué servicio, en qué idioma, de qué país (encabezado de Vercel, si existe) y
+ * cuándo. Sin cookies ni datos personales: la IP se guarda solo como HMAC, para
+ * limitar ráfagas (30 por minuto por IP), nunca en claro.
+ */
+export const interestEvents = pgTable(
+  "interest_events",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    item: text("item").notNull(),
+    locale: text("locale").notNull(),
+    /** ISO 3166-1 alfa-2 en mayúsculas, o `null` si el pedido no trajo uno válido. */
+    country: char("country", { length: 2 }),
+    ipHash: text("ip_hash").notNull(),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    check("interest_events_item_valid", oneOf(t.item, INTEREST_ITEMS)),
+    check("interest_events_locale_valid", oneOf(t.locale, INTEREST_LOCALES)),
+    check("interest_events_country_valid", sql`${t.country} is null or ${t.country} ~ '^[A-Z]{2}$'`),
+    index("interest_events_created_at_idx").on(t.createdAt),
+    index("interest_events_ip_hash_created_at_idx").on(t.ipHash, t.createdAt),
+  ],
+);
+
 export type Customer = typeof customers.$inferSelect;
 export type NewCustomer = typeof customers.$inferInsert;
 export type Sale = typeof sales.$inferSelect;
 export type NewSale = typeof sales.$inferInsert;
+export type InterestEvent = typeof interestEvents.$inferSelect;
+export type NewInterestEvent = typeof interestEvents.$inferInsert;

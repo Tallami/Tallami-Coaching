@@ -6,18 +6,19 @@
 //
 // Usa la misma base que el panel sin `DATABASE_URL`: la carpeta de
 // `PGLITE_DIR` o `.data/pglite`. Es seguro repetirlo: borra las filas de
-// ejemplo de la vez anterior (se reconocen por su id) y las vuelve a cargar con
-// las fechas de hoy; no toca lo que cargaste a mano. Si todavía no cargaste el
+// ejemplo de la vez anterior (se reconocen por su id: alumnos, ventas y clics en
+// los botones de reserva) y las vuelve a cargar con las fechas de hoy; no toca lo que cargaste a mano. Si todavía no cargaste el
 // monotributo, deja uno de ejemplo; si ya lo cargaste, lo respeta.
 
-import { inArray } from "drizzle-orm";
+import { gte, inArray } from "drizzle-orm";
 import { pathToFileURL } from "node:url";
 import { DEMO_MONOTRIBUTO_SETTINGS, buildDemoData } from "../src/admin/demo-data";
+import { DEMO_INTEREST_ID_BASE } from "../src/admin/demo-interest";
 import { todayInArgentina } from "../src/admin/dates";
 import { MONOTRIBUTO_SETTING_KEY } from "../src/admin/settings/read";
 import { getDb, type Db } from "../src/db/client";
 import { getDatabaseUrl } from "../src/db/config";
-import { customers, sales, settings } from "../src/db/schema";
+import { customers, interestEvents, sales, settings } from "../src/db/schema";
 
 /** Se intentó cargar los datos de ejemplo en una base que no es la local. */
 export class DemoSeedRefusedError extends Error {
@@ -37,6 +38,7 @@ export function assertLocalDatabase(env: { DATABASE_URL?: string }): void {
 export interface SeedResult {
   customers: number;
   sales: number;
+  interest: number;
 }
 
 /**
@@ -54,12 +56,15 @@ export async function seedDemo(db: Db, today: string): Promise<SeedResult> {
     await tx.delete(customers).where(inArray(customers.id, customerIds));
     await tx.insert(customers).values(data.customers);
     await tx.insert(sales).values(data.sales);
+    // Los clics de ejemplo viven en un rango de ids reservado: no se pisan con los reales.
+    await tx.delete(interestEvents).where(gte(interestEvents.id, DEMO_INTEREST_ID_BASE));
+    await tx.insert(interestEvents).values(data.interest);
     await tx
       .insert(settings)
       .values({ key: MONOTRIBUTO_SETTING_KEY, value: DEMO_MONOTRIBUTO_SETTINGS })
       .onConflictDoNothing();
   });
-  return { customers: data.customers.length, sales: data.sales.length };
+  return { customers: data.customers.length, sales: data.sales.length, interest: data.interest.length };
 }
 
 /** Cierra la base si el driver lo permite, para que los datos queden escritos antes de salir. */
@@ -74,7 +79,7 @@ async function main(): Promise<void> {
   try {
     const result = await seedDemo(db, todayInArgentina());
     process.stdout.write(
-      `Listo: ${result.customers} alumnos y ${result.sales} ventas de ejemplo en la base local.\n`,
+      `Listo: ${result.customers} alumnos, ${result.sales} ventas y ${result.interest} clics de ejemplo en la base local.\n`,
     );
   } finally {
     await closeDb(db);
