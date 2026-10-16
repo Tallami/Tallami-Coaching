@@ -183,6 +183,7 @@ describe("isAdminPath", () => {
     "/admin/ventas.csv",
     "/admin.rsc",
     "/admin/login.segments/_tree.segment.rsc",
+    "/admin/login.segments/lo-que-sea",
     "/%61dmin",
     "/%61dmin/ventas",
     "/admin%2Fventas",
@@ -238,6 +239,20 @@ describe("guardAdmin", () => {
 
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toContain("/admin/login");
+  });
+
+  test("closes the sessions of the old password: a new ADMIN_PASSWORD_HASH sends them to the login", async () => {
+    const cookie = await validCookie();
+    const open = await guardAdmin(get("/admin/ventas", { cookie }));
+    expect(isPassThrough(open)).toBe(true);
+
+    vi.stubEnv("ADMIN_PASSWORD_HASH", await hashPassword("la-clave-nueva-del-panel"));
+
+    const closed = await guardAdmin(get("/admin/ventas", { cookie }));
+    expect(closed.status).toBe(307);
+    expect(closed.headers.get("location")).toContain("/admin/login");
+    const action = await guardAdmin(get("/admin/ventas", { "next-action": "40abc", cookie }, "POST"));
+    expect(action.status).toBe(401);
   });
 
   test("lets a valid session through, with noindex and no caching", async () => {
@@ -315,12 +330,61 @@ describe("guardAdmin", () => {
     expect(response.headers.get("x-robots-tag")).toBe("noindex, nofollow");
   });
 
-  test.each(["/admin/login.rsc", "/admin/login.segments/__PAGE__.segment.rsc", "/admin/setup.rsc"])(
-    "leaves the doors open in their transport form %s",
-    async (path) => {
-      expect(isPassThrough(await guardAdmin(get(path)))).toBe(true);
-    },
-  );
+  test.each([
+    "/admin/login.rsc",
+    "/admin/login.segments/__PAGE__.segment.rsc",
+    "/admin/login.segments/a/b/c.segment.rsc",
+    "/admin/setup.rsc",
+    "/admin/setup.segments/__PAGE__.segment.rsc",
+  ])("leaves the doors open in their transport form %s", async (path) => {
+    expect(isPassThrough(await guardAdmin(get(path)))).toBe(true);
+  });
+
+  // Next solo entiende `^(/.*)\.segments(/.*)\.segment\.rsc$` y `\.rsc$` como formas de
+  // transporte. Cualquier otra cosa que se parezca no es el login, aunque empiece igual.
+  test.each([
+    "/admin/login.segments/lo-que-sea",
+    "/admin/login.segments/",
+    "/admin/login.segments/x.segment",
+    "/admin/login.segments/x.segment.rsc.rsc",
+    "/admin/login.segments.segment.rsc",
+    "/admin/login.segments/x.segment.rsc/y",
+    "/admin/setup.segments/lo-que-sea",
+    "/admin/login.segments/x.segments/y",
+    // Un punto escrito como %2E no forma ".rsc": Next no lo toma como transporte.
+    "/admin/login%2Ersc",
+  ])("does not take %s for a door: it is the panel and needs a session", async (path) => {
+    const response = await guardAdmin(get(path));
+
+    expect(response.status).toBe(307);
+    // (Con una barra final en la dirección pedida, el redirect la conserva; Next la quita al llegar.)
+    expect(response.headers.get("location")).toMatch(/\/admin\/login\/?\?next=/);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+  });
+
+  test("a valid session still gets through those addresses (the page, not the guard, answers)", async () => {
+    const cookie = await validCookie();
+
+    for (const path of ["/admin/login.segments/lo-que-sea", "/admin/ventas.segments/x.segment"]) {
+      expect(isPassThrough(await guardAdmin(get(path, { cookie }))), path).toBe(true);
+    }
+  });
+
+  test("strips only the transport form Next defines, and only once", async () => {
+    const cases: [string, string][] = [
+      // Quita `.segments/<ruta>.segment.rsc` entero, hasta el último `.segments/` (el cuantificador es codicioso).
+      ["/admin/ventas.segments/a.segments/b.segment.rsc", "%2Fadmin%2Fventas.segments%2Fa"],
+      ["/admin/ventas.segments/_tree.segment.rsc", "%2Fadmin%2Fventas"],
+      ["/admin/ventas.rsc", "%2Fadmin%2Fventas"],
+      // Una sola pasada: lo que queda después no se vuelve a limpiar.
+      ["/admin/ventas.rsc.rsc", "%2Fadmin%2Fventas.rsc"],
+    ];
+
+    for (const [path, next] of cases) {
+      const response = await guardAdmin(get(path));
+      expect(response.headers.get("location"), path).toBe(`${ORIGIN}/admin/login?next=${next}`);
+    }
+  });
 
   describe("when the panel is not configured", () => {
     beforeEach(() => {

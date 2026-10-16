@@ -1,6 +1,7 @@
 // Quién cuenta como "el mismo visitante" en el límite de clics, y cómo se
-// guarda sin poder seguirlo. Es una clave propia de los clics: `getClientIp` y
-// el límite de ingresos al panel no cambian.
+// guarda sin poder seguirlo. La clave (`interestIpKey`) también la usa el límite
+// de intentos de ingreso al panel (`src/admin/auth/login-ip.ts`); `getClientIp`
+// no cambia.
 //
 // - IPv4: la dirección tal cual.
 // - IPv6: los primeros 64 bits (el /64). Una conexión doméstica recibe un /64
@@ -12,8 +13,9 @@
 // Lo que se guarda es un HMAC de esa clave con la fecha de Argentina del
 // clic (`interestIpHash`): el mismo visitante tiene otro hash cada día, así que
 // las filas no se pueden vincular entre días ni con `login_attempts` (que hashea
-// la IP sola). Dentro del día el límite funciona igual; a medianoche el cupo
-// vuelve a empezar, un costo inofensivo.
+// la clave sin el día: su ventana de 15 minutos puede cruzar la medianoche).
+// Dentro del día el límite funciona igual; a medianoche el cupo vuelve a
+// empezar, un costo inofensivo.
 
 import { isIP } from "node:net";
 import { hashIp } from "@/admin/auth/session";

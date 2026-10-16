@@ -4,6 +4,7 @@ import type { Page } from "@playwright/test";
 import {
   ADMIN_COOKIE,
   ADMIN_TEST_PASSWORD,
+  ADMIN_TEST_PASSWORD_HASH,
   expect,
   loginAsAdmin,
   signTestToken,
@@ -14,6 +15,11 @@ import {
 const LOGIN_URL = /\/admin\/login(\?|$)/;
 const LOCKED_AFTER = 5;
 const SESSION_SECONDS = 12 * 60 * 60;
+/** El hash de una contraseña anterior: mismo formato, otra sal. */
+const OLD_PASSWORD_HASH = ADMIN_TEST_PASSWORD_HASH.replace(
+  "zASgC6oh0nRcKv2kEl3tbQ==",
+  "AAAAAAAAAAAAAAAAAAAAAA==",
+);
 /** La línea bajo el título del resumen: solo aparece con la sesión iniciada. */
 const PANEL_MARKER = "Cuánto ganás, qué se vende y qué tenés pendiente.";
 
@@ -101,6 +107,12 @@ test.describe("without a session", () => {
       "expired": await signTestToken({ expiresInSeconds: -60 }),
       "for another audience": await signTestToken({ audience: "otro-sitio" }),
       "signed with another algorithm": await signTestToken({ alg: "HS512" }),
+      // Firmada con el secreto correcto, pero con el claim de otra contraseña: la
+      // sesión de antes de que Tallami cambiara la contraseña.
+      "from before the password changed": await signTestToken({
+        passwordHash: OLD_PASSWORD_HASH,
+      }),
+      "from before the password claim existed": await signTestToken({ passwordHash: null }),
       "without a signature": [
         Buffer.from('{"alg":"none","typ":"JWT"}').toString("base64url"),
         Buffer.from(
@@ -184,6 +196,19 @@ test.describe("without a session", () => {
     });
   }
 
+  // Solo `.rsc` y `.segments/…/….segment.rsc` son formas de transporte para Next: una dirección
+  // que empieza como el login pero no termina así es del panel y pide sesión.
+  for (const path of ["/admin/login.segments/lo-que-sea", "/admin/setup.segments/lo-que-sea"]) {
+    test(`an address that only looks like a door needs a session: ${path}`, async ({ baseURL }) => {
+      const response = await rawGet(baseURL!, path);
+
+      expect(response.status).toBe(307);
+      expect(response.location).toContain("/admin/login?next=");
+      expect(response.headers["cache-control"]).toBe("no-store");
+      expect(response.body).not.toContain(PANEL_MARKER);
+    });
+  }
+
   test("server actions without a valid session answer 401, never data", async ({ request }) => {
     const action = { "next-action": "00deadbeef", "content-type": "text/plain;charset=UTF-8" };
 
@@ -235,6 +260,43 @@ test.describe("login", () => {
     });
     const otherPage = await elsewhere.newPage();
     await loginAsAdmin(otherPage);
+    await elsewhere.close();
+  });
+
+  test("an ipv6 visitor cannot dodge the lock by changing address inside their /64", async ({
+    browser,
+  }) => {
+    const group = () => Math.floor(Math.random() * 0xffff).toString(16);
+    const prefix = `2001:db8:${group()}:${group()}`;
+
+    // Cinco intentos fallidos, cada uno desde otra dirección del mismo /64.
+    for (let attempt = 1; attempt <= LOCKED_AFTER; attempt += 1) {
+      const context = await browser.newContext({
+        extraHTTPHeaders: { "x-forwarded-for": `${prefix}::${attempt}` },
+      });
+      const page = await context.newPage();
+      await page.goto("/admin/login");
+      await submitPassword(page, `clave-incorrecta-${attempt}`);
+      await expect(loginAlert(page)).toHaveText("Contraseña incorrecta.");
+      await context.close();
+    }
+
+    // Una dirección más del mismo /64: bloqueada, ni con la contraseña correcta.
+    const sameBlock = await browser.newContext({
+      extraHTTPHeaders: { "x-forwarded-for": `${prefix}:1234:5678:9abc:def0` },
+    });
+    const blockedPage = await sameBlock.newPage();
+    await blockedPage.goto("/admin/login");
+    await submitPassword(blockedPage, ADMIN_TEST_PASSWORD);
+    await expect(loginAlert(blockedPage)).toContainText("Demasiados intentos");
+    await expect(blockedPage).toHaveURL(/error=blocked/);
+    await sameBlock.close();
+
+    // Otro /64 no tiene nada que ver.
+    const elsewhere = await browser.newContext({
+      extraHTTPHeaders: { "x-forwarded-for": `2001:db8:${group()}:${group()}::1` },
+    });
+    await loginAsAdmin(await elsewhere.newPage());
     await elsewhere.close();
   });
 
@@ -333,11 +395,35 @@ test.describe("public pages", () => {
       const response = await page.goto(path);
 
       expect(response?.status()).toBe(200);
-      expect(response?.headers()["set-cookie"]).toBeUndefined();
+      // `headers()` de Playwright no incluye `set-cookie`: hace falta `allHeaders()`.
+      const headers = await response!.allHeaders();
+      expect(headers["set-cookie"] ?? "").not.toContain(ADMIN_COOKIE);
       await expect(page.locator('a[href*="admin"]')).toHaveCount(0);
       expect(await page.content()).not.toMatch(/href="[^"]*\/admin/);
     });
   }
+
+  test("after logging in, the public pages neither set nor receive the session cookie", async ({
+    page,
+  }) => {
+    // Control: `allHeaders()` sí deja ver la cookie cuando el servidor la manda (el login).
+    await page.goto("/admin/login");
+    await page.getByLabel("Contraseña").fill(ADMIN_TEST_PASSWORD);
+    const [loginResponse] = await Promise.all([
+      page.waitForResponse((response) => response.request().method() === "POST" && response.url().includes("/admin/login")),
+      page.getByRole("button", { name: "Ingresar" }).click(),
+    ]);
+    expect((await loginResponse.allHeaders())["set-cookie"] ?? "").toContain(`${ADMIN_COOKIE}=`);
+    await expect(page).toHaveURL(/\/admin$/);
+
+    for (const path of ["/es", "/pt", "/en"]) {
+      const response = await page.goto(path);
+
+      expect((await response!.allHeaders())["set-cookie"] ?? "", path).not.toContain(ADMIN_COOKIE);
+      // La cookie es de `/admin`: el navegador no la manda al sitio público.
+      expect((await response!.request().allHeaders()).cookie ?? "", path).not.toContain(ADMIN_COOKIE);
+    }
+  });
 
   test("the panel has no language prefix and does not turn into /es/admin", async ({
     request,

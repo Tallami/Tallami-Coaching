@@ -3,9 +3,14 @@
 
 import { expect, test as base, type Page } from "@playwright/test";
 import { SignJWT } from "jose";
-import { ADMIN_TEST_PASSWORD, ADMIN_TEST_SESSION_SECRET } from "./admin-server";
+import { PASSWORD_CLAIM, passwordClaim } from "../../src/admin/auth/password-claim";
+import {
+  ADMIN_TEST_PASSWORD,
+  ADMIN_TEST_PASSWORD_HASH,
+  ADMIN_TEST_SESSION_SECRET,
+} from "./admin-server";
 
-export { ADMIN_TEST_PASSWORD, ADMIN_TEST_SESSION_SECRET };
+export { ADMIN_TEST_PASSWORD, ADMIN_TEST_PASSWORD_HASH, ADMIN_TEST_SESSION_SECRET };
 
 /** Cookie y audiencia del panel (los valores reales viven en `src/admin/auth/session.ts`). */
 export const ADMIN_COOKIE = "tallami_admin";
@@ -40,22 +45,31 @@ interface TokenOptions {
   /** Segundos desde ahora; negativo = ya vencido. */
   expiresInSeconds?: number;
   alg?: "HS256" | "HS512";
+  /**
+   * El hash de contraseña del que sale el claim de la sesión (el que usa el
+   * servidor de los e2e por defecto). Con otro hash la firma es válida pero el
+   * claim es el de una contraseña anterior; `null` firma una sesión sin claim.
+   */
+  passwordHash?: string | null;
 }
 
-/** Firma una sesión como lo hace el panel; con opciones, una falsa o vencida. */
+/** Firma una sesión como lo hace el panel; con opciones, una falsa, vencida o de una contraseña anterior. */
 export async function signTestToken({
   secret = ADMIN_TEST_SESSION_SECRET,
   audience = ADMIN_AUDIENCE,
   expiresInSeconds = SESSION_HOURS * SECONDS_PER_HOUR,
   alg = "HS256",
+  passwordHash = ADMIN_TEST_PASSWORD_HASH,
 }: TokenOptions = {}): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
-  return new SignJWT({})
+  const key = new TextEncoder().encode(secret);
+  const claims = passwordHash === null ? {} : { [PASSWORD_CLAIM]: passwordClaim(key, passwordHash) };
+  return new SignJWT(claims)
     .setProtectedHeader({ alg })
     .setAudience(audience)
     .setIssuedAt(now - SECONDS_PER_HOUR)
     .setExpirationTime(now + expiresInSeconds)
-    .sign(new TextEncoder().encode(secret));
+    .sign(key);
 }
 
 /** Entra al panel con la contraseña de prueba y espera a estar adentro. */

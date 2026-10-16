@@ -25,11 +25,23 @@ function isUnder(pathname: string, root: string): boolean {
  * `/admin/ventas.rsc` (datos de la página) y
  * `/admin/ventas.segments/_tree.segment.rsc` (prefetch por segmentos). Son del
  * panel igual que `/admin/ventas` y deben pasar por el mismo filtro.
+ *
+ * Son las reglas exactas de Next (`SegmentPrefixRSCPathnameNormalizer` y
+ * `SuffixPathnameNormalizer`, con `RSC_SEGMENTS_DIR_SUFFIX`, `RSC_SEGMENT_SUFFIX`
+ * y `RSC_SUFFIX`), una sola pasada y sobre la ruta cruda: primero el prefetch
+ * por segmentos, que se queda con lo que está antes de `.segments/…` (el primer
+ * grupo es codicioso: llega hasta el último `.segments/`); si no, el sufijo
+ * `.rsc`. Cualquier otra cosa que se le parezca (`/admin/login.segments/lo-que-sea`,
+ * que no termina en `.segment.rsc`) no es una forma de transporte: se queda tal
+ * cual y, por lo tanto, no es `/admin/login`.
  */
-const TRANSPORT_SUFFIX = /\.segments\/.*$|\.rsc$/;
+const SEGMENT_PREFETCH_PATH = /^(\/.*)\.segments(\/.*)\.segment\.rsc$/;
+const RSC_SUFFIX = /\.rsc$/;
 
 function stripTransport(pathname: string): string {
-  return pathname.replace(TRANSPORT_SUFFIX, "");
+  const prefetch = SEGMENT_PREFETCH_PATH.exec(pathname);
+  if (prefetch) return prefetch[1];
+  return pathname.replace(RSC_SUFFIX, "");
 }
 
 function decodeOrSelf(pathname: string): string {
@@ -40,9 +52,13 @@ function decodeOrSelf(pathname: string): string {
   }
 }
 
-/** Sin forma de transporte ni barras finales: `/admin/login.rsc` y `/admin/login/` son `/admin/login`. */
+/**
+ * Sin forma de transporte ni barras finales: `/admin/login.rsc` y `/admin/login/` son `/admin/login`.
+ * La forma de transporte se reconoce en la ruta cruda, como hace Next; recién después se decodifica
+ * (`/%61dmin/login`). Un `%2E` que formaría `.rsc` al decodificar no cuenta como transporte.
+ */
 function normalizePath(pathname: string): string {
-  const decoded = stripTransport(decodeOrSelf(pathname));
+  const decoded = decodeOrSelf(stripTransport(pathname));
   return decoded.length > 1 ? decoded.replace(/\/+$/, "") : decoded;
 }
 

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { SignJWT } from "jose";
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { hashPassword } from "@/admin/auth/password";
+import { PASSWORD_CLAIM, passwordClaim } from "@/admin/auth/password-claim";
 import { loginPath } from "@/admin/auth/redirect";
 import { hasAdminSession, requireAdmin } from "@/admin/auth/require-admin";
 import { ADMIN_COOKIE, createSessionToken } from "@/admin/auth/session";
@@ -24,9 +25,14 @@ function requestWithCookie(value: string | undefined): void {
   } as Awaited<ReturnType<typeof cookies>>);
 }
 
-async function signed({ expiresInSeconds = 3600, audience = "tallami-admin" } = {}) {
+/** Una sesión firmada a mano, con el claim de la contraseña vigente (o el de `hash`). */
+async function signed({
+  expiresInSeconds = 3600,
+  audience = "tallami-admin",
+  hash = storedHash,
+} = {}) {
   const now = Math.floor(Date.now() / 1000);
-  return new SignJWT({})
+  return new SignJWT({ [PASSWORD_CLAIM]: passwordClaim(new TextEncoder().encode(SECRET), hash) })
     .setProtectedHeader({ alg: "HS256" })
     .setAudience(audience)
     .setIssuedAt(now - 7200)
@@ -61,11 +67,18 @@ describe("requireAdmin", () => {
     expect(redirect).not.toHaveBeenCalled();
   });
 
+  test("a signed session is valid (so the cases below fail for the right reason)", async () => {
+    requestWithCookie(await signed());
+
+    await expect(requireAdmin()).resolves.toBeUndefined();
+  });
+
   test.each([
     ["no cookie", async () => undefined],
     ["a forged cookie", async () => "una-cookie-inventada"],
     ["an expired session", () => signed({ expiresInSeconds: -60 })],
     ["a session for another audience", () => signed({ audience: "otro-sitio" })],
+    ["a session from before the password changed", () => signed({ hash: "scrypt$131072$8$1$AAAAAAAAAAAAAAAAAAAAAA==$tQGqq7QyqTr/jXICWaMh8tbjhxd18TqxqeHLEHdIxfg=" })],
   ])("sends %s to the login", async (_label, makeCookie) => {
     requestWithCookie(await makeCookie());
 

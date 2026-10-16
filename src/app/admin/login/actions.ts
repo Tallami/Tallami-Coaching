@@ -5,15 +5,11 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getMissingConfig } from "@/admin/auth/config";
 import { attemptLogin } from "@/admin/auth/login";
+import { loginIpHash } from "@/admin/auth/login-ip";
 import type { LoginErrorCode } from "@/admin/auth/login-errors";
 import { loginPath, safeNextPath } from "@/admin/auth/redirect";
 import { getClientIp, shouldUseSecureCookie } from "@/admin/auth/request";
-import {
-  ADMIN_COOKIE,
-  createSessionToken,
-  hashIp,
-  sessionCookieOptions,
-} from "@/admin/auth/session";
+import { ADMIN_COOKIE, createSessionToken, sessionCookieOptions } from "@/admin/auth/session";
 import { getDb } from "@/db/client";
 
 /** Tope del largo de la contraseña: scrypt cuesta lo mismo, pero no hay por qué procesar un texto enorme. */
@@ -46,7 +42,7 @@ export async function loginAction(formData: FormData): Promise<void> {
   let result: Awaited<ReturnType<typeof attemptLogin>>;
   try {
     const db = await getDb();
-    result = await attemptLogin(db, hashIp(getClientIp(requestHeaders)), password.data);
+    result = await attemptLogin(db, loginIpHash(getClientIp(requestHeaders)), password.data);
   } catch (error) {
     // Base caída o mal configurada: no se deja entrar sin poder anotar el intento.
     console.error("Panel: no se pudo verificar el ingreso.", error);

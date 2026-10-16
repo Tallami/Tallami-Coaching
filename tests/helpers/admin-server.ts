@@ -8,9 +8,17 @@
 import { mkdirSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { hashPassword } from "../../src/admin/auth/password";
 
 export const ADMIN_TEST_PASSWORD = "clave-de-prueba-del-panel";
+/**
+ * Hash scrypt de `ADMIN_TEST_PASSWORD`, fijo. Las sesiones llevan un claim
+ * derivado del hash de la contraseña (`src/admin/auth/password-claim.ts`): el
+ * servidor de los e2e y los tests que firman sesiones tienen que usar el mismo
+ * hash, y calcularlo en cada proceso daría uno distinto por la sal al azar.
+ * `tests/unit/e2e-server-env.test.ts` comprueba que corresponde a la contraseña.
+ */
+export const ADMIN_TEST_PASSWORD_HASH =
+  "scrypt$131072$8$1$zASgC6oh0nRcKv2kEl3tbQ==$tQGqq7QyqTr/jXICWaMh8tbjhxd18TqxqeHLEHdIxfg=";
 /** Más de 32 caracteres, el mínimo que exige el panel. */
 export const ADMIN_TEST_SESSION_SECRET =
   "secreto-de-prueba-solo-para-los-e2e-0123456789";
@@ -47,7 +55,7 @@ function resetPgliteDir(dir: string): string {
  */
 async function serverEnv(pgliteDir: string): Promise<Record<string, string>> {
   return {
-    ADMIN_PASSWORD_HASH: await hashPassword(ADMIN_TEST_PASSWORD),
+    ADMIN_PASSWORD_HASH: ADMIN_TEST_PASSWORD_HASH,
     ADMIN_SESSION_SECRET: ADMIN_TEST_SESSION_SECRET,
     PGLITE_DIR: resetPgliteDir(pgliteDir),
     EXCHANGE_RATE_SOURCE: "fixed",

@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { adminServerEnv, demoServerEnv } from "../helpers/admin-server";
+import { verifyPassword } from "@/admin/auth/password";
+import {
+  ADMIN_TEST_PASSWORD,
+  ADMIN_TEST_PASSWORD_HASH,
+  adminServerEnv,
+  demoServerEnv,
+} from "../helpers/admin-server";
 
 // Importar los helpers o las configuraciones de Playwright arma el entorno del
 // servidor y, en el proceso principal, borra la carpeta de la base de los e2e:
@@ -35,6 +41,14 @@ describe("environment of the e2e servers", () => {
 
     expect((await serverEnvOf("../../playwright.config")).DATABASE_URL).toBe("");
     expect((await serverEnvOf("../../playwright.demo.config")).DATABASE_URL).toBe("");
+  });
+
+  test("both servers use the fixed password hash, which is the hash of the test password", async () => {
+    // Un hash fijo y no uno nuevo por proceso: las sesiones que firman los tests
+    // llevan un claim derivado del hash, y la sal al azar daría uno distinto en cada worker.
+    expect((await adminServerEnv()).ADMIN_PASSWORD_HASH).toBe(ADMIN_TEST_PASSWORD_HASH);
+    expect((await demoServerEnv()).ADMIN_PASSWORD_HASH).toBe(ADMIN_TEST_PASSWORD_HASH);
+    expect(await verifyPassword(ADMIN_TEST_PASSWORD, ADMIN_TEST_PASSWORD_HASH)).toBe(true);
   });
 
   test("each server has its own database folder and the fixed exchange rates", async () => {

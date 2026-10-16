@@ -3,12 +3,11 @@ import { SignJWT } from "jose";
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { attemptLogin } from "@/admin/auth/login";
 import { hashPassword, verifyPassword } from "@/admin/auth/password";
+import { PASSWORD_CLAIM, passwordClaim } from "@/admin/auth/password-claim";
 import {
   LOGIN_MAX_FAILURES,
   LOGIN_WINDOW_MS,
   confirmLoginSuccess,
-  isLoginBlocked,
-  recordLoginAttempt,
   reserveLoginAttempt,
 } from "@/admin/auth/rate-limit";
 import {
@@ -20,6 +19,7 @@ import {
 } from "@/admin/auth/session";
 import type { Db } from "@/db/client";
 import { loginAttempts } from "@/db/schema";
+import { ADMIN_TEST_PASSWORD_HASH } from "../helpers/admin-server";
 import { createTestDb } from "../helpers/db";
 
 // `verifyPassword` (scrypt) queda envuelta en un espía que conserva su
@@ -33,6 +33,8 @@ vi.mock("@/admin/auth/password", async (importOriginal) => {
 const PASSWORD = "una-clave-larga-de-prueba";
 const SECRET = "secreto-de-prueba-de-mas-de-32-caracteres";
 const OTHER_SECRET = "otro-secreto-de-prueba-de-mas-de-32-caracteres";
+/** Otro hash con el formato válido (cambia solo la sal): la contraseña después de un cambio. */
+const OTHER_PASSWORD_HASH = ADMIN_TEST_PASSWORD_HASH.replace("zASgC6oh0nRcKv2kEl3tbQ==", "AAAAAAAAAAAAAAAAAAAAAA==");
 const MINUTE_MS = 60_000;
 const HOUR_SECONDS = 3600;
 
@@ -45,15 +47,18 @@ async function signToken({
   expiresInSeconds = HOUR_SECONDS,
   alg = "HS256",
   withExpiration = true,
+  claim = passwordClaim(encoder.encode(secret), ADMIN_TEST_PASSWORD_HASH),
 }: {
   secret?: string;
   audience?: string;
   expiresInSeconds?: number;
   alg?: "HS256" | "HS512";
   withExpiration?: boolean;
+  /** El claim de la contraseña; `null` firma una sesión de antes de que existiera. */
+  claim?: string | null;
 } = {}): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
-  const jwt = new SignJWT({})
+  const jwt = new SignJWT(claim === null ? {} : { [PASSWORD_CLAIM]: claim })
     .setProtectedHeader({ alg })
     .setAudience(audience)
     .setIssuedAt(now - 2 * HOUR_SECONDS);
@@ -136,10 +141,76 @@ describe("passwords", () => {
 describe("session tokens", () => {
   beforeEach(() => {
     vi.stubEnv("ADMIN_SESSION_SECRET", SECRET);
+    vi.stubEnv("ADMIN_PASSWORD_HASH", ADMIN_TEST_PASSWORD_HASH);
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
+  });
+
+  describe("the password claim", () => {
+    test("is a short keyed value derived from the password hash, never the hash itself", async () => {
+      const payload = decodePart((await createSessionToken()).split(".")[1]);
+
+      expect(payload[PASSWORD_CLAIM]).toMatch(/^[0-9a-f]{16}$/);
+      expect(payload[PASSWORD_CLAIM]).toBe(passwordClaim(encoder.encode(SECRET), ADMIN_TEST_PASSWORD_HASH));
+      expect(ADMIN_TEST_PASSWORD_HASH).not.toContain(String(payload[PASSWORD_CLAIM]));
+    });
+
+    test("depends on the hash and on the secret", () => {
+      const claim = passwordClaim(encoder.encode(SECRET), ADMIN_TEST_PASSWORD_HASH);
+
+      expect(passwordClaim(encoder.encode(SECRET), ADMIN_TEST_PASSWORD_HASH)).toBe(claim);
+      expect(passwordClaim(encoder.encode(SECRET), OTHER_PASSWORD_HASH)).not.toBe(claim);
+      expect(passwordClaim(encoder.encode(OTHER_SECRET), ADMIN_TEST_PASSWORD_HASH)).not.toBe(claim);
+    });
+
+    test("a new password hash closes the sessions of the old one, and new sessions work", async () => {
+      const token = await createSessionToken();
+      expect(await verifySessionToken(token)).toBe(true);
+
+      vi.stubEnv("ADMIN_PASSWORD_HASH", OTHER_PASSWORD_HASH);
+
+      expect(await verifySessionToken(token)).toBe(false);
+      const fresh = await createSessionToken();
+      expect(await verifySessionToken(fresh)).toBe(true);
+      expect(fresh).not.toBe(token);
+    });
+
+    test("rejects a session from before the claim existed", async () => {
+      expect(await verifySessionToken(await signToken({ claim: null }))).toBe(false);
+    });
+
+    test.each([
+      ["from another password hash", () => passwordClaim(encoder.encode(SECRET), OTHER_PASSWORD_HASH)],
+      ["from another secret", () => passwordClaim(encoder.encode(OTHER_SECRET), ADMIN_TEST_PASSWORD_HASH)],
+      ["of the wrong length", () => passwordClaim(encoder.encode(SECRET), ADMIN_TEST_PASSWORD_HASH).slice(0, 15)],
+      ["empty", () => ""],
+    ])("rejects a claim %s", async (_label, makeClaim) => {
+      expect(await verifySessionToken(await signToken({ claim: makeClaim() }))).toBe(false);
+    });
+
+    test("rejects a claim that is not text", async () => {
+      const now = Math.floor(Date.now() / 1000);
+      const token = await new SignJWT({ [PASSWORD_CLAIM]: 1234567890123456 })
+        .setProtectedHeader({ alg: "HS256" })
+        .setAudience(SESSION_AUDIENCE)
+        .setIssuedAt(now)
+        .setExpirationTime(now + HOUR_SECONDS)
+        .sign(encoder.encode(SECRET));
+
+      expect(await verifySessionToken(token)).toBe(false);
+    });
+
+    test("no session is valid, or can be created, without a usable password hash", async () => {
+      const token = await createSessionToken();
+
+      for (const hash of ["", "no-es-un-hash"]) {
+        vi.stubEnv("ADMIN_PASSWORD_HASH", hash);
+        expect(await verifySessionToken(token)).toBe(false);
+        await expect(createSessionToken()).rejects.toThrow(/ADMIN_PASSWORD_HASH/);
+      }
+    });
   });
 
   test("creates a token that verifies, for twelve hours and for the panel only", async () => {
@@ -240,6 +311,13 @@ describe("hashIp", () => {
 });
 
 describe("login rate limit", () => {
+  test("offers only the reservation API the login uses", async () => {
+    // Las funciones viejas (mirar si está bloqueada y anotar después) dejaban pasar una ráfaga.
+    const exported = Object.keys(await import("@/admin/auth/rate-limit")).sort();
+
+    expect(exported).toEqual(["LOGIN_MAX_FAILURES", "LOGIN_WINDOW_MS", "confirmLoginSuccess", "reserveLoginAttempt"]);
+  });
+
   let db: Db;
   const now = new Date("2026-10-13T15:00:00.000Z");
   const IP = "hash-de-una-ip";
@@ -252,50 +330,56 @@ describe("login rate limit", () => {
     await db.delete(loginAttempts);
   });
 
-  async function failures(count: number, ipHash = IP, at = now): Promise<void> {
-    for (let i = 0; i < count; i += 1) await recordLoginAttempt(db, ipHash, false, at);
+  /** Intentos ya resueltos de `ipHash` a la hora `at`, escritos directo en la tabla. */
+  async function seed(count: number, succeeded: boolean, ipHash = IP, at = now): Promise<void> {
+    await db.insert(loginAttempts).values(Array.from({ length: count }, () => ({ ipHash, succeeded, createdAt: at })));
+  }
+
+  /** ¿Se rechaza hoy un intento de `ipHash`? Reservarlo es la única forma de preguntarlo: si entra, queda anotado. */
+  async function isRefused(ipHash = IP, at = now): Promise<boolean> {
+    return (await reserveLoginAttempt(db, ipHash, at)) === null;
   }
 
   test("blocks an ip after five failures in fifteen minutes and frees it after", async () => {
-    await failures(LOGIN_MAX_FAILURES - 1);
-    expect(await isLoginBlocked(db, IP, now)).toBe(false);
+    await seed(LOGIN_MAX_FAILURES - 1, false);
+    // El quinto intento todavía entra (y queda anotado); el sexto ya no.
+    expect(await isRefused()).toBe(false);
 
-    await failures(1);
-    expect(await isLoginBlocked(db, IP, now)).toBe(true);
-    expect(await isLoginBlocked(db, IP, new Date(now.getTime() + 14 * MINUTE_MS))).toBe(true);
-    expect(await isLoginBlocked(db, IP, new Date(now.getTime() + LOGIN_WINDOW_MS))).toBe(false);
-    expect(await isLoginBlocked(db, IP, new Date(now.getTime() + 16 * MINUTE_MS))).toBe(false);
+    expect(await isRefused()).toBe(true);
+    expect(await isRefused(IP, new Date(now.getTime() + 14 * MINUTE_MS))).toBe(true);
+    expect(await isRefused(IP, new Date(now.getTime() + LOGIN_WINDOW_MS))).toBe(false);
+    expect(await isRefused(IP, new Date(now.getTime() + 16 * MINUTE_MS))).toBe(false);
   });
 
   test("keeps each ip apart", async () => {
-    await failures(LOGIN_MAX_FAILURES);
+    await seed(LOGIN_MAX_FAILURES, false);
 
-    expect(await isLoginBlocked(db, IP, now)).toBe(true);
-    expect(await isLoginBlocked(db, "hash-de-otra-ip", now)).toBe(false);
+    expect(await isRefused()).toBe(true);
+    expect(await isRefused("hash-de-otra-ip")).toBe(false);
   });
 
   test("counts only failures: successful logins never block", async () => {
-    for (let i = 0; i < 10; i += 1) await recordLoginAttempt(db, IP, true, now);
-    expect(await isLoginBlocked(db, IP, now)).toBe(false);
+    await seed(10, true);
+    await seed(LOGIN_MAX_FAILURES - 1, false);
 
-    await failures(LOGIN_MAX_FAILURES - 1);
-    expect(await isLoginBlocked(db, IP, now)).toBe(false);
+    // Diez ingresos y cuatro fallos: el quinto intento entra; el sexto, no.
+    expect(await isRefused()).toBe(false);
+    expect(await isRefused()).toBe(true);
   });
 
   test("counts only the failures inside the window", async () => {
-    const old = new Date(now.getTime() - 20 * MINUTE_MS);
-    await failures(LOGIN_MAX_FAILURES, IP, old);
-    await failures(2);
+    await seed(LOGIN_MAX_FAILURES, false, IP, new Date(now.getTime() - 20 * MINUTE_MS));
+    await seed(2, false);
 
-    expect(await isLoginBlocked(db, IP, now)).toBe(false);
+    expect(await isRefused()).toBe(false);
   });
 
   test("forgets attempts after thirty days and keeps the recent ones", async () => {
     const longAgo = new Date(now.getTime() - 31 * 24 * 60 * MINUTE_MS);
-    await recordLoginAttempt(db, IP, false, longAgo);
-    await recordLoginAttempt(db, IP, true, new Date(now.getTime() - 5 * 24 * 60 * MINUTE_MS));
+    await seed(1, false, IP, longAgo);
+    await seed(1, true, IP, new Date(now.getTime() - 5 * 24 * 60 * MINUTE_MS));
 
-    await recordLoginAttempt(db, IP, false, now);
+    await reserveLoginAttempt(db, IP, now);
 
     const rows = await db.select().from(loginAttempts);
     expect(rows).toHaveLength(2);
@@ -303,10 +387,10 @@ describe("login rate limit", () => {
   });
 
   test("stores the ip hash and the outcome, nothing else", async () => {
-    await recordLoginAttempt(db, IP, false, now);
+    const id = await reserveLoginAttempt(db, IP, now);
 
     const [row] = await db.select().from(loginAttempts);
-    expect(row).toMatchObject({ ipHash: IP, succeeded: false, createdAt: now });
+    expect(row).toMatchObject({ id, ipHash: IP, succeeded: false, createdAt: now });
   });
 
   describe("reserving a slot before checking the password", () => {
@@ -328,11 +412,10 @@ describe("login rate limit", () => {
         if (id === null) throw new Error("the reservation should not be refused");
         ids.push(id);
       }
-      expect(await isLoginBlocked(db, IP, now)).toBe(true);
+      expect(await isRefused()).toBe(true);
 
       await confirmLoginSuccess(db, ids[0]);
 
-      expect(await isLoginBlocked(db, IP, now)).toBe(false);
       const confirmed = await db.select().from(loginAttempts);
       expect(confirmed.filter((row) => row.succeeded)).toHaveLength(1);
       expect(typeof (await reserveLoginAttempt(db, IP, now))).toBe("number");
@@ -403,7 +486,7 @@ describe("attemptLogin", () => {
     const rows = await db.select().from(loginAttempts);
     expect(rows.filter((row) => row.succeeded)).toHaveLength(1);
     expect(rows.filter((row) => !row.succeeded)).toHaveLength(LOGIN_MAX_FAILURES - 1);
-    expect(await isLoginBlocked(db, IP, new Date())).toBe(false);
+    expect(await reserveLoginAttempt(db, IP, new Date())).not.toBeNull();
   });
 
   test("never checks the password while blocked", async () => {

@@ -1,10 +1,13 @@
 // Sesión del panel: un JWT firmado (HS256) con `ADMIN_SESSION_SECRET`, guardado
 // en una cookie. No hay usuarios ni sesiones en la base: la cookie es válida si
-// la firma, la audiencia y el vencimiento son correctos.
+// la firma, la audiencia, el vencimiento y el claim de la contraseña son
+// correctos. El claim (`password-claim.ts`) cambia cuando cambia
+// `ADMIN_PASSWORD_HASH`, así cambiar la contraseña cierra todas las sesiones.
 
-import { createHmac } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
-import { getSessionSecret } from "./config";
+import { getPasswordHash, getSessionSecret } from "./config";
+import { PASSWORD_CLAIM, passwordClaim } from "./password-claim";
 
 export const ADMIN_COOKIE = "tallami_admin";
 /** Para qué sirve el token: un token firmado con el mismo secreto pero otra audiencia no entra. */
@@ -25,32 +28,57 @@ function requireSecret(): Uint8Array {
   return secret;
 }
 
-/** Firma una sesión nueva: audiencia del panel y vencimiento a las 12 horas. */
+/** El claim de la contraseña vigente, o `null` si el hash no está configurado. */
+function currentPasswordClaim(secret: Uint8Array): string | null {
+  const passwordHash = getPasswordHash();
+  return passwordHash ? passwordClaim(secret, passwordHash) : null;
+}
+
+/** Igualdad en tiempo constante de dos textos (falso enseguida si el largo difiere). */
+function sameText(a: string, b: string): boolean {
+  const left = Buffer.from(a);
+  const right = Buffer.from(b);
+  return left.length === right.length && timingSafeEqual(left, right);
+}
+
+/**
+ * Firma una sesión nueva: audiencia del panel, vencimiento a las 12 horas y el
+ * claim de la contraseña vigente. Tira si falta el secreto o el hash.
+ */
 export async function createSessionToken(): Promise<string> {
-  return new SignJWT({})
+  const secret = requireSecret();
+  const claim = currentPasswordClaim(secret);
+  if (claim === null) {
+    throw new Error("ADMIN_PASSWORD_HASH falta o no tiene el formato esperado.");
+  }
+  return new SignJWT({ [PASSWORD_CLAIM]: claim })
     .setProtectedHeader({ alg: ALGORITHM })
     .setAudience(SESSION_AUDIENCE)
     .setIssuedAt()
     .setExpirationTime(`${SESSION_HOURS}h`)
-    .sign(requireSecret());
+    .sign(secret);
 }
 
 /**
  * ¿Es `token` una sesión válida? Exige firma HS256 con el secreto, la audiencia
- * del panel y un vencimiento que no pasó. Cualquier otra cosa (sin cookie,
- * texto cualquiera, `alg: none`, otro algoritmo, token sin vencimiento) es
- * `false`; nunca tira.
+ * del panel, un vencimiento que no pasó y el claim de la contraseña vigente:
+ * una sesión de antes de cambiar `ADMIN_PASSWORD_HASH` (o de antes de que
+ * existiera el claim) no vale. Cualquier otra cosa (sin cookie, texto
+ * cualquiera, `alg: none`, otro algoritmo, token sin vencimiento) es `false`;
+ * nunca tira.
  */
 export async function verifySessionToken(token: string | undefined): Promise<boolean> {
   const secret = getSessionSecret();
   if (!token || !secret) return false;
   try {
-    await jwtVerify(token, secret, {
+    const { payload } = await jwtVerify(token, secret, {
       algorithms: [ALGORITHM],
       audience: SESSION_AUDIENCE,
       requiredClaims: ["exp"],
     });
-    return true;
+    const expected = currentPasswordClaim(secret);
+    const claim = payload[PASSWORD_CLAIM];
+    return expected !== null && typeof claim === "string" && sameText(claim, expected);
   } catch {
     return false;
   }

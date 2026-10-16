@@ -1,7 +1,7 @@
 // Límite de intentos de ingreso: 5 fallidos por IP cada 15 minutos. Los
 // intentos viven en la tabla `login_attempts` (no en memoria): en Vercel cada
 // pedido puede caer en una instancia distinta. La IP se guarda solo como hash
-// (`hashIp`).
+// (`loginIpHash`: el /64 de una IPv6, ver `login-ip.ts`).
 //
 // Reservar antes de revisar. Mirar si la IP está bloqueada y recién después
 // anotar el fallo deja pasar una ráfaga: todos los pedidos simultáneos ven
@@ -46,29 +46,12 @@ async function purgeOldAttempts(db: Db, now: Date): Promise<void> {
     .where(lt(loginAttempts.createdAt, new Date(now.getTime() - RETENTION_MS)));
 }
 
-/** ¿Esta IP ya hizo `LOGIN_MAX_FAILURES` intentos fallidos en los últimos 15 minutos? */
-export async function isLoginBlocked(db: Db, ipHash: string, now: Date): Promise<boolean> {
-  return (await countRecentFailures(db, ipHash, now)) >= LOGIN_MAX_FAILURES;
-}
-
-/**
- * Anota un intento ya resuelto y borra los de hace más de 30 días. La hora la
- * pone la app (no la base), la misma con la que después se consulta el bloqueo.
- */
-export async function recordLoginAttempt(
-  db: Db,
-  ipHash: string,
-  succeeded: boolean,
-  at: Date = new Date(),
-): Promise<void> {
-  await db.insert(loginAttempts).values({ ipHash, succeeded, createdAt: at });
-  await purgeOldAttempts(db, at);
-}
-
 /**
  * Reserva un lugar para un intento de ingreso, antes de revisar la contraseña.
  * Devuelve el id de la reserva (un fallo anotado hasta que se confirme el éxito)
  * o `null` si la IP ya agotó sus intentos: en ese caso no deja ninguna fila.
+ * La hora la pone la app (no la base), la misma con la que se cuenta la ventana;
+ * al reservar se borran también los intentos de hace más de 30 días.
  */
 export async function reserveLoginAttempt(
   db: Db,
