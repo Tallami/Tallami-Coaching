@@ -3,6 +3,7 @@ import Link from "next/link";
 import { requireAdmin } from "@/admin/auth/require-admin";
 import { InvoicePanel } from "@/admin/billing/invoice-panel";
 import { invoiceUndoNotice } from "@/admin/billing/saved-notice";
+import { todayInArgentina } from "@/admin/dates";
 import { saleToFormValues } from "@/admin/sales/form-values";
 import { priceListUsd } from "@/admin/sales/price-list";
 import { getSale } from "@/admin/sales/repository";
@@ -54,12 +55,17 @@ export default async function EditSalePage(props: PageProps<"/admin/ventas/[id]"
         </Notice>
       ) : null}
       <SavedValues sale={sale} />
-      <InvoicePanel sale={sale} undoAction={markInvoicePendingAction.bind(null, sale.id)} />
+      <InvoicePanel
+        sale={sale}
+        undoAction={markInvoicePendingAction.bind(null, sale.id)}
+        today={todayInArgentina()}
+      />
       <SaleForm
         mode="edit"
         action={updateSaleAction.bind(null, sale.id)}
         initialValues={saleToFormValues(sale)}
         priceListUsd={priceListUsd()}
+        invoiced={sale.invoiceStatus === "issued"}
       />
     </AdminShell>
   );

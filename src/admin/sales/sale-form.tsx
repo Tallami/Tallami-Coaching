@@ -43,6 +43,8 @@ export interface SaleFormProps {
   initialValues: SaleFormValues;
   /** Precio de lista en dólares enteros de cada servicio que tiene uno. */
   priceListUsd: Partial<Record<SaleItem, number>>;
+  /** La venta que se edita ya tiene una factura emitida: el formulario avisa que, si cambia el monto, la moneda o la fecha, hay que revisarla. */
+  invoiced?: boolean;
 }
 
 const SALES_PATH = "/admin/ventas";
@@ -104,7 +106,7 @@ const threeColumns = "grid grid-cols-3 gap-x-5 gap-y-5 narrow:grid-cols-1";
  * error y hay que conservar lo escrito. Por lo mismo, el botón de guardar
  * espera a que la página esté lista.
  */
-export function SaleForm({ mode, action, initialValues, priceListUsd }: SaleFormProps) {
+export function SaleForm({ mode, action, initialValues, priceListUsd, invoiced = false }: SaleFormProps) {
   const [values, setValues] = useState(initialValues);
   const [autoFilledAmount, setAutoFilledAmount] = useState<string | null>(null);
   const [state, dispatch, isSaving] = useActionState(action, INITIAL_SALE_FORM_STATE);
@@ -177,6 +179,12 @@ export function SaleForm({ mode, action, initialValues, priceListUsd }: SaleForm
           </Notice>
         ) : null}
       </div>
+      {invoiced ? (
+        // Cambiar el monto, la moneda o la fecha de cobro no toca la factura: el aviso recuerda revisarla.
+        <Notice tone="info">
+          Esta venta ya tiene factura; si cambiás el monto, la moneda o la fecha, revisá la factura.
+        </Notice>
+      ) : null}
 
       <FormSection title="Alumno" description="Quién compró. Si es la primera vez, cargalo acá.">
         <CustomerPicker values={values} errors={errors} onChange={update} />
@@ -336,7 +344,7 @@ export function SaleForm({ mode, action, initialValues, priceListUsd }: SaleForm
             id="sale-delivered-at"
             label="Entregada el"
             optional
-            hint="Si la venta queda entregada y la dejás vacía, se anota el momento en que guardás."
+            hint="Solo vale si la venta queda entregada: con otro estado se borra. Si queda entregada y la dejás vacía, se anota el momento en que guardás."
             error={errors.deliveredAt}
           >
             {(control) => (

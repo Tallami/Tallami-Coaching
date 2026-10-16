@@ -23,6 +23,8 @@ import {
   whenInteractive,
 } from "../helpers/admin-ui";
 import { parseCsv } from "../helpers/csv";
+import { formatDay } from "../../src/admin/dates";
+import { addDays, todayInArgentina } from "../../src/admin/metrics/period";
 
 const BILLING_PATH = "/admin/facturacion";
 const SETTINGS_PATH = "/admin/configuracion";
@@ -684,6 +686,62 @@ test.describe("undoing an invoice", () => {
     await expect(page.getByTestId("invoice-panel")).toContainText(right);
     await expect(page.getByTestId("invoice-panel")).not.toContainText(wrong);
     await expect(page.getByTestId("invoice-panel")).toContainText("Factura E");
+  });
+
+  test("an invoiced sale that was cancelled keeps its invoice on screen, without the undo button, and points to ARCA", async ({
+    page,
+  }) => {
+    const student = uniqueName("Lola cancelada");
+    const number = uniqueInvoiceNumber();
+    await createSale(page, { student });
+    await invoiceOne(page, student, { type: "C", number, issuedOn: "2026-10-02" });
+    await page.goto(await saleHref(page, student));
+    // Con la factura emitida, el formulario avisa que hay que revisarla si cambia el monto, la moneda o la fecha.
+    const form = page.locator("form[data-hydrated='true']");
+    await expect(
+      form.getByText("Esta venta ya tiene factura; si cambiás el monto, la moneda o la fecha, revisá la factura."),
+    ).toBeVisible();
+    await expect(page.getByTestId("invoice-panel").getByRole("button", { name: "Volver a pendiente" })).toBeVisible();
+
+    await form.getByLabel("Estado", { exact: true }).selectOption("cancelled");
+    await page.getByRole("button", { name: "Guardar cambios" }).click();
+    await expect(page).toHaveURL(/\/admin\/ventas\?guardada=editada$/);
+
+    await page.goto(await saleHref(page, student));
+    const panel = page.getByTestId("invoice-panel");
+    await expect(panel).toContainText("Factura C");
+    await expect(panel).toContainText(number);
+    await expect(panel).toContainText("02/10/2026");
+    await expect(panel).toContainText("la venta está cancelada");
+    await expect(panel).toContainText("nota de crédito");
+    await expect(panel).toContainText("ARCA");
+    await expect(panel.getByRole("button")).toHaveCount(0);
+  });
+
+  test("a sale without an invoice does not show the invoice warning in its form", async ({ page }) => {
+    const student = uniqueName("Nora sin aviso");
+    await createSale(page, { student });
+
+    await page.goto(await saleHref(page, student));
+
+    await expect(page.locator("form[data-hydrated='true']")).toBeVisible();
+    await expect(page.getByText("Esta venta ya tiene factura")).toHaveCount(0);
+  });
+
+  test("a sale collected on a future day says from which day it can be invoiced", async ({ page }) => {
+    const student = uniqueName("Mora futura");
+    const payDay = addDays(todayInArgentina(), 10);
+    await createSale(page, { student, paidOn: payDay });
+
+    await page.goto(await saleHref(page, student));
+
+    const panel = page.getByTestId("invoice-panel");
+    await expect(panel).toContainText(`La vas a poder facturar desde el ${formatDay(payDay)}.`);
+    await expect(panel.getByRole("link")).toHaveCount(0);
+    await expect(panel.getByRole("button")).toHaveCount(0);
+    // Y todavía no está en la lista de Facturación.
+    await openBilling(page);
+    await expect(rowOf(page, student)).toHaveCount(0);
   });
 
   test("a sale marked as not requiring an invoice can go back to pending and is listed again", async ({ page }) => {

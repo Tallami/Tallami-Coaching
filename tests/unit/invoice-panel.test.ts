@@ -7,8 +7,11 @@ import { saleRow } from "../helpers/sale-rows";
 
 async function noop() {}
 
-function render(overrides: Partial<SaleRow> = {}): string {
-  return renderToStaticMarkup(createElement(InvoicePanel, { sale: saleRow(overrides), undoAction: noop }));
+/** Martes 16/10/2026 en Argentina: la venta de prueba (cobrada el 5/10) ya se puede facturar. */
+const TODAY = "2026-10-16";
+
+function render(overrides: Partial<SaleRow> = {}, today: string = TODAY): string {
+  return renderToStaticMarkup(createElement(InvoicePanel, { sale: saleRow(overrides), undoAction: noop, today }));
 }
 
 const ISSUED = {
@@ -67,6 +70,81 @@ describe("InvoicePanel", () => {
     expect(markup).toContain("cobrada");
     expect(markup).not.toContain('href="/admin/facturacion"');
     expect(markup).not.toContain("Volver a pendiente");
+  });
+
+  test.each(["paid", "delivered"] as const)("a %s sale with an invoice can be returned to pending", (status) => {
+    const markup = render({ ...ISSUED, status });
+
+    expect(markup).toContain("Volver a pendiente");
+    expect(markup).toContain("<form");
+    expect(markup).not.toContain("nota de crédito");
+  });
+
+  describe("a cancelled or refunded sale", () => {
+    test.each([
+      ["cancelled", "cancelada"],
+      ["refunded", "reembolsada"],
+    ] as const)("%s: shows the invoice data, no undo button, and says the credit note is made in ARCA", (status, word) => {
+      const markup = render({ ...ISSUED, status });
+
+      expect(markup).toContain("Facturada");
+      expect(markup).toContain("Factura E");
+      expect(markup).toContain("00003-00000045");
+      expect(markup).toContain("13/10/2026");
+      expect(markup).not.toContain("Volver a pendiente");
+      expect(markup).not.toContain("<form");
+      expect(markup).not.toContain("<button");
+      expect(markup).toContain(`la venta está ${word}`);
+      expect(markup).toContain("nota de crédito");
+      expect(markup).toContain("ARCA");
+    });
+
+    test("one marked as not requiring an invoice has no button either, and no credit note to talk about", () => {
+      const markup = render({ invoiceStatus: "not_required", status: "cancelled" });
+
+      expect(markup).toContain("No requiere");
+      expect(markup).not.toContain("Volver a pendiente");
+      expect(markup).not.toContain("<form");
+      expect(markup).not.toContain("nota de crédito");
+      expect(markup).toContain("la venta está cancelada");
+    });
+  });
+
+  test("an invoiced sale that is not collected yet cannot be returned to pending either", () => {
+    const markup = render({ ...ISSUED, status: "pending", paidOn: null });
+
+    expect(markup).toContain("Factura E");
+    expect(markup).not.toContain("Volver a pendiente");
+    expect(markup).not.toContain("<form");
+    expect(markup).toContain("cobrada o entregada");
+  });
+
+  describe("a collected sale whose payment date is in the future", () => {
+    test("says from which day it can be invoiced, with no link to Facturación (it is not in that list yet)", () => {
+      const markup = render({ invoiceStatus: "pending", paidOn: "2026-10-20" });
+
+      expect(markup).toContain("La vas a poder facturar desde el 20/10/2026.");
+      expect(markup).not.toContain('href="/admin/facturacion"');
+      expect(markup).not.toContain("Todavía no la marcaste");
+      expect(markup).not.toContain("Volver a pendiente");
+    });
+
+    test("is a normal pending sale on the payment day itself and after it", () => {
+      for (const paidOn of ["2026-10-16", "2026-10-15"]) {
+        const markup = render({ invoiceStatus: "pending", paidOn });
+
+        expect(markup, paidOn).toContain("Todavía no la marcaste");
+        expect(markup, paidOn).toContain('href="/admin/facturacion"');
+        expect(markup, paidOn).not.toContain("La vas a poder facturar");
+      }
+    });
+
+    test("only changes the text of pending invoices: an invoiced one keeps its data and button", () => {
+      const markup = render({ ...ISSUED, paidOn: "2026-10-20" });
+
+      expect(markup).toContain("Volver a pendiente");
+      expect(markup).not.toContain("La vas a poder facturar");
+    });
   });
 
   test("text written by hand in the number is escaped, not run", () => {
