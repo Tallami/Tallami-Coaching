@@ -46,3 +46,18 @@ export const PLAYERS: readonly Player[] = [
   { name: "Mack", handle: "mackftn", photo: mackftn },
   { name: "Vadeal", handle: "VadealFN", photo: vadealfn },
 ];
+
+// Un `Map`: un usuario como "constructor" o "__proto__" no tiene que encontrar
+// nada. X no distingue mayúsculas en los usuarios, así que se busca en minúscula.
+const PLAYERS_BY_HANDLE: ReadonlyMap<string, Player> = new Map(
+  PLAYERS.map((player) => [player.handle.toLowerCase(), player]),
+);
+
+/**
+ * El jugador de ese usuario de X, o `undefined` si no está en la lista. Las
+ * tarjetas del muro de Reviews lo usan para mostrar su foto local en lugar del
+ * avatar que manda X.
+ */
+export function playerByHandle(handle: string): Player | undefined {
+  return PLAYERS_BY_HANDLE.get(handle.toLowerCase());
+}

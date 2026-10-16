@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
-import { PLAYERS } from "@/content/players";
+import { PLAYERS, playerByHandle } from "@/content/players";
 import { FNCS_TITLES, LAN_RESULTS, WINS } from "@/content/results";
 import {
   LESSON_PACK,
@@ -116,6 +116,22 @@ describe("players", () => {
       missing,
       "Hay foto en src/assets/players pero no se importó en src/content/players.ts",
     ).toEqual([]);
+  });
+
+  test("finds a player by X handle, ignoring capitals, which is how X treats them", () => {
+    for (const player of PLAYERS) {
+      expect(playerByHandle(player.handle)).toBe(player);
+      expect(playerByHandle(player.handle.toLowerCase())).toBe(player);
+      expect(playerByHandle(player.handle.toUpperCase())).toBe(player);
+    }
+    expect(playerByHandle("lewafn")?.name).toBe("Lewa");
+    expect(playerByHandle("LEWAFN")?.photo).toBeDefined();
+  });
+
+  test("finds nobody for a handle that is not a player, nor for names that live in every object", () => {
+    for (const handle of ["", "nadie", "lewafn ", "@lewafn", "__proto__", "constructor", "toString", "hasOwnProperty"]) {
+      expect(playerByHandle(handle), handle).toBeUndefined();
+    }
   });
 
   test("the e2e reading of players.ts matches PLAYERS", () => {

@@ -65,6 +65,21 @@
   background: var(--color-stage-line);
 }
 
+/* Sin foto local del jugador: sus iniciales sobre el círculo azul, como en la franja "Trabajé con". */
+.initials {
+  display: grid;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--color-beam);
+  color: var(--color-on-stage);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .who {
   display: flex;
   flex: 1;

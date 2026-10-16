@@ -2,17 +2,14 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
 import { TweetCard } from "@/components/home/tweet-card";
-import type { TweetCard as TweetCardData } from "@/lib/tweets";
+import { TWEET_SNAPSHOTS } from "@/content/tweet-snapshots";
+import { TWEET_IDS } from "@/content/tweets";
+import { toTweetCard, type TweetCard as TweetCardData } from "@/lib/tweets";
 
 const CARD: TweetCardData = {
   id: "2104290558906868129",
   url: "https://x.com/LewaFn/status/2104290558906868129",
-  author: {
-    name: "Lewa",
-    handle: "LewaFn",
-    avatarUrl:
-      "https://pbs.twimg.com/profile_images/2091496317293903872/b2uVDrQ3_200x200.jpg",
-  },
+  author: { name: "Lewa", handle: "LewaFn" },
   text: "Top 14 ($32000) conned 12/12 🥲\n@romerofdps @tallami1",
   createdAt: "2026-09-27T19:22:19.000Z",
   image: {
@@ -94,6 +91,65 @@ describe("TweetCard", () => {
     const photo = markup.slice(markup.lastIndexOf("<img"));
     expect(photo.match(/ \d(\.\d)?x[,"]/g)).toHaveLength(2);
     expect(photo).not.toContain("3840w");
+  });
+
+  describe("the avatar", () => {
+    test("is the local photo of the player, decorative, at 40 px, and never an image from X", () => {
+      const [avatar] = pictureImagesOf(render(CARD));
+
+      expect(avatar).toContain('alt=""');
+      expect(avatar).toContain('width="40"');
+      expect(avatar).toContain('height="40"');
+      // Sale de `src/assets/players/lewafn.jpg` (la importa `PLAYERS`), no de pbs.twimg.com.
+      expect(avatar).toContain("lewafn");
+      expect(avatar).not.toContain("twimg");
+      expect(avatar).not.toContain("profile_images");
+    });
+
+    test("finds the player whatever the capitals of the handle", () => {
+      for (const handle of ["lewafn", "LEWAFN", "LewaFn"]) {
+        const [avatar] = pictureImagesOf(render({ ...CARD, author: { name: "Lewa", handle } }));
+
+        expect(avatar, handle).toContain("lewafn");
+      }
+    });
+
+    test("every author of the tweets on the wall gets a local photo, and no image from X", () => {
+      for (const id of TWEET_IDS) {
+        const card = toTweetCard(TWEET_SNAPSHOTS[id]);
+        const markup = render({ ...card, image: undefined });
+
+        const [avatar] = pictureImagesOf(markup);
+        expect(avatar, `tweet ${id}`).toBeDefined();
+        expect(avatar, `tweet ${id}`).not.toContain("twimg");
+        expect(markup, `tweet ${id}`).not.toContain("twimg.com");
+      }
+    });
+
+    test("falls back to the initials on a circle, with no image at all, for an author without a local photo", () => {
+      const markup = render({
+        ...CARD,
+        image: undefined,
+        author: { name: "Nuevo Jugador", handle: "nuevo_jugador" },
+      });
+
+      expect(markup).toMatch(/<span class="[^"]*"[^>]*>NJ<\/span>/);
+      // Sin foto no hay imagen rota ni pedido a X: solo el emoji del texto es una imagen.
+      expect(pictureImagesOf(markup)).toHaveLength(0);
+      expect(markup).not.toContain("twimg");
+      // El nombre y el usuario siguen escritos.
+      expect(markup).toContain("Nuevo Jugador");
+      expect(markup).toContain("@nuevo_jugador");
+    });
+
+    test("the initials are decoration inside the part already hidden from screen readers", () => {
+      const markup = render({ ...CARD, author: { name: "Nuevo", handle: "nuevo_jugador" } });
+
+      const hidden = markup.indexOf('aria-hidden="true"');
+      const initials = markup.search(/>N<\/span>/);
+      expect(hidden).toBeGreaterThan(-1);
+      expect(initials).toBeGreaterThan(hidden);
+    });
   });
 
   test("shows the tweet photo lazily and without alt text", () => {

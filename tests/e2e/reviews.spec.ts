@@ -362,13 +362,47 @@ test.describe("reviews wall", () => {
     await expect(images).toHaveCount(2);
     for (const image of await images.all()) {
       await expect(image).toHaveAttribute("alt", "");
-      await expect(image).toHaveAttribute(
-        "src",
-        /^\/_next\/image\?url=https%3A%2F%2Fpbs\.twimg\.com%2F/,
-      );
     }
-    // El avatar va primero; la foto del tweet carga en diferido.
+    // El avatar va primero y es la foto local del jugador (un archivo del sitio);
+    // la foto del tweet es de X, pasa por el optimizador y carga en diferido.
+    await expect(images.nth(0)).toHaveAttribute(
+      "src",
+      /^\/_next\/image\?url=%2F_next%2Fstatic%2Fmedia%2F/,
+    );
+    await expect(images.nth(1)).toHaveAttribute(
+      "src",
+      /^\/_next\/image\?url=https%3A%2F%2Fpbs\.twimg\.com%2Fmedia%2F/,
+    );
     await expect(images.nth(1)).toHaveAttribute("loading", "lazy");
+  });
+
+  test("avatars are the local photos of the players: nothing asks X for one, and none is broken", async ({
+    page,
+  }) => {
+    const requested: string[] = [];
+    page.on("request", (request) => requested.push(request.url()));
+    await page.goto("/es");
+
+    // El avatar es la imagen del encabezado de cada tarjeta (el bloque que se oculta al lector).
+    const avatars = wallOf(page).locator("a[href*='/status/'] > span[aria-hidden='true'] > img");
+    await expect(avatars.first()).toBeAttached();
+    expect(await avatars.count()).toBeGreaterThanOrEqual(TWEET_IDS.length);
+    // Cargan en diferido: se las pide a todas para comprobar que ninguna queda rota.
+    await avatars.evaluateAll((images) => {
+      for (const image of images as HTMLImageElement[]) image.loading = "eager";
+    });
+    await expect
+      .poll(() =>
+        avatars.evaluateAll((images) =>
+          (images as HTMLImageElement[]).every((image) => image.complete && image.naturalWidth > 0),
+        ),
+      )
+      .toBe(true);
+
+    const avatarRequests = requested.filter((url) => /profile_images|abs\.twimg\.com/.test(decodeURIComponent(url)));
+    expect(avatarRequests).toEqual([]);
+    // Lo que sí se pidió: las fotos de `src/assets/players` por el optimizador de imágenes.
+    expect(requested.some((url) => /\/_next\/image\?url=%2F_next%2Fstatic%2Fmedia%2F/.test(url))).toBe(true);
   });
 
   // Los emojis son imágenes de Twemoji (en Windows 10 los nuevos salen como

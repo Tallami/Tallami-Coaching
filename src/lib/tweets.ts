@@ -12,8 +12,12 @@ export type TweetCard = {
   id: string;
   /** `https://x.com/<usuario>/status/<id>`. */
   url: string;
-  /** `avatarUrl` es el avatar de 200x200 (X manda el de 48 px; ver `sharpAvatarUrl`). */
-  author: { name: string; handle: string; avatarUrl: string };
+  /**
+   * Sin avatar: la tarjeta muestra la foto local del jugador (`playerByHandle`),
+   * nunca la de X, que a veces responde 404 (`_200x200` no siempre existe) y
+   * obligaba a permitir otro servidor de imágenes.
+   */
+  author: { name: string; handle: string };
   /** Texto plano: sin el link `t.co` final y con las entidades HTML decodificadas. */
   text: string;
   /** Fecha de publicación, ISO 8601. */
@@ -64,8 +68,11 @@ const SNAPSHOTS_SOURCE = "snapshots";
 const X_REQUEST_TIMEOUT_MS = 5_000;
 
 const TRAILING_SHORT_LINK = /\s*https:\/\/t\.co\/\w+\s*$/;
-const NORMAL_AVATAR_SUFFIX = /_normal(\.\w+)$/;
 const MENTION = /@\w+/g;
+const WHITESPACE = /\s+/;
+/** Una letra o un número de cualquier idioma: lo que cuenta como inicial. */
+const LETTER_OR_NUMBER = /[\p{L}\p{N}]/u;
+const MAX_INITIALS = 2;
 const WORD_CHARACTER = /[\w@]/;
 
 /** Un grafema es un emoji si tiene un pictograma, es una bandera o es un keycap. */
@@ -107,13 +114,28 @@ function cleanTweetText(rawText: string): string {
     .trim();
 }
 
+/** La primera letra o número del texto (por code point), o `undefined` si no tiene ninguno. */
+function firstLetterOrNumber(text: string): string | undefined {
+  return Array.from(text).find((char) => LETTER_OR_NUMBER.test(char));
+}
+
 /**
- * X manda el avatar de 48 px (`..._normal.jpg`), que se ve borroso a 40 px en
- * pantallas 2x y 3x. El mismo archivo existe en 200x200: se pide ese. Una URL
- * sin el sufijo `_normal` al final queda como vino.
+ * Las iniciales para el círculo de una tarjeta sin foto local: la primera letra
+ * de cada una de las dos primeras palabras del nombre ("Tomás Allami" → "TA",
+ * "Lewa" → "L"), en mayúscula. Las palabras sin letras ni números (emojis,
+ * símbolos) no cuentan. Si el nombre no tiene ninguna, la primera del usuario;
+ * y si tampoco, "?": nunca queda vacío.
  */
-function sharpAvatarUrl(url: string): string {
-  return url.replace(NORMAL_AVATAR_SUFFIX, "_200x200$1");
+export function authorInitials(name: string, handle: string): string {
+  const fromName = name
+    .trim()
+    .split(WHITESPACE)
+    .map(firstLetterOrNumber)
+    .filter((initial): initial is string => initial !== undefined)
+    .slice(0, MAX_INITIALS)
+    .join("");
+  const initials = fromName || firstLetterOrNumber(handle) || "?";
+  return initials.toUpperCase();
 }
 
 /** Fecha ISO que se puede leer; si no, tira error (la tarjeta no se arma). */
@@ -146,12 +168,6 @@ export function toTweetCard(tweet: Tweet): TweetCard {
     author: {
       name: requireText(tweet.user.name, "user.name"),
       handle,
-      avatarUrl: sharpAvatarUrl(
-        requireText(
-          tweet.user.profile_image_url_https,
-          "user.profile_image_url_https",
-        ),
-      ),
     },
     text: cleanTweetText(requireText(tweet.text, "text")),
     createdAt: requireDate(tweet.created_at),

@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 import Image from "next/image";
-import { tweetTextParts, type TweetCard as TweetCardData } from "@/lib/tweets";
+import { playerByHandle } from "@/content/players";
+import { authorInitials, tweetTextParts, type TweetCard as TweetCardData } from "@/lib/tweets";
 import styles from "./tweet-card.module.css";
 
 const AVATAR_SIZE = 40;
@@ -31,6 +32,23 @@ export interface TweetCardProps {
   date: string;
   /** "Ver en X". */
   viewOnX: string;
+}
+
+/**
+ * El círculo del autor: la foto local del jugador (`src/assets/players`, la misma
+ * de la franja "Trabajé con") y, si el autor no tiene una, sus iniciales sobre
+ * el círculo azul. Nunca el avatar de X: a veces responde 404 y la tarjeta
+ * quedaría con una imagen rota. Es decoración: va dentro del bloque que se
+ * oculta al lector de pantalla.
+ */
+function Avatar({ author }: { author: TweetCardData["author"] }) {
+  const photo = playerByHandle(author.handle)?.photo;
+  if (!photo) {
+    return <span className={styles.initials}>{authorInitials(author.name, author.handle)}</span>;
+  }
+  return (
+    <Image className={styles.avatar} src={photo} alt="" width={AVATAR_SIZE} height={AVATAR_SIZE} />
+  );
 }
 
 /**
@@ -100,13 +118,7 @@ export function TweetCard({ card, label, date, viewOnX }: TweetCardProps) {
     >
       <span className="sr-only">{label}: </span>
       <span className={styles.head} aria-hidden="true">
-        <Image
-          className={styles.avatar}
-          src={author.avatarUrl}
-          alt=""
-          width={AVATAR_SIZE}
-          height={AVATAR_SIZE}
-        />
+        <Avatar author={author} />
         <span className={styles.who}>
           <b>{author.name}</b>
           <span>@{author.handle}</span>

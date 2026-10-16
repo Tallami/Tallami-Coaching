@@ -1,10 +1,11 @@
 import type { Tweet } from "react-tweet/api";
 import { getTweet } from "react-tweet/api";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { PLAYERS } from "@/content/players";
+import { PLAYERS, playerByHandle } from "@/content/players";
 import { TWEET_SNAPSHOTS } from "@/content/tweet-snapshots";
 import { TWEET_IDS } from "@/content/tweets";
 import {
+  authorInitials,
   fetchTweetCards,
   getTweetCards,
   resolveTweet,
@@ -77,6 +78,17 @@ describe("TWEET_IDS", () => {
       ).toBe(true);
     }
   });
+
+  test("every author has a local photo, so no card shows the avatar from X", () => {
+    for (const id of TWEET_IDS) {
+      const { author } = toTweetCard(TWEET_SNAPSHOTS[id]);
+
+      expect(
+        playerByHandle(author.handle)?.photo,
+        `@${author.handle} (tweet ${id}) no tiene foto local: corré "npm run players:photo -- ${author.handle}" y agregala en src/content/players.ts`,
+      ).toBeDefined();
+    }
+  });
 });
 
 describe("toTweetCard", () => {
@@ -86,9 +98,6 @@ describe("toTweetCard", () => {
     expect(card.id).toBe(TISCO_TWEET_ID);
     expect(card.author.handle).toBe("Tiscofn");
     expect(card.author.name).toBe("Tisco");
-    expect(card.author.avatarUrl).toMatch(
-      /^https:\/\/pbs\.twimg\.com\/profile_images\//,
-    );
     expect(card.url).toBe(`https://x.com/Tiscofn/status/${TISCO_TWEET_ID}`);
     expect(card.text).toBe(
       "12th FNCS Globals ($30.000)🇦🇷\n\n@CaduFN1 @StrykerFN1 @tallami1",
@@ -149,38 +158,22 @@ describe("toTweetCard", () => {
     expect(card).not.toHaveProperty("image");
   });
 
-  test("asks X for the sharp 200x200 avatar instead of the 48 px one", () => {
+  test("carries no avatar from X: the card shows the local photo of the player", () => {
     for (const id of TWEET_IDS) {
-      const { avatarUrl } = toTweetCard(fixture(id)).author;
+      const { author } = toTweetCard(fixture(id));
 
-      expect(avatarUrl).toMatch(/^https:\/\/pbs\.twimg\.com\/profile_images\//);
-      expect(avatarUrl).toMatch(/_200x200\.(jpg|jpeg|png)$/);
-      expect(avatarUrl).not.toContain("_normal");
+      expect(Object.keys(author).sort(), id).toEqual(["handle", "name"]);
     }
   });
 
-  test("swaps the size suffix of the default avatar too, and nothing else", () => {
-    const withAvatar = (profile_image_url_https: string) =>
-      toTweetCard({
-        ...fixture(TISCO_TWEET_ID),
-        user: { ...fixture(TISCO_TWEET_ID).user, profile_image_url_https },
-      }).author.avatarUrl;
+  test("does not need the avatar in the response from X", () => {
+    const tweet = fixture(TISCO_TWEET_ID);
+    const { profile_image_url_https, ...userWithoutAvatar } = tweet.user;
+    void profile_image_url_https;
 
-    expect(
-      withAvatar(
-        "https://abs.twimg.com/sticky/default_profile_images/default_profile_normal.png",
-      ),
-    ).toBe(
-      "https://abs.twimg.com/sticky/default_profile_images/default_profile_200x200.png",
-    );
-    // Sin el sufijo `_normal` la URL queda como vino.
-    expect(withAvatar("https://pbs.twimg.com/profile_images/1/abc.jpg")).toBe(
-      "https://pbs.twimg.com/profile_images/1/abc.jpg",
-    );
-    // Solo se cambia el sufijo del final: un `_normal` dentro del nombre no se toca.
-    expect(
-      withAvatar("https://pbs.twimg.com/profile_images/1/my_normal_pic_normal.jpg"),
-    ).toBe("https://pbs.twimg.com/profile_images/1/my_normal_pic_200x200.jpg");
+    const card = toTweetCard({ ...tweet, user: userWithoutAvatar as Tweet["user"] });
+
+    expect(card.author).toEqual({ name: "Tisco", handle: "Tiscofn" });
   });
 
   test("throws when the date is missing or is not a date", () => {
@@ -190,6 +183,33 @@ describe("toTweetCard", () => {
         created_at,
       ).toThrow(/created_at/);
     }
+  });
+});
+
+describe("authorInitials", () => {
+  test.each([
+    ["Lewa", "LewaFn", "L"],
+    ["Tomás Allami", "tallami1", "TA"],
+    ["  mack  ftn  ", "mackftn", "MF"],
+    ["Ana María Paula", "ana", "AM"],
+    ["áñ", "x", "Á"],
+    ["山田 太郎", "yamada", "山太"],
+    ["K1ng", "k1ng", "K"],
+    ["7even", "seven", "7"],
+  ])("takes the initials of %j", (name, handle, expected) => {
+    expect(authorInitials(name, handle)).toBe(expected);
+  });
+
+  test("skips emoji and symbols, which are not letters", () => {
+    expect(authorInitials("🔥 LEWA 🔥", "lewafn")).toBe("L");
+    expect(authorInitials("🔥🔥 Fazer ⚡ FN", "fazerfn")).toBe("FF");
+  });
+
+  test("falls back to the handle, and then to a question mark, so it is never empty", () => {
+    expect(authorInitials("🔥🔥", "lewafn")).toBe("L");
+    expect(authorInitials("", "_lewa_")).toBe("L");
+    expect(authorInitials("🔥", "___")).toBe("?");
+    expect(authorInitials("", "")).toBe("?");
   });
 });
 

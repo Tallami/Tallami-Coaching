@@ -9,12 +9,13 @@ import nextConfig from "../../next.config";
 const ALLOWED = [
   "https://pbs.twimg.com/profile_images/2091496317293903872/b2uVDrQ3_200x200.jpg",
   "https://pbs.twimg.com/media/HTPxG3WXkAA17Xr.jpg",
-  "https://abs.twimg.com/sticky/default_profile_images/default_profile_200x200.png",
 ];
 
 const REJECTED = [
   // Mismo servidor, sin https.
   "http://pbs.twimg.com/profile_images/x/y_200x200.jpg",
+  // El avatar por defecto de X ya no se usa: las tarjetas muestran la foto local del jugador.
+  "https://abs.twimg.com/sticky/default_profile_images/default_profile_200x200.png",
   "http://abs.twimg.com/sticky/default_profile_images/default_profile_200x200.png",
   // Otro servidor, o uno que solo se le parece.
   "https://evil.example.com/profile_images/x/y_200x200.jpg",
@@ -44,12 +45,9 @@ describe("next.config images.remotePatterns", () => {
     expect(isAllowed(url)).toBe(false);
   });
 
-  test("lists only the two X image servers, over https", () => {
+  test("lists only the X server of the tweet photos, over https", () => {
     const patterns = nextConfig.images?.remotePatterns ?? [];
 
-    expect(patterns).toEqual([
-      { protocol: "https", hostname: "pbs.twimg.com", pathname: "/**" },
-      { protocol: "https", hostname: "abs.twimg.com", pathname: "/**" },
-    ]);
+    expect(patterns).toEqual([{ protocol: "https", hostname: "pbs.twimg.com", pathname: "/**" }]);
   });
 });
