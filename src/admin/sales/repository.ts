@@ -70,8 +70,19 @@ async function resolveCustomerId(db: Db, customer: SaleCustomerInput): Promise<s
 }
 
 /**
- * Los valores de la venta a guardar. Una venta entregada sin hora de entrega
- * queda con la hora en que se guarda. USD y USDT valen lo mismo en dólares que
+ * La hora de entrega que se guarda: solo una venta entregada tiene una. Con otro
+ * estado (cobrada, pendiente, cancelada, reembolsada) queda vacía aunque el
+ * formulario traiga la fecha de cuando estaba entregada: una venta cobrada con
+ * hora de entrega saldría de los pendientes de entrega sin haberse entregado. Una
+ * venta entregada sin hora queda con la hora en que se guarda.
+ */
+function deliveryTime(input: SaleInput): Date | null {
+  if (input.status !== "delivered") return null;
+  return input.deliveredAt ?? new Date();
+}
+
+/**
+ * Los valores de la venta a guardar. USD y USDT valen lo mismo en dólares que
  * su monto; las demás monedas pasan por pesos.
  */
 function saleValues(customerId: string, input: SaleInput, rates: SaleRates) {
@@ -95,7 +106,7 @@ function saleValues(customerId: string, input: SaleInput, rates: SaleRates) {
     status: input.status,
     paidOn: input.paidOn ?? null,
     dueAt: input.dueAt ?? null,
-    deliveredAt: input.deliveredAt ?? (input.status === "delivered" ? new Date() : null),
+    deliveredAt: deliveryTime(input),
     notes: input.notes ?? null,
   };
 }

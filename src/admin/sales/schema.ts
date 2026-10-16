@@ -22,6 +22,7 @@ import {
   type SaleStatus,
 } from "@/admin/catalog";
 import { argentinaLocalToDate, isPlausibleDay } from "@/admin/dates";
+import { stripNul } from "@/admin/text";
 import {
   InvalidAmountError,
   InvalidRateError,
@@ -72,9 +73,12 @@ const MESSAGES = {
   notesTooLong: `Las notas son demasiado largas (máximo ${MAX_NOTES_LENGTH} caracteres).`,
 } as const;
 
-/** Texto opcional: sin espacios en los bordes y con un largo máximo. */
+/**
+ * Texto opcional: sin caracteres NUL (Postgres no los guarda), sin espacios en
+ * los bordes y con un largo máximo.
+ */
 function optionalText(max: number, tooLong: string) {
-  return z.string().trim().max(max, tooLong).optional();
+  return z.string().overwrite(stripNul).trim().max(max, tooLong).optional();
 }
 
 const customerSchema = z.discriminatedUnion(
@@ -88,12 +92,14 @@ const customerSchema = z.discriminatedUnion(
       mode: z.literal("new"),
       name: z
         .string({ error: MESSAGES.name })
+        .overwrite(stripNul)
         .trim()
         .min(1, MESSAGES.name)
         .max(MAX_NAME_LENGTH, MESSAGES.nameTooLong),
       discord: optionalText(MAX_DISCORD_LENGTH, MESSAGES.discordTooLong),
       country: z
         .string()
+        .overwrite(stripNul)
         .trim()
         .toUpperCase()
         .refine((value) => value === "" || COUNTRY_CODE.test(value), { error: MESSAGES.country })

@@ -8,13 +8,13 @@ import {
   salesQueryString,
 } from "@/admin/sales/filters";
 import { listSales } from "@/admin/sales/repository";
+import { savedSaleMessage } from "@/admin/sales/saved-message";
 import { SalesFilters } from "@/admin/sales/sales-filters";
 import { SalesTable } from "@/admin/sales/sales-table";
 import { AdminShell } from "@/admin/ui/admin-shell";
 import { Notice } from "@/admin/ui/notice";
 import { PageHeader } from "@/admin/ui/page-header";
 import { Pagination } from "@/admin/ui/pagination";
-import { firstValue } from "@/admin/ui/search-params";
 import { Button } from "@/components/ui/button";
 import { getDb } from "@/db/client";
 
@@ -22,12 +22,6 @@ export const metadata: Metadata = { title: "Ventas" };
 
 const PAGE_SIZE = 25;
 const SALES_PATH = "/admin/ventas";
-
-/** Avisos que deja `?guardada=` después de guardar una venta. */
-const SAVED_MESSAGES: Record<string, string> = {
-  creada: "Venta guardada.",
-  editada: "Cambios guardados.",
-};
 
 export default async function SalesPage(props: PageProps<"/admin/ventas">) {
   await requireAdmin();
@@ -39,7 +33,7 @@ export default async function SalesPage(props: PageProps<"/admin/ventas">) {
   // Una página que ya no existe (se borraron filtros, cambió la lista): a la última.
   if (page > pageCount) redirect(`${SALES_PATH}${salesQueryString(filter, pageCount)}`);
 
-  const savedMessage = SAVED_MESSAGES[firstValue(params.guardada) ?? ""];
+  const savedMessage = savedSaleMessage(params.guardada);
 
   return (
     <AdminShell active="sales">

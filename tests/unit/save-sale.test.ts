@@ -110,7 +110,49 @@ describe("saveSale", () => {
     });
   });
 
+  test("drops NUL characters from the texts instead of failing to save", async () => {
+    vi.stubEnv("EXCHANGE_RATE_SOURCE", "fixed");
+
+    const outcome = await saveSale(
+      db,
+      form({
+        customerName: "Dani\u0000 Nul",
+        customerDiscord: "dani\u0000.nul",
+        customerCountry: "a\u0000r",
+        item: "other",
+        description: "Clase\u0000 extra",
+        notes: "pagó\u0000 en efectivo",
+      }),
+    );
+
+    expect(outcome.saved).toBe(true);
+    if (!outcome.saved) return;
+    expect(await getSale(db, outcome.id)).toMatchObject({
+      customerName: "Dani Nul",
+      customerDiscord: "dani.nul",
+      customerCountry: "AR",
+      description: "Clase extra",
+      notes: "pagó en efectivo",
+    });
+  });
+
+  test("a name, a description or an amount that are only NUL characters count as empty", async () => {
+    vi.stubEnv("EXCHANGE_RATE_SOURCE", "fixed");
+    const before = await totals(db);
+
+    const outcome = await saveSale(
+      db,
+      form({ customerName: "\u0000\u0000", item: "other", description: "\u0000" }),
+    );
+
+    expect(outcome.saved).toBe(false);
+    if (outcome.saved) return;
+    expect(Object.keys(outcome.state.fieldErrors).sort()).toEqual(["customerName", "description"]);
+    expect(await totals(db)).toEqual(before);
+  });
+
   test("an unknown student is a field error, not a crash", async () => {
+    vi.stubEnv("EXCHANGE_RATE_SOURCE", "fixed");
     const before = await totals(db);
 
     const outcome = await saveSale(db, form({ customerMode: "existing", customerId: UNKNOWN_ID }));
@@ -118,6 +160,18 @@ describe("saveSale", () => {
     expect(outcome.saved).toBe(false);
     if (outcome.saved) return;
     expect(outcome.state.fieldErrors.customerId).toMatch(/ya no existe/);
+    expect(await totals(db)).toEqual(before);
+  });
+
+  test("an empty sale id is an edit of nothing: it never creates a sale", async () => {
+    vi.stubEnv("EXCHANGE_RATE_SOURCE", "fixed");
+    const before = await totals(db);
+
+    const outcome = await saveSale(db, form({ customerName: "No se debería crear" }), "");
+
+    expect(outcome.saved).toBe(false);
+    if (outcome.saved) return;
+    expect(outcome.state.formError).toBe("No encontramos esa venta.");
     expect(await totals(db)).toEqual(before);
   });
 

@@ -45,7 +45,8 @@ export async function saveSale(db: Db, formData: FormData, saleId?: string): Pro
 
   try {
     let previous: SaleRow | null = null;
-    if (saleId) {
+    // Solo `undefined` crea: un id vacío (`""`) es una edición de una venta que no existe.
+    if (saleId !== undefined) {
       previous = await getSale(db, saleId);
       if (!previous) return rejected({ formError: new SaleNotFoundError().message });
     }
@@ -58,9 +59,10 @@ export async function saveSale(db: Db, formData: FormData, saleId?: string): Pro
       });
     }
 
-    const { id } = saleId
-      ? await updateSale(db, saleId, input, resolution.rates)
-      : await createSale(db, input, resolution.rates);
+    const { id } =
+      saleId === undefined
+        ? await createSale(db, input, resolution.rates)
+        : await updateSale(db, saleId, input, resolution.rates);
     return { saved: true, id };
   } catch (error) {
     if (error instanceof CustomerNotFoundError) {

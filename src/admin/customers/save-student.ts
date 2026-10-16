@@ -59,9 +59,11 @@ export async function saveStudent(
   }
 
   try {
-    const { id } = studentId
-      ? await updateCustomer(db, studentId, parsed.data)
-      : await createCustomer(db, parsed.data);
+    // Solo `undefined` crea: un id vacío (`""`) es una edición de un alumno que no existe.
+    const { id } =
+      studentId === undefined
+        ? await createCustomer(db, parsed.data)
+        : await updateCustomer(db, studentId, parsed.data);
     return { saved: true, id };
   } catch (error) {
     if (error instanceof CustomerNotFoundError) return rejected({ formError: NOT_FOUND_MESSAGE });

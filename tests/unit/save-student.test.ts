@@ -131,6 +131,21 @@ describe("saveStudent", () => {
     }
   });
 
+  test("an empty id is an edit of nobody: it never creates a student", async () => {
+    // `""` es falsy, pero no es "sin id": solo `undefined` crea.
+    const before = (await namesLike(db, "")).length;
+
+    const outcome = await saveStudent(db, form({ name: "No se debería crear" }), "");
+
+    expect(outcome.saved).toBe(false);
+    if (outcome.saved) return;
+    expect(outcome.state.formError).toBe(
+      "No encontramos a ese alumno. Volvé a la lista de alumnos y elegilo de nuevo.",
+    );
+    expect(await namesLike(db, "No se debería crear")).toEqual([]);
+    expect((await namesLike(db, "")).length).toBe(before);
+  });
+
   test("a failing database is logged and reported without details", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     const { id } = await createCustomer(db, { name: "Eli intacta" });

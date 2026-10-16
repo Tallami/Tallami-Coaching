@@ -205,6 +205,79 @@ describe("createSale", () => {
   });
 });
 
+describe("the delivery time follows the status", () => {
+  let db: Db;
+  const DELIVERED_AT = "2026-10-13T10:00";
+  const DELIVERED_INSTANT = new Date("2026-10-13T13:00:00Z");
+
+  beforeAll(async () => {
+    db = await createTestDb();
+  });
+
+  test.each(["pending", "paid", "refunded", "cancelled"] as const)(
+    "a new %s sale keeps no delivery time even if one is typed",
+    async (status) => {
+      const paidOn = status === "pending" || status === "cancelled" ? undefined : "2026-10-12";
+      const { id } = await createSale(
+        db,
+        input({ status, paidOn, deliveredAt: DELIVERED_AT }),
+        RATES_1500,
+      );
+
+      expect((await getSale(db, id))?.deliveredAt).toBeNull();
+    },
+  );
+
+  test("moving a delivered sale to another status clears its delivery time", async () => {
+    for (const status of ["paid", "pending", "refunded", "cancelled"] as const) {
+      const { id } = await createSale(
+        db,
+        input({ status: "delivered", deliveredAt: DELIVERED_AT }),
+        RATES_1500,
+      );
+      expect((await getSale(db, id))?.deliveredAt).toEqual(DELIVERED_INSTANT);
+
+      // El formulario de edición manda la fecha que la venta ya tenía.
+      await updateSale(db, id, input({ status, deliveredAt: DELIVERED_AT }), RATES_1500);
+
+      expect((await getSale(db, id))?.deliveredAt, status).toBeNull();
+    }
+  });
+
+  test("a delivered sale keeps the time that was typed", async () => {
+    const { id } = await createSale(db, input({ status: "paid" }), RATES_1500);
+
+    await updateSale(db, id, input({ status: "delivered", deliveredAt: DELIVERED_AT }), RATES_1500);
+
+    expect((await getSale(db, id))?.deliveredAt).toEqual(DELIVERED_INSTANT);
+  });
+
+  test("a delivered sale without a time gets the moment it is saved, also when edited", async () => {
+    const { id } = await createSale(db, input({ status: "paid" }), RATES_1500);
+    const before = Date.now();
+
+    await updateSale(db, id, input({ status: "delivered" }), RATES_1500);
+
+    const stamped = (await getSale(db, id))?.deliveredAt?.getTime() ?? 0;
+    expect(stamped).toBeGreaterThanOrEqual(before - 1000);
+    expect(stamped).toBeLessThanOrEqual(Date.now() + 1000);
+  });
+
+  test("a sale that goes back to delivered gets a new time, not the old one", async () => {
+    const { id } = await createSale(
+      db,
+      input({ status: "delivered", deliveredAt: DELIVERED_AT }),
+      RATES_1500,
+    );
+    await updateSale(db, id, input({ status: "paid", deliveredAt: DELIVERED_AT }), RATES_1500);
+    const before = Date.now();
+
+    await updateSale(db, id, input({ status: "delivered" }), RATES_1500);
+
+    expect((await getSale(db, id))?.deliveredAt?.getTime()).toBeGreaterThanOrEqual(before - 1000);
+  });
+});
+
 describe("updateSale", () => {
   let db: Db;
 

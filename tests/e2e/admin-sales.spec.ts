@@ -158,6 +158,35 @@ test.describe("sales", () => {
     ).not.toHaveValue("");
   });
 
+  test("taking a sale back from delivered clears its delivery time", async ({ page }) => {
+    const student = uniqueName("Eli entrega");
+    await createSale(page, { student, item: "vodRecorded", status: "delivered" });
+    await openListFor(page, student);
+    await rowOf(page, student).getByRole("link", { name: student }).click();
+    const form = page.locator("form[data-hydrated='true']");
+    await expect(form).toBeVisible();
+    // Entregada: la venta tiene su fecha de entrega, que el formulario muestra.
+    await expect(form.getByLabel("Entregada el")).not.toHaveValue("");
+
+    await form.getByLabel("Estado", { exact: true }).selectOption("paid");
+    await page.getByRole("button", { name: "Guardar cambios" }).click();
+    await expect(page).toHaveURL(/\/admin\/ventas\?guardada=editada$/);
+
+    await openListFor(page, student);
+    await expect(rowOf(page, student)).toContainText("Cobrada");
+    await rowOf(page, student).getByRole("link", { name: student }).click();
+    // Cobrada pero no entregada: la fecha de entrega se borró, aunque el formulario la mandó.
+    await expect(page.locator("form[data-hydrated='true']").getByLabel("Entregada el")).toHaveValue("");
+
+    // Y al volver a entregarla se anota una nueva.
+    await page.locator("form[data-hydrated='true']").getByLabel("Estado", { exact: true }).selectOption("delivered");
+    await page.getByRole("button", { name: "Guardar cambios" }).click();
+    await expect(page).toHaveURL(/\/admin\/ventas\?guardada=editada$/);
+    await openListFor(page, student);
+    await rowOf(page, student).getByRole("link", { name: student }).click();
+    await expect(page.locator("form[data-hydrated='true']").getByLabel("Entregada el")).not.toHaveValue("");
+  });
+
   test("picks an existing student from the search", async ({ page }) => {
     const student = uniqueName("Dani recurrente");
     await createSale(page, { student });
@@ -239,6 +268,22 @@ test.describe("sales", () => {
       await expect(page.getByRole("heading", { name: "Ventas", level: 1 }), query).toBeVisible();
       await expect(page.getByLabel("Buscar alumno", { exact: true }), query).toBeVisible();
     }
+  });
+
+  test("a hand-typed ?guardada= that is an object property still shows the list, with no notice", async ({ page }) => {
+    // En un objeto común estas claves devuelven algo del prototipo (un objeto o una función), que
+    // React no puede mostrar como aviso: la página daba 500.
+    for (const value of ["__proto__", "constructor", "toString", "hasOwnProperty", "valueOf"]) {
+      const response = await page.goto(`/admin/ventas?guardada=${value}`);
+
+      expect(response?.status(), value).toBe(200);
+      await expect(page.getByRole("heading", { name: "Ventas", level: 1 }), value).toBeVisible();
+      await expect(page.getByRole("status").filter({ hasText: /guardad/i }), value).toHaveCount(0);
+    }
+
+    // Lo conocido sigue avisando.
+    await page.goto("/admin/ventas?guardada=editada");
+    await expect(page.getByRole("status").filter({ hasText: "Cambios guardados." })).toBeVisible();
   });
 
   test("a sale that does not exist says so inside the panel", async ({ page }) => {
