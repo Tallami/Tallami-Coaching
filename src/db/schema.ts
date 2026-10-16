@@ -175,8 +175,10 @@ export const loginAttempts = pgTable(
 /**
  * Un clic anónimo en un botón de reserva del sitio público (`/api/interest`):
  * qué servicio, en qué idioma, de qué país (encabezado de Vercel, si existe) y
- * cuándo. Sin cookies ni datos personales: la IP se guarda solo como HMAC, para
- * limitar ráfagas (30 por minuto por IP), nunca en claro.
+ * cuándo. Sin cookies ni datos personales: de la IP se guarda solo un HMAC de su
+ * /64 (o IPv4) con la fecha de Argentina, para limitar ráfagas, así que no se
+ * puede vincular entre días (ver `src/admin/interest/ip-key.ts`). Se borran a
+ * los 400 días (`src/admin/interest/retention.ts`).
  */
 export const interestEvents = pgTable(
   "interest_events",

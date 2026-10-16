@@ -118,6 +118,26 @@ test.describe("the service buttons of the public site", () => {
     expect(watch.requests()).toHaveLength(1);
   });
 
+  test("without sendBeacon the fetch fallback sends the same JSON click and the server accepts it", async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "sendBeacon", { value: undefined, configurable: true });
+    });
+    await page.goto("/pt");
+    const link = menuLink(page, 1);
+    await whenInteractive(link);
+    const sent = page.waitForRequest((request) => new URL(request.url()).pathname === ENDPOINT);
+    const answered = page.waitForResponse((response) => new URL(response.url()).pathname === ENDPOINT);
+
+    await link.click();
+
+    const request = await sent;
+    expect(request.method()).toBe("POST");
+    expect(request.headers()["content-type"]).toBe("application/json");
+    expect(request.postData()).toBe(bodyOf("vodLive", "pt"));
+    expect((await answered).status()).toBe(204);
+    await expect(page).toHaveURL(/\/pt#services$/);
+  });
+
   test("a click that cannot reach the server still follows the link", async ({ page }) => {
     await page.route(`**${ENDPOINT}`, (route) => route.abort());
     await page.goto("/es");
@@ -211,6 +231,21 @@ test.describe("POST /api/interest", () => {
     }
   });
 
+  test("accepts application/json with a charset, and refuses any other content-type with 415", async ({ request }) => {
+    const body = JSON.stringify({ item: "lesson", locale: "es" });
+
+    const withCharset = await post(request, body, { "content-type": "application/json; charset=utf-8" });
+    expect(withCharset.status()).toBe(204);
+
+    // Lo único que un POST entre sitios sin CORS puede mandar: texto plano, formulario o multipart.
+    for (const contentType of ["text/plain", "text/plain;charset=UTF-8", "application/x-www-form-urlencoded"]) {
+      const response = await post(request, body, { "content-type": contentType });
+      expect(response.status(), contentType).toBe(415);
+      expect(response.headers()["cache-control"]).toBe("no-store");
+      expect(await response.json()).toEqual({ error: "unsupported_media_type" });
+    }
+  });
+
   test("refuses a body over the size limit with 413", async ({ request }) => {
     const response = await post(request, JSON.stringify({ item: "lesson", locale: "es", pad: "x".repeat(5000) }));
 
@@ -232,6 +267,24 @@ test.describe("POST /api/interest", () => {
     );
 
     expect(response.status()).toBe(204);
+  });
+
+  test("an IPv6 visitor is one /64: rotating the last 64 bits does not escape the limit", async ({ request }) => {
+    const group = () => Math.floor(Math.random() * 0xffff).toString(16);
+    const prefix = `2001:db8:${group()}:${group()}`;
+    const statuses: number[] = [];
+    for (let index = 1; index <= 32; index += 1) {
+      const suffix = (index + 0x100).toString(16);
+      const response = await post(
+        request,
+        { item: "vodRecorded", locale: "es" },
+        { "x-forwarded-for": `${prefix}:${suffix}:${suffix}:${suffix}:${suffix}` },
+      );
+      statuses.push(response.status());
+    }
+
+    expect(statuses.slice(0, 30).every((status) => status === 204)).toBe(true);
+    expect(statuses.slice(30)).toEqual([429, 429]);
   });
 
   test("limits a burst: 30 clicks a minute per ip, then 429", async ({ request }) => {

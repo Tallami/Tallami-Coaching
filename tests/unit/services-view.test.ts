@@ -53,7 +53,6 @@ describe("ServicesView", () => {
       "Ingresos",
       "Ticket promedio",
       "% del total",
-      "Últimos 6 meses",
       "Última venta",
       "Clics en Reservar",
       "Conversión",
@@ -77,7 +76,32 @@ describe("ServicesView", () => {
     expect(cellOf(lesson, "share")).toBe("23,5 %");
     expect(cellOf(lesson, "last")).toContain("05/10/2026");
     expect(cellOf(lesson, "clicks")).toBe("8");
-    expect(cellOf(lesson, "conversion")).toBe("25 %");
+    // 8 clics y 3 ventas contando la del pack: 2 de Clase 1 a 1 y 1 del pack (que se pide desde ese botón).
+    expect(cellOf(lesson, "conversion")).toBe("37,5 % incluye 1 venta del pack");
+  });
+
+  test("the pack note only shows in Clase 1 a 1, and only when the pack sold", () => {
+    const markup = render();
+
+    expect(markup.match(/incluye \d+ ventas? del pack/g)).toHaveLength(1);
+    expect(cellOf(rowOf(markup, "lessonPack"), "conversion")).toBe("—");
+    expect(cellOf(rowOf(markup, "gamePlan"), "conversion")).toBe("—");
+    const withoutPack = render([sale({ item: "lesson", paidOn: "2026-10-05" })], { lesson: 4 });
+    expect(withoutPack).not.toMatch(/incluye \d+ ventas? del pack/);
+    expect(cellOf(rowOf(withoutPack, "lesson"), "conversion")).toBe("25 %");
+    const twoPacks = render(
+      [sale({ item: "lessonPack", paidOn: "2026-10-05" }), sale({ item: "lessonPack", paidOn: "2026-10-06" })],
+      { lesson: 4 },
+    );
+    expect(cellOf(rowOf(twoPacks, "lesson"), "conversion")).toBe("50 % incluye 2 ventas del pack");
+  });
+
+  test("the footnote says Clase 1 a 1 counts the pack sales", () => {
+    expect(render()).toContain("la conversión de Clase 1 a 1 cuenta también las ventas del pack");
+  });
+
+  test("the trend column says right in its header that each row has its own scale", () => {
+    expect(render()).toMatch(/>Últimos 6 meses\s?<span[^>]*>\(escala propia\)<\/span><\/th>/);
   });
 
   test("shows a dash, never NaN or Infinity, when there is nothing to divide by", () => {

@@ -27,8 +27,9 @@ function Notes() {
           vende por fuera del sitio (Discord, mensajes) y una compra puede cerrarse en otro período que el clic.
         </li>
         <li>
-          El pack de 4 clases y Otro no tienen botón propio en el sitio, por eso no tienen clics ni conversión. El
-          pack se pide desde el botón de Clase 1 a 1.
+          El pack de 4 clases y Otro no tienen botón propio en el sitio, por eso no tienen clics ni conversión propios.
+          El pack se pide desde el botón de Clase 1 a 1: la conversión de Clase 1 a 1 cuenta también las ventas del
+          pack (sus columnas de ventas e ingresos son solo las de la clase).
         </li>
         <li>
           Los clics son anónimos (sin cookies ni datos personales). Se descartan los bots y las ráfagas de una misma

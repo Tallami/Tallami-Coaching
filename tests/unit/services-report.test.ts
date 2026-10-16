@@ -139,6 +139,65 @@ describe("buildServicesReport", () => {
       expect(report.totals.clicks).toBe(0);
     });
 
+    test("Clase 1 a 1 also counts the pack sales: the pack is requested from that button", () => {
+      const sales = [
+        sale({ item: "lesson", dollars: 40 }),
+        sale({ item: "lesson", dollars: 40 }),
+        sale({ item: "lessonPack", dollars: 140 }),
+      ];
+
+      const report = buildServicesReport(sales, clicks({ lesson: 12 }), "thisMonth", NOW);
+      const lesson = rowOf(report.rows, "lesson");
+      const pack = rowOf(report.rows, "lessonPack");
+
+      // (2 clases + 1 pack) ÷ 12 clics del botón.
+      expect(lesson.conversionPct).toBe(25);
+      expect(lesson.conversionSales).toBe(3);
+      expect(lesson.includedPackSales).toBe(1);
+      // Las columnas propias de cada fila no se mezclan.
+      expect(lesson.sales).toBe(2);
+      expect(lesson.incomeUsdMinor).toBe(8000);
+      expect(pack.sales).toBe(1);
+      expect(pack.incomeUsdMinor).toBe(14_000);
+      expect(pack.conversionPct).toBeNull();
+      expect(pack.includedPackSales).toBe(0);
+      expect(pack.conversionSales).toBe(1);
+    });
+
+    test("pack sales that are not income, or outside the period, do not count for Clase 1 a 1", () => {
+      const sales = [
+        sale({ item: "lesson" }),
+        sale({ item: "lessonPack", status: "pending", paidOn: null }),
+        sale({ item: "lessonPack", status: "cancelled", paidOn: null }),
+        sale({ item: "lessonPack", status: "refunded", paidOn: "2026-10-06" }),
+        sale({ item: "lessonPack", paidOn: "2026-09-30" }),
+        sale({ item: "lessonPack", paidOn: "2026-10-20" }),
+      ];
+
+      const lesson = rowOf(buildServicesReport(sales, clicks({ lesson: 4 }), "thisMonth", NOW).rows, "lesson");
+
+      expect(lesson.includedPackSales).toBe(0);
+      expect(lesson.conversionSales).toBe(1);
+      expect(lesson.conversionPct).toBe(25);
+    });
+
+    test("pack sales with no clicks on Clase 1 a 1 still leave the conversion empty", () => {
+      const report = buildServicesReport([sale({ item: "lessonPack" })], clicks({ lesson: 0 }), "thisMonth", NOW);
+
+      expect(rowOf(report.rows, "lesson").conversionPct).toBeNull();
+      expect(rowOf(report.rows, "lesson").includedPackSales).toBe(1);
+    });
+
+    test("every other row keeps its own sales as the numerator", () => {
+      const sales = [sale({ item: "gamePlan" }), sale({ item: "lessonPack" })];
+
+      const report = buildServicesReport(sales, clicks({ gamePlan: 4 }), "thisMonth", NOW);
+
+      expect(rowOf(report.rows, "gamePlan").conversionSales).toBe(1);
+      expect(rowOf(report.rows, "gamePlan").conversionPct).toBe(25);
+      expect(rowOf(report.rows, "gamePlan").includedPackSales).toBe(0);
+    });
+
     test("only counts the clicks it is given for the period (the loader filters by date)", () => {
       const march = buildServicesReport([sale({ item: "lesson" })], clicks({ lesson: 2 }), "lastMonth", NOW);
 

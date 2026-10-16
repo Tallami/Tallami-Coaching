@@ -105,11 +105,13 @@ Los botones de reserva del sitio público (`BookingLink`, `src/components/home/b
 | Qué | Cómo |
 | --- | --- |
 | Cuerpo | JSON `{ item, locale }`: `item` de `INTEREST_ITEMS` (`src/admin/catalog.ts`, todo menos "Otro") y `locale` `es`, `pt` o `en`. Cualquier otro campo o valor es un 400; sin eco de lo recibido |
-| Respuestas | `204` guardado (y también aceptado y descartado), `400` inválido, `413` más de 1 KB, `429` con `Retry-After: 60`, `405` otros métodos; siempre `Cache-Control: no-store` |
-| Descartes (204 sin guardar) | Bots por `user-agent` (lista corta en `src/admin/interest/bots.ts`), y sin `ADMIN_SESSION_SECRET` o sin base configurada: el sitio público nunca se rompe por esto |
-| Límite | 30 eventos por minuto por IP; la IP se guarda solo como hash con clave (el mismo `hashIp` del login), nunca en claro |
+| Respuestas | `204` guardado (y también aceptado y descartado), `400` inválido, `413` más de 1 KB, `415` si el `Content-Type` no es `application/json` (el aviso del sitio siempre lo manda; así no entra un POST entre sitios sin CORS), `429` con `Retry-After: 60`, `405` otros métodos; siempre `Cache-Control: no-store` |
+| Descartes (204 sin guardar) | Bots por `user-agent` (lista corta en `src/admin/interest/bots.ts`), tope global superado, y sin `ADMIN_SESSION_SECRET` o sin base configurada: el sitio público nunca se rompe por esto |
+| Límites | 30 eventos por minuto por visitante y 200 por minuto entre todos (pasado el global, descarte en silencio: acota lo que puede escribir quien rote IPs). El visitante es la IPv4 o el /64 de la IPv6 (una IPv4 escrita como `::ffff:a.b.c.d` cuenta como esa IPv4); ver `src/admin/interest/ip-key.ts` |
+| Privacidad | Se guarda un HMAC de la clave del visitante con la fecha de Argentina (nunca la IP): el mismo visitante tiene otro hash cada día, así que las filas no se pueden vincular entre días ni con `login_attempts`. A medianoche el cupo por minuto vuelve a empezar |
+| Retención | Los clics se borran a los 400 días (más que cualquier período que muestra el panel). La limpieza es oportunista: al guardar un clic, como mucho una vez por hora por proceso (`src/admin/interest/retention.ts`) |
 | País | Del encabezado `x-vercel-ip-country`, solo si son dos letras mayúsculas |
-| Conversión | En Servicios: ventas cobradas ÷ clics en "Reservar" del mismo período; vacía (—) sin clics. Puede pasar de 100 %: también se vende por fuera del sitio |
+| Conversión | En Servicios: ventas cobradas ÷ clics en "Reservar" del mismo período; vacía (—) sin clics. En Clase 1 a 1 cuentan también las ventas del pack de 4 clases (se pide desde ese botón; la fila lo aclara). Puede pasar de 100 %: también se vende por fuera del sitio |
 
 ### Tests del panel
 

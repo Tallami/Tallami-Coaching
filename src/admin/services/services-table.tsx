@@ -90,7 +90,14 @@ function ServiceTableRow({ row, today }: { row: ServiceRow; today: string }) {
         {row.conversionPct === null ? (
           <Dash reason={row.clicks === null ? "sin botón en el sitio" : "sin clics en el período"} />
         ) : (
-          formatPercent(row.conversionPct)
+          <>
+            {formatPercent(row.conversionPct)}{" "}
+            {row.includedPackSales > 0 ? (
+              <span className="ml-auto block max-w-[10rem] text-[0.8125rem] leading-snug font-normal whitespace-normal text-balance text-ink-2">
+                incluye {row.includedPackSales} {row.includedPackSales === 1 ? "venta" : "ventas"} del pack
+              </span>
+            ) : null}
+          </>
         )}
       </TableCell>
     </TableRow>
@@ -112,7 +119,10 @@ export function ServicesTable({ report }: { report: ServicesReport }) {
             <TableHead className="text-right">Ingresos</TableHead>
             <TableHead className="text-right">Ticket promedio</TableHead>
             <TableHead className="text-right">% del total</TableHead>
-            <TableHead>Últimos 6 meses</TableHead>
+            <TableHead>
+              Últimos 6 meses{" "}
+              <span className="block text-[0.75rem] font-normal text-on-stage-2">(escala propia)</span>
+            </TableHead>
             <TableHead>Última venta</TableHead>
             <TableHead className="text-right">Clics en Reservar</TableHead>
             <TableHead className="text-right">Conversión</TableHead>

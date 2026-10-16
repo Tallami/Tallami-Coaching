@@ -3,6 +3,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vi
 import { SALE_ITEMS, INTEREST_ITEMS, INTEREST_LOCALES, SITE_BOOKING_ITEMS } from "@/admin/catalog";
 import { hashIp } from "@/admin/auth/session";
 import { isBotUserAgent } from "@/admin/interest/bots";
+import { interestIpHash } from "@/admin/interest/ip-key";
 import { handleInterestRequest, MAX_BODY_BYTES } from "@/admin/interest/endpoint";
 import { parseInterestPayload, readCountry } from "@/admin/interest/payload";
 import { interestByItem } from "@/admin/interest/query";
@@ -13,35 +14,10 @@ import { DbNotConfiguredError } from "@/db/client";
 import { interestEvents } from "@/db/schema";
 import { routing } from "@/i18n/routing";
 import { createTestDb } from "../helpers/db";
+import { CHROME, click } from "../helpers/interest-requests";
 
 const SECRET = "secreto-de-prueba-de-mas-de-32-caracteres";
 const NOW = new Date("2026-10-13T18:00:00.000Z");
-const CHROME =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
-
-interface ClickOptions {
-  ip?: string | null;
-  userAgent?: string | null;
-  country?: string;
-  /** Texto del cuerpo tal cual; si falta se manda `body` como JSON. */
-  raw?: string;
-  method?: string;
-}
-
-/** Un pedido como el que manda el sitio: JSON chico, con la IP que pone Vercel. */
-function click(body: unknown = { item: "lesson", locale: "es" }, options: ClickOptions = {}): Request {
-  const { ip = "203.0.113.9", userAgent = CHROME, country, raw, method = "POST" } = options;
-  const headers = new Headers({ "content-type": "application/json" });
-  if (ip !== null) headers.set("x-forwarded-for", ip);
-  if (userAgent !== null) headers.set("user-agent", userAgent);
-  if (country !== undefined) headers.set("x-vercel-ip-country", country);
-  return new Request("http://localhost/api/interest", {
-    method,
-    headers,
-    body: method === "GET" ? undefined : (raw ?? JSON.stringify(body)),
-  });
-}
-
 let db: Db;
 
 function handle(request: Request, now: Date = NOW): Promise<Response> {
@@ -97,7 +73,9 @@ describe("POST /api/interest", () => {
     expect(row.createdAt).toEqual(NOW);
     // La IP solo queda como HMAC (hexadecimal de 64 caracteres) y nunca en claro.
     expect(row.ipHash).toMatch(/^[0-9a-f]{64}$/);
-    expect(row.ipHash).toBe(hashIp("203.0.113.9"));
+    expect(row.ipHash).toBe(interestIpHash("203.0.113.9", "2026-10-13"));
+    // Ni siquiera es el hash que usa el login para la misma IP.
+    expect(row.ipHash).not.toBe(hashIp("203.0.113.9"));
     expect(JSON.stringify(row)).not.toContain("203.0.113.9");
   });
 
@@ -189,7 +167,7 @@ describe("POST /api/interest", () => {
     });
     const streamed = new Request("http://localhost/api/interest", {
       method: "POST",
-      headers: { "user-agent": CHROME, "x-forwarded-for": "203.0.113.9" },
+      headers: { "content-type": "application/json", "user-agent": CHROME, "x-forwarded-for": "203.0.113.9" },
       body: chunks,
       duplex: "half",
     } as RequestInit);
@@ -275,7 +253,10 @@ describe("POST /api/interest", () => {
     expect(response.status).toBe(204);
     expect(second.status).toBe(204);
     const rows = await storedRows();
-    expect(rows.map((row) => row.ipHash)).toEqual([hashIp("unknown"), hashIp("unknown")]);
+    expect(rows.map((row) => row.ipHash)).toEqual([
+      interestIpHash("unknown", "2026-10-13"),
+      interestIpHash("unknown", "2026-10-13"),
+    ]);
   });
 
   test("without ADMIN_SESSION_SECRET it accepts and drops the click instead of crashing", async () => {

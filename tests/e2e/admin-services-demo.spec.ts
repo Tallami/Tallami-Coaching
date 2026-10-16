@@ -9,6 +9,7 @@ import type { Page } from "@playwright/test";
 import { ITEM_LABELS, INTEREST_ITEMS, SALE_ITEMS, SITE_BOOKING_ITEMS } from "../../src/admin/catalog";
 import { dateToArgentinaLocal, formatDay } from "../../src/admin/dates";
 import { buildServicesReport, type ServicesReport } from "../../src/admin/services/report";
+import { percent } from "../../src/admin/metrics/math";
 import { incomeByItem } from "../../src/admin/metrics/series";
 import { PERIODS, PERIOD_LABELS, periodRange, type Period } from "../../src/admin/metrics/period";
 import { formatPercent, formatRangeLabel, monthLabels } from "../../src/admin/overview/labels";
@@ -68,8 +69,13 @@ test.describe("the services table matches the demo data in every period", () => 
         await expect(cell(page, row.item, "clicks"), `${row.item} clicks`).toHaveText(
           row.clicks === null ? "—" : String(row.clicks),
         );
+        // Clase 1 a 1 aclara cuántas ventas del pack incluye.
+        const packNote =
+          row.includedPackSales > 0 && row.conversionPct !== null
+            ? ` incluye ${row.includedPackSales} ${row.includedPackSales === 1 ? "venta" : "ventas"} del pack`
+            : "";
         await expect(cell(page, row.item, "conversion"), `${row.item} conversion`).toHaveText(
-          row.conversionPct === null ? "—" : formatPercent(row.conversionPct),
+          row.conversionPct === null ? "—" : `${formatPercent(row.conversionPct)}${packNote}`,
         );
         await expect(cell(page, row.item, "last"), `${row.item} last`).toContainText(
           row.lastSaleOn === null ? "—" : formatDay(row.lastSaleOn),
@@ -106,6 +112,32 @@ test("clicks and sales are consistent with the overview and with the raw demo ev
   for (const item of SITE_BOOKING_ITEMS) {
     await expect(cell(page, item, "clicks")).toHaveText(String(inRange.filter((event) => event.item === item).length));
   }
+});
+
+test("Clase 1 a 1 converts its own sales plus the pack's, because the pack is requested from that button", async ({ page }) => {
+  await openServices(page, "last12");
+  const range = periodRange("last12", new Date());
+  const counts = new Map(incomeByItem(sales, range).map((entry) => [entry.item, entry.count]));
+  const lessonSales = counts.get("lesson") ?? 0;
+  const packSales = counts.get("lessonPack") ?? 0;
+  const lessonClicks = data.interest.filter((event) => {
+    const day = dayOf(event.createdAt as Date);
+    return event.item === "lesson" && day >= range.from && day <= range.to;
+  }).length;
+  expect(packSales).toBeGreaterThan(0);
+  expect(lessonClicks).toBeGreaterThan(0);
+
+  // Las columnas propias quedan como estaban: la fila de Clase 1 a 1 no suma las ventas del pack.
+  await expect(cell(page, "lesson", "sales")).toHaveText(String(lessonSales));
+  await expect(cell(page, "lessonPack", "sales")).toHaveText(String(packSales));
+  await expect(cell(page, "lesson", "conversion")).toContainText(
+    formatPercent(percent(lessonSales + packSales, lessonClicks)),
+  );
+  await expect(cell(page, "lesson", "conversion")).toContainText(
+    `incluye ${packSales} ${packSales === 1 ? "venta" : "ventas"} del pack`,
+  );
+  await expect(page.getByText("la conversión de Clase 1 a 1 cuenta también las ventas del pack")).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "Últimos 6 meses (escala propia)" })).toBeVisible();
 });
 
 test("a button nobody clicked this month shows 0 clicks and a dash for conversion; the pack and 'other' show dashes", async ({ page }) => {
