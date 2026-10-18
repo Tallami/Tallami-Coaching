@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/admin/auth/require-admin";
+import { PAGE_SIZE } from "@/admin/limits";
+import { ADMIN_ROUTES } from "@/admin/routes";
 import {
   hasActiveFilters,
   parseSalesQuery,
@@ -11,17 +13,14 @@ import { listSales } from "@/admin/sales/repository";
 import { savedSaleMessage } from "@/admin/sales/saved-message";
 import { SalesFilters } from "@/admin/sales/sales-filters";
 import { SalesTable } from "@/admin/sales/sales-table";
-import { AdminShell } from "@/admin/ui/admin-shell";
 import { Notice } from "@/admin/ui/notice";
 import { PageHeader } from "@/admin/ui/page-header";
 import { Pagination } from "@/admin/ui/pagination";
 import { Button } from "@/components/ui/button";
 import { getDb } from "@/db/client";
+import { PanelShell } from "@/app/admin/panel-shell";
 
 export const metadata: Metadata = { title: "Ventas" };
-
-const PAGE_SIZE = 25;
-const SALES_PATH = "/admin/ventas";
 
 export default async function SalesPage(props: PageProps<"/admin/ventas">) {
   await requireAdmin();
@@ -31,12 +30,12 @@ export default async function SalesPage(props: PageProps<"/admin/ventas">) {
   const { rows, total } = await listSales(await getDb(), filter, page, PAGE_SIZE);
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   // Una página que ya no existe (se borraron filtros, cambió la lista): a la última.
-  if (page > pageCount) redirect(`${SALES_PATH}${salesQueryString(filter, pageCount)}`);
+  if (page > pageCount) redirect(`${ADMIN_ROUTES.sales}${salesQueryString(filter, pageCount)}`);
 
   const savedMessage = savedSaleMessage(params.guardada);
 
   return (
-    <AdminShell active="sales">
+    <PanelShell active="sales">
       <PageHeader
         title="Ventas"
         description="Todo lo que cobraste, con su valor en pesos y en dólares."
@@ -45,13 +44,13 @@ export default async function SalesPage(props: PageProps<"/admin/ventas">) {
             {/* Un archivo, no una página: un enlace común (con `Link` Next intentaría navegar a él). */}
             {total > 0 ? (
               <Button asChild variant="ink-outline">
-                <a href={`${SALES_PATH}/exportar${salesQueryString(filter)}`} download>
+                <a href={`${ADMIN_ROUTES.salesExport}${salesQueryString(filter)}`} download>
                   Exportar CSV
                 </a>
               </Button>
             ) : null}
             <Button asChild>
-              <Link href={`${SALES_PATH}/nueva`}>Nueva venta</Link>
+              <Link href={ADMIN_ROUTES.newSale}>Nueva venta</Link>
             </Button>
           </>
         }
@@ -70,9 +69,9 @@ export default async function SalesPage(props: PageProps<"/admin/ventas">) {
           pageSize={PAGE_SIZE}
           total={total}
           noun="ventas"
-          hrefFor={(target) => `${SALES_PATH}${salesQueryString(filter, target)}`}
+          hrefFor={(target) => `${ADMIN_ROUTES.sales}${salesQueryString(filter, target)}`}
         />
       ) : null}
-    </AdminShell>
+    </PanelShell>
   );
 }

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { INCOME_STATUSES, ITEM_LABELS, type SaleStatus } from "@/admin/catalog";
 import { formatDay } from "@/admin/dates";
+import { ADMIN_ROUTES, saleHref } from "@/admin/routes";
 import type { SaleRow } from "@/admin/sales/repository";
 import { SaleStatusBadge } from "@/admin/sales/status-badge";
 import { EmptyState } from "@/admin/ui/empty-state";
@@ -16,8 +17,6 @@ import {
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
-const SALES_PATH = "/admin/ventas";
-const NEW_SALE_PATH = "/admin/ventas/nueva";
 const INCOME: readonly SaleStatus[] = INCOME_STATUSES;
 
 interface StudentHistoryProps {
@@ -40,7 +39,7 @@ export function StudentHistory({ sales }: StudentHistoryProps) {
         description="Cada venta que cargues a este alumno aparece acá, con su estado."
         action={
           <Button asChild>
-            <Link href={NEW_SALE_PATH}>Cargar una venta</Link>
+            <Link href={ADMIN_ROUTES.newSale}>Cargar una venta</Link>
           </Button>
         }
       />
@@ -88,7 +87,7 @@ export function StudentHistory({ sales }: StudentHistoryProps) {
                   </TableCell>
                   <TableCell>
                     <Link
-                      href={`${SALES_PATH}/${sale.id}`}
+                      href={saleHref(sale.id)}
                       prefetch={false}
                       className="rounded-[2px] font-bold underline decoration-ink-2/50 underline-offset-4 hover:decoration-ink"
                     >

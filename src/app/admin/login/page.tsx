@@ -4,15 +4,11 @@ import { getMissingConfig } from "@/admin/auth/config";
 import { parseLoginError } from "@/admin/auth/login-errors";
 import { SETUP_PATH, safeNextPath } from "@/admin/auth/redirect";
 import { hasAdminSession } from "@/admin/auth/require-admin";
+import { firstValue } from "@/admin/ui/search-params";
 import { LoginForm } from "@/components/admin/login-form";
 import { loginAction } from "./actions";
 
 export const metadata: Metadata = { title: "Ingresar" };
-
-/** `?clave=valor` puede venir repetido (`string[]`): vale el primero. */
-function firstValue(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
-}
 
 export default async function LoginPage(props: PageProps<"/admin/login">) {
   const { error, next } = await props.searchParams;

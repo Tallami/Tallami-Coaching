@@ -15,6 +15,7 @@ import {
   type SaleStatus,
 } from "@/admin/catalog";
 import { CustomerNotFoundError, createCustomer } from "@/admin/customers/repository";
+import { PAGE_SIZE } from "@/admin/limits";
 import type { SaleRates } from "@/admin/sales/rates";
 import { newestSalesFirst, saleRowColumns, toSaleRow, type SaleRow } from "@/admin/sales/sale-row";
 import type { SaleCustomerInput, SaleInput } from "@/admin/sales/schema";
@@ -31,7 +32,6 @@ export type { SaleRow };
 export { CustomerNotFoundError };
 
 /** Ventas por página si no se pide otro tamaño. */
-const DEFAULT_PAGE_SIZE = 25;
 /** Tope de página: más allá, el desplazamiento dejaría de ser un entero seguro. */
 const MAX_PAGE = 1_000_000;
 
@@ -186,7 +186,7 @@ export async function listSales(
   db: Db,
   filter: SaleFilter,
   page: number,
-  pageSize: number = DEFAULT_PAGE_SIZE,
+  pageSize: number = PAGE_SIZE,
 ): Promise<{ rows: SaleRow[]; total: number }> {
   const safePage = Number.isInteger(page) && page > 1 ? Math.min(page, MAX_PAGE) : 1;
   const where = and(...filterConditions(filter));

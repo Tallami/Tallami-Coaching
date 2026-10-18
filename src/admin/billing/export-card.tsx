@@ -1,14 +1,13 @@
 import Link from "next/link";
 import { INVOICE_STATUSES, INVOICE_STATUS_LABELS } from "@/admin/catalog";
 import type { DateRange } from "@/admin/metrics/period";
+import { ADMIN_ROUTES } from "@/admin/routes";
 import { SALES_PARAMS } from "@/admin/sales/filters";
 import { SectionCard } from "@/admin/overview/section-card";
 import { Field } from "@/admin/ui/field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
-
-export const BILLING_EXPORT_PATH = "/admin/facturacion/exportar";
 
 /**
  * La descarga para el contador: lo cobrado en un período, en un CSV que se abre
@@ -23,7 +22,7 @@ export function ExportCard({ defaults }: { defaults: DateRange }) {
       title="Exportar para el contador"
       description="Un archivo CSV con lo cobrado, para abrir en Excel."
     >
-      <form method="get" action={BILLING_EXPORT_PATH} aria-label="Exportar para el contador" className="flex flex-col gap-4">
+      <form method="get" action={ADMIN_ROUTES.billingExport} aria-label="Exportar para el contador" className="flex flex-col gap-4">
         <div className="grid grid-cols-2 gap-4">
           <Field id="export-from" label="Desde">
             {(control) => <Input {...control} type="date" name={SALES_PARAMS.from} defaultValue={defaults.from} />}
@@ -55,7 +54,7 @@ export function ExportCard({ defaults }: { defaults: DateRange }) {
       </p>
       <p className="mt-2 text-[0.875rem] leading-snug text-ink-2">
         Para otras ventas, con otros filtros, usá «Exportar CSV» en{" "}
-        <Link href="/admin/ventas" prefetch={false} className="font-semibold underline underline-offset-2">
+        <Link href={ADMIN_ROUTES.sales} prefetch={false} className="font-semibold underline underline-offset-2">
           Ventas
         </Link>
         .

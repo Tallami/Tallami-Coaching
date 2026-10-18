@@ -25,8 +25,6 @@ const MONTHS_LONG = [
 /** Domingo primero, como `getUTCDay()`. */
 const WEEKDAYS_SHORT = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
 
-const MS_PER_DAY = 86_400_000;
-
 interface DayParts {
   year: number;
   month: number;
@@ -35,15 +33,6 @@ interface DayParts {
 
 function parts(day: string): DayParts {
   return { year: Number(day.slice(0, 4)), month: Number(day.slice(5, 7)), date: Number(day.slice(8, 10)) };
-}
-
-function utcMs({ year, month, date }: DayParts): number {
-  return Date.UTC(year, month - 1, date);
-}
-
-/** Cantidad de días del rango, contando los dos extremos. */
-export function rangeLengthInDays(range: DateRange): number {
-  return Math.round((utcMs(parts(range.to)) - utcMs(parts(range.from))) / MS_PER_DAY) + 1;
 }
 
 /**

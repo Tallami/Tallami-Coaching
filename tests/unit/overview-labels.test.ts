@@ -7,10 +7,9 @@ import {
   formatSessionWhen,
   formatSignedPercent,
   monthLabels,
-  rangeLengthInDays,
 } from "@/admin/overview/labels";
 import { DEFAULT_PERIOD, PERIOD_SLUGS, overviewHref, parsePeriodParam } from "@/admin/overview/period-param";
-import { PERIODS } from "@/admin/metrics/period";
+import { PERIODS, lengthInDays } from "@/admin/metrics/period";
 
 const TODAY = "2026-10-14";
 
@@ -87,9 +86,9 @@ describe("range labels", () => {
   });
 
   test("the length counts both ends", () => {
-    expect(rangeLengthInDays({ from: "2026-10-01", to: "2026-10-01" })).toBe(1);
-    expect(rangeLengthInDays({ from: "2026-10-01", to: "2026-10-14" })).toBe(14);
-    expect(rangeLengthInDays({ from: "2026-01-01", to: "2026-12-31" })).toBe(365);
+    expect(lengthInDays({ from: "2026-10-01", to: "2026-10-01" })).toBe(1);
+    expect(lengthInDays({ from: "2026-10-01", to: "2026-10-14" })).toBe(14);
+    expect(lengthInDays({ from: "2026-01-01", to: "2026-12-31" })).toBe(365);
   });
 });
 

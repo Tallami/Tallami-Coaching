@@ -10,6 +10,7 @@ import {
   markInvoiced,
   type InvoiceInput,
 } from "@/admin/billing/invoicing";
+import { formText } from "@/admin/text";
 import type { Db } from "@/db/client";
 
 /** Qué botón se tocó. */
@@ -32,12 +33,6 @@ function isIntent(value: unknown): value is InvoicingIntent {
   return typeof value === "string" && INVOICING_INTENTS.some((intent) => intent === value);
 }
 
-/** Un campo de texto del formulario; un archivo o un campo ausente no es texto (la validación lo rechaza). */
-function text(formData: FormData, name: string): string | undefined {
-  const value = formData.get(name);
-  return typeof value === "string" ? value : undefined;
-}
-
 /**
  * Marca las ventas elegidas (`ids`) como facturadas o como "no requiere
  * factura", según el botón (`intent`). Si algo falla devuelve el estado que el
@@ -50,7 +45,7 @@ export async function saveInvoicing(
   formData: FormData,
   now: Date = new Date(),
 ): Promise<SaveInvoicingOutcome> {
-  const intent = text(formData, "intent");
+  const intent = formText(formData, "intent");
   if (!isIntent(intent)) {
     return rejected({ fieldErrors: {}, formError: UNKNOWN_ACTION_MESSAGE });
   }
@@ -58,9 +53,9 @@ export async function saveInvoicing(
   // tipo cualquier texto): se pasa tal cual y `markInvoiced` lo valida con zod.
   const ids = formData.getAll("ids") as string[];
   const invoice = {
-    type: text(formData, "type"),
-    number: text(formData, "number"),
-    issuedOn: text(formData, "issuedOn"),
+    type: formText(formData, "type"),
+    number: formText(formData, "number"),
+    issuedOn: formText(formData, "issuedOn"),
   } as unknown as InvoiceInput;
 
   try {

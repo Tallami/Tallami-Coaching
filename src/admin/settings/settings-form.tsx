@@ -5,7 +5,6 @@ import {
   useEffect,
   useRef,
   useState,
-  useSyncExternalStore,
   useTransition,
   type FormEvent,
   type ReactNode,
@@ -18,6 +17,7 @@ import {
 import { MONOTRIBUTO_CATEGORIES } from "@/admin/settings/schema";
 import { Field } from "@/admin/ui/field";
 import { Notice } from "@/admin/ui/notice";
+import { useHydrated } from "@/admin/ui/use-hydrated";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
@@ -31,12 +31,6 @@ export interface SettingsFormProps {
   /** Lo que va debajo de los campos: de dónde sale cada dato y el link a la tabla. */
   children?: ReactNode;
 }
-
-// Un snapshot que siempre es `true` en el navegador y `false` al renderizar en
-// el servidor: dice si la página ya está lista para usarse.
-const subscribeNever = () => () => {};
-const isHydrated = () => true;
-const isNotHydrated = () => false;
 
 /**
  * Formulario del monotributo: categoría, tope anual en pesos y desde cuándo
@@ -55,7 +49,7 @@ export function SettingsForm({ action, initialValues, footnote, children }: Sett
   const [editedFields, setEditedFields] = useState<ReadonlySet<string>>(new Set());
   const formRef = useRef<HTMLFormElement>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
-  const hydrated = useSyncExternalStore(subscribeNever, isHydrated, isNotHydrated);
+  const hydrated = useHydrated();
 
   // Una respuesta nueva del servidor: los errores vuelven a valer.
   if (state !== handledState) {

@@ -6,6 +6,7 @@ import { MonthlyIncome } from "@/admin/overview/monthly-income";
 import type { OverviewData } from "@/admin/overview/overview-data";
 import { PendingSection } from "@/admin/overview/pending-section";
 import { PeriodSelector } from "@/admin/overview/period-selector";
+import { ADMIN_ROUTES } from "@/admin/routes";
 import { EmptyState } from "@/admin/ui/empty-state";
 import { Button } from "@/components/ui/button";
 
@@ -24,7 +25,7 @@ export function OverviewView({ data }: { data: OverviewData }) {
         description="Cada venta cobrada suma a lo que ganás, a lo que tenés para facturar y al medidor del monotributo. Cargá una y acá aparece el resumen."
         action={
           <Button asChild>
-            <Link href="/admin/ventas/nueva">Cargá tu primera venta</Link>
+            <Link href={ADMIN_ROUTES.newSale}>Cargá tu primera venta</Link>
           </Button>
         }
       />

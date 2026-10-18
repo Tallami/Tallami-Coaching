@@ -21,8 +21,13 @@ import {
   type SaleItem,
   type SaleStatus,
 } from "@/admin/catalog";
+import {
+  MAX_DISCORD_LENGTH,
+  MAX_NAME_LENGTH,
+} from "@/admin/customers/limits";
 import { argentinaLocalToDate, isPlausibleDay } from "@/admin/dates";
-import { stripNul } from "@/admin/text";
+import { MAX_DESCRIPTION_LENGTH, MAX_SALE_NOTES_LENGTH } from "@/admin/sales/limits";
+import { cleanText, optionalText, requiredText } from "@/admin/zod-text";
 import {
   InvalidAmountError,
   InvalidRateError,
@@ -40,11 +45,6 @@ export type RateMode = (typeof RATE_MODES)[number];
  */
 export const MAX_AMOUNT_MINOR = 10_000_000_000;
 const MAX_AMOUNT_MESSAGE = "El monto es demasiado grande (máximo 100.000.000).";
-
-const MAX_NAME_LENGTH = 120;
-const MAX_DISCORD_LENGTH = 64;
-const MAX_DESCRIPTION_LENGTH = 200;
-const MAX_NOTES_LENGTH = 2000;
 
 /** Estados en los que la venta ya se cobró: la base exige su fecha de cobro. */
 const STATUSES_WITH_PAYMENT = new Set<SaleStatus>(["paid", "delivered", "refunded"]);
@@ -70,16 +70,8 @@ const MESSAGES = {
   rateMode: "Elegí cómo cargar el tipo de cambio.",
   arsPerUsd: "Cargá los pesos por dólar.",
   arsPerUnit: "Cargá los pesos por real.",
-  notesTooLong: `Las notas son demasiado largas (máximo ${MAX_NOTES_LENGTH} caracteres).`,
+  notesTooLong: `Las notas son demasiado largas (máximo ${MAX_SALE_NOTES_LENGTH} caracteres).`,
 } as const;
-
-/**
- * Texto opcional: sin caracteres NUL (Postgres no los guarda), sin espacios en
- * los bordes y con un largo máximo.
- */
-function optionalText(max: number, tooLong: string) {
-  return z.string().overwrite(stripNul).trim().max(max, tooLong).optional();
-}
 
 const customerSchema = z.discriminatedUnion(
   "mode",
@@ -90,17 +82,9 @@ const customerSchema = z.discriminatedUnion(
     }),
     z.object({
       mode: z.literal("new"),
-      name: z
-        .string({ error: MESSAGES.name })
-        .overwrite(stripNul)
-        .trim()
-        .min(1, MESSAGES.name)
-        .max(MAX_NAME_LENGTH, MESSAGES.nameTooLong),
+      name: requiredText(MESSAGES.name, MAX_NAME_LENGTH, MESSAGES.nameTooLong),
       discord: optionalText(MAX_DISCORD_LENGTH, MESSAGES.discordTooLong),
-      country: z
-        .string()
-        .overwrite(stripNul)
-        .trim()
+      country: cleanText()
         .toUpperCase()
         .refine((value) => value === "" || COUNTRY_CODE.test(value), { error: MESSAGES.country })
         .optional(),
@@ -156,7 +140,7 @@ const fieldsSchema = z.object({
   rateMode: z.enum(RATE_MODES, { error: MESSAGES.rateMode }).default("auto"),
   arsPerUnit: z.string().trim().optional(),
   arsPerUsd: z.string().trim().optional(),
-  notes: optionalText(MAX_NOTES_LENGTH, MESSAGES.notesTooLong),
+  notes: optionalText(MAX_SALE_NOTES_LENGTH, MESSAGES.notesTooLong),
 });
 
 type RawSale = z.output<typeof fieldsSchema>;

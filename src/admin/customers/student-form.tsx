@@ -6,7 +6,6 @@ import {
   useEffect,
   useRef,
   useState,
-  useSyncExternalStore,
   useTransition,
   type FormEvent,
 } from "react";
@@ -20,9 +19,10 @@ import {
   MAX_DISCORD_LENGTH,
   MAX_NAME_LENGTH,
   MAX_NOTES_LENGTH,
-} from "@/admin/customers/schema";
+} from "@/admin/customers/limits";
 import { Field } from "@/admin/ui/field";
 import { Notice } from "@/admin/ui/notice";
+import { useHydrated } from "@/admin/ui/use-hydrated";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -35,12 +35,6 @@ export interface StudentFormProps {
   /** A dónde lleva "Cancelar". */
   cancelHref: string;
 }
-
-// Un snapshot que siempre es `true` en el navegador y `false` al renderizar en
-// el servidor: dice si la página ya está lista para usarse.
-const subscribeNever = () => () => {};
-const isHydrated = () => true;
-const isNotHydrated = () => false;
 
 /**
  * Formulario de alta y edición de un alumno. Los valores viven en el estado del
@@ -61,7 +55,7 @@ export function StudentForm({ mode, action, initialValues, cancelHref }: Student
   const [editedFields, setEditedFields] = useState<ReadonlySet<string>>(new Set());
   const formRef = useRef<HTMLFormElement>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
-  const hydrated = useSyncExternalStore(subscribeNever, isHydrated, isNotHydrated);
+  const hydrated = useHydrated();
 
   // Una respuesta nueva del servidor: los errores vuelven a valer.
   if (state !== handledState) {

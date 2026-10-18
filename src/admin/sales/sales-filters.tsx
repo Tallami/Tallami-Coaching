@@ -15,6 +15,8 @@ import {
   hasActiveFilters,
   salesQueryString,
 } from "@/admin/sales/filters";
+import { MAX_SEARCH_LENGTH } from "@/admin/limits";
+import { ADMIN_ROUTES } from "@/admin/routes";
 import type { SaleFilter } from "@/admin/sales/repository";
 import { Field } from "@/admin/ui/field";
 import { PhoneDisclosure } from "@/admin/ui/phone-disclosure";
@@ -26,7 +28,6 @@ interface SalesFiltersProps {
   filter: SaleFilter;
 }
 
-const SALES_PATH = "/admin/ventas";
 
 /**
  * Filtros de la lista: un formulario `GET`, así que queda en la dirección y se
@@ -40,7 +41,7 @@ export function SalesFilters({ filter }: SalesFiltersProps) {
         // Los campos son "no controlados": al cambiar los filtros (volver, limpiar) se arma un formulario nuevo.
         key={salesQueryString(filter)}
         method="get"
-        action={SALES_PATH}
+        action={ADMIN_ROUTES.sales}
         aria-label="Filtros de ventas"
         className="border-2 border-ink bg-white p-4"
       >
@@ -52,7 +53,7 @@ export function SalesFilters({ filter }: SalesFiltersProps) {
                 type="search"
                 name={SALES_PARAMS.q}
                 defaultValue={filter.q ?? ""}
-                maxLength={100}
+                maxLength={MAX_SEARCH_LENGTH}
                 autoComplete="off"
                 placeholder="Nombre o Discord"
               />
@@ -133,7 +134,7 @@ export function SalesFilters({ filter }: SalesFiltersProps) {
           </Button>
           {hasActiveFilters(filter) ? (
             <Link
-              href={SALES_PATH}
+              href={ADMIN_ROUTES.sales}
               prefetch={false}
               className="rounded-[2px] font-bold underline underline-offset-4 hover:text-zone"
             >

@@ -3,6 +3,7 @@ import { INTEREST_GLOBAL_MAX_PER_HOUR, INTEREST_GLOBAL_MAX_PER_WINDOW } from "@/
 import { PERIOD_LABELS } from "@/admin/metrics/period";
 import { formatRangeLabel } from "@/admin/overview/labels";
 import { PeriodSelector } from "@/admin/overview/period-selector";
+import { ADMIN_ROUTES } from "@/admin/routes";
 import { clicksCountText, droppedClicksText, salesCountText } from "@/admin/services/labels";
 import type { ServicesReport } from "@/admin/services/report";
 import { ServicesTable } from "@/admin/services/services-table";
@@ -10,7 +11,6 @@ import { EmptyState } from "@/admin/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
 
-const SERVICES_PATH = "/admin/servicios";
 
 /** Los topes con el separador de miles de Argentina: 2000 se escribe "2.000". */
 const numberText = (value: number) => new Intl.NumberFormat("es-AR").format(value);
@@ -62,7 +62,7 @@ export function ServicesView({ report }: { report: ServicesReport }) {
   return (
     <>
       <div className="mb-5">
-        <PeriodSelector current={report.period} basePath={SERVICES_PATH} label="Período de los servicios" />
+        <PeriodSelector current={report.period} basePath={ADMIN_ROUTES.services} label="Período de los servicios" />
       </div>
       {report.hasActivity ? <ServicesBody report={report} /> : <NoActivity />}
     </>
@@ -76,7 +76,7 @@ function NoActivity() {
       description="Cada venta cobrada y cada clic en Reservar del sitio aparecen acá, servicio por servicio, con su conversión. Cargá una venta y empieza la tabla."
       action={
         <Button asChild>
-          <Link href="/admin/ventas/nueva">Cargá tu primera venta</Link>
+          <Link href={ADMIN_ROUTES.newSale}>Cargá tu primera venta</Link>
         </Button>
       }
     />

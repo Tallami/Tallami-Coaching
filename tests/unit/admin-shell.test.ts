@@ -9,7 +9,11 @@ import { ADMIN_SECTIONS } from "@/admin/ui/sections";
 
 describe("AdminShell", () => {
   const markup = renderToStaticMarkup(
-    AdminShell({ active: "sales", children: createElement("p", null, "contenido de la página") }),
+    AdminShell({
+      active: "sales",
+      logoutAction: async () => {},
+      children: createElement("p", null, "contenido de la página"),
+    }),
   );
 
   test("lists every section in order, in one navigation", () => {

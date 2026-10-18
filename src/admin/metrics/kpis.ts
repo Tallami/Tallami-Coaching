@@ -49,6 +49,13 @@ function firstPurchaseDays(income: readonly IncomeSale[]): Map<string, string> {
   return firstDays;
 }
 
+/** Las tarjetas del período y lo cobrado en el tramo con el que se comparan. */
+export interface KpisWithPrevious {
+  kpis: Kpis;
+  /** Ingresos en dólares del tramo anterior (`previousPeriodRange`), en centavos: contra lo que se calcula la variación. */
+  previousIncomeUsdMinor: number;
+}
+
 /**
  * Las tarjetas del período, con "hoy" en Argentina. Alumnos nuevos y recompra
  * miran la historia completa que reciben las ventas (`loadMetricSales` incluye,
@@ -56,6 +63,18 @@ function firstPurchaseDays(income: readonly IncomeSale[]): Map<string, string> {
  * sea más vieja).
  */
 export function computeKpis(sales: readonly MetricSale[], period: Period, now: Date): Kpis {
+  return computeKpisWithPrevious(sales, period, now).kpis;
+}
+
+/**
+ * Las mismas tarjetas, y además lo cobrado en el tramo anterior, que ya se
+ * calculó para la variación: así quien lo muestra no lo recalcula.
+ */
+export function computeKpisWithPrevious(
+  sales: readonly MetricSale[],
+  period: Period,
+  now: Date,
+): KpisWithPrevious {
   const range = periodRange(period, now);
   const income = sales.filter(isIncome);
   const current = inRange(income, range);
@@ -76,13 +95,16 @@ export function computeKpis(sales: readonly MetricSale[], period: Period, now: D
   }
 
   return {
-    incomeUsdMinor,
-    incomeArsMinor: sumMinor(current.map((sale) => sale.amountArsMinor)),
-    incomeUsdDeltaPct:
-      previousUsdMinor === 0 ? null : percent(incomeUsdMinor - previousUsdMinor, previousUsdMinor),
-    salesCount: current.length,
-    avgTicketUsdMinor: current.length === 0 ? 0 : divideRound(incomeUsdMinor, current.length),
-    newCustomers,
-    repeatRatePct: periodCustomers.size === 0 ? 0 : percent(returningCustomers, periodCustomers.size),
+    kpis: {
+      incomeUsdMinor,
+      incomeArsMinor: sumMinor(current.map((sale) => sale.amountArsMinor)),
+      incomeUsdDeltaPct:
+        previousUsdMinor === 0 ? null : percent(incomeUsdMinor - previousUsdMinor, previousUsdMinor),
+      salesCount: current.length,
+      avgTicketUsdMinor: current.length === 0 ? 0 : divideRound(incomeUsdMinor, current.length),
+      newCustomers,
+      repeatRatePct: periodCustomers.size === 0 ? 0 : percent(returningCustomers, periodCustomers.size),
+    },
+    previousIncomeUsdMinor: previousUsdMinor,
   };
 }

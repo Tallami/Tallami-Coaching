@@ -3,6 +3,7 @@
 // página lo escribe. Todo lo que llega de la dirección es texto del usuario: lo
 // que no se reconoce no muestra nada.
 
+import { ADMIN_ROUTES, saleHref } from "@/admin/routes";
 import { firstValue, type SearchParams } from "@/admin/ui/search-params";
 
 /** Hasta 4 dígitos: alcanza para el máximo de un lote (1000). */
@@ -17,7 +18,7 @@ function countFrom(value: string | undefined): number | null {
 /** La dirección a la que vuelve la acción después de marcar `updated` ventas. */
 export function invoicingResultPath(intent: "invoiced" | "not_required", updated: number): string {
   const kind = intent === "invoiced" ? "facturadas" : "sin-factura";
-  return `/admin/facturacion?guardada=${kind}&cantidad=${updated}`;
+  return `${ADMIN_ROUTES.billing}?guardada=${kind}&cantidad=${updated}`;
 }
 
 /** El aviso para los parámetros de la dirección, o `null` si no hay nada que avisar. */
@@ -82,7 +83,7 @@ const UNDO_PARAM_BY_OUTCOME: Record<InvoiceUndoOutcome, string> = {
 
 /** La dirección de la venta `id` a la que vuelve la acción de volver a pendiente. */
 export function invoiceUndoPath(id: string, outcome: InvoiceUndoOutcome): string {
-  return `/admin/ventas/${id}?factura=${UNDO_PARAM_BY_OUTCOME[outcome]}`;
+  return `${saleHref(id)}?factura=${UNDO_PARAM_BY_OUTCOME[outcome]}`;
 }
 
 /** El aviso de la ficha de la venta para los parámetros de la dirección, o `null` si no hay nada que avisar. */

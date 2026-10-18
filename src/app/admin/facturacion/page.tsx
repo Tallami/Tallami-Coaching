@@ -6,10 +6,10 @@ import { listUninvoicedSales } from "@/admin/billing/invoicing";
 import { invoicingNotice } from "@/admin/billing/saved-notice";
 import { loadMetricSales } from "@/admin/metrics/load";
 import { getMonotributoSettings } from "@/admin/settings/read";
-import { AdminShell } from "@/admin/ui/admin-shell";
 import { Notice } from "@/admin/ui/notice";
 import { PageHeader } from "@/admin/ui/page-header";
 import { getDb } from "@/db/client";
+import { PanelShell } from "@/app/admin/panel-shell";
 import { invoicingAction } from "./actions";
 
 export const metadata: Metadata = { title: "Facturación" };
@@ -30,7 +30,7 @@ export default async function BillingPage(props: PageProps<"/admin/facturacion">
   const data = buildBilling({ uninvoiced, sales, settings, now });
 
   return (
-    <AdminShell active="billing">
+    <PanelShell active="billing">
       <PageHeader
         title="Facturación"
         description="Qué cobraste y todavía no facturaste, cuánto llevás en el año y lo que le pasás al contador."
@@ -41,6 +41,6 @@ export default async function BillingPage(props: PageProps<"/admin/facturacion">
         </Notice>
       ) : null}
       <BillingView data={data} invoiceAction={invoicingAction} />
-    </AdminShell>
+    </PanelShell>
   );
 }

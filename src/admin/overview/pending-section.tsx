@@ -6,13 +6,12 @@ import type { PendingDelivery, PendingSaleRef, SessionToMark, UpcomingSession } 
 import { formatDueDay, formatSessionWhen } from "@/admin/overview/labels";
 import type { OverviewData } from "@/admin/overview/overview-data";
 import { SectionCard } from "@/admin/overview/section-card";
+import { ADMIN_ROUTES, saleHref } from "@/admin/routes";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/lib/money";
 
 /** Cuántas sesiones por marcar se ven de entrada; el resto, al desplegar. */
 const TO_MARK_VISIBLE = 5;
-const SALES_PATH = "/admin/ventas";
-const BILLING_HREF = "/admin/facturacion";
 
 interface PendingRowProps {
   sale: PendingSaleRef;
@@ -27,7 +26,7 @@ function PendingRow({ sale, when, badge }: PendingRowProps) {
     <li className="flex items-start justify-between gap-3 border-b border-rule py-2.5 last:border-b-0">
       <div className="min-w-0">
         <Link
-          href={`${SALES_PATH}/${sale.id}`}
+          href={saleHref(sale.id)}
           prefetch={false}
           className="rounded-[2px] font-bold underline decoration-ink-2/50 underline-offset-4 hover:decoration-ink"
         >
@@ -208,7 +207,7 @@ function Uninvoiced({ uninvoiced }: { uninvoiced: OverviewData["pending"]["uninv
             <span className="text-ink-2"> ({formatMoney(uninvoiced.usdMinor, "USD")})</span>
           </p>
           <Link
-            href={BILLING_HREF}
+            href={ADMIN_ROUTES.billing}
             prefetch={false}
             className="mt-2 inline-flex min-h-11 items-center gap-2 rounded-[4px] font-bold underline decoration-ink-2/50 underline-offset-4 hover:decoration-ink"
           >

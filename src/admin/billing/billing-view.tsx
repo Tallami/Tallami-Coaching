@@ -5,6 +5,7 @@ import type { InvoicingAction } from "@/admin/billing/form-state";
 import { MonthlyBilling } from "@/admin/billing/monthly-billing";
 import { UninvoicedSection } from "@/admin/billing/uninvoiced-section";
 import { MonotributoCard } from "@/admin/overview/monotributo-card";
+import { ADMIN_ROUTES } from "@/admin/routes";
 import { EmptyState } from "@/admin/ui/empty-state";
 import { Button } from "@/components/ui/button";
 
@@ -29,7 +30,7 @@ export function BillingView({ data, invoiceAction }: BillingViewProps) {
         description="Cada venta cobrada aparece acá hasta que la marques como facturada, y suma al medidor del monotributo. Cargá una y empezás."
         action={
           <Button asChild>
-            <Link href="/admin/ventas/nueva">Cargá tu primera venta</Link>
+            <Link href={ADMIN_ROUTES.newSale}>Cargá tu primera venta</Link>
           </Button>
         }
       />

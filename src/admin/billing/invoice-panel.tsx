@@ -2,10 +2,9 @@ import Link from "next/link";
 import { INCOME_STATUSES, STATUS_LABELS } from "@/admin/catalog";
 import { formatDay } from "@/admin/dates";
 import type { SaleRow } from "@/admin/sales/repository";
+import { ADMIN_ROUTES } from "@/admin/routes";
 import { InvoiceStatusBadge } from "@/admin/sales/status-badge";
 import { SubmitButton } from "@/components/admin/submit-button";
-
-const BILLING_HREF = "/admin/facturacion";
 
 interface InvoicePanelProps {
   sale: Pick<SaleRow, "status" | "paidOn" | "invoiceStatus" | "invoiceType" | "invoiceNumber" | "invoicedOn">;
@@ -17,7 +16,7 @@ interface InvoicePanelProps {
 
 function BillingLink({ children }: { children: string }) {
   return (
-    <Link href={BILLING_HREF} prefetch={false} className="font-semibold underline underline-offset-2">
+    <Link href={ADMIN_ROUTES.billing} prefetch={false} className="font-semibold underline underline-offset-2">
       {children}
     </Link>
   );

@@ -6,7 +6,6 @@ import {
   useEffect,
   useRef,
   useState,
-  useSyncExternalStore,
   useTransition,
   type FormEvent,
   type ReactNode,
@@ -28,8 +27,10 @@ import { CustomerPicker } from "@/admin/sales/customer-picker";
 import type { SaleFormValues } from "@/admin/sales/form-values";
 import { INITIAL_SALE_FORM_STATE, type SaleFormState } from "@/admin/sales/form-state";
 import { RateFields } from "@/admin/sales/rate-fields";
+import { ADMIN_ROUTES } from "@/admin/routes";
 import { Field } from "@/admin/ui/field";
 import { Notice } from "@/admin/ui/notice";
+import { useHydrated } from "@/admin/ui/use-hydrated";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
@@ -46,14 +47,6 @@ export interface SaleFormProps {
   /** La venta que se edita ya tiene una factura emitida: el formulario avisa que, si cambia el monto, la moneda o la fecha, hay que revisarla. */
   invoiced?: boolean;
 }
-
-const SALES_PATH = "/admin/ventas";
-
-// Un snapshot que siempre es `true` en el navegador y `false` al renderizar en
-// el servidor: dice si la página ya está lista para usarse.
-const subscribeNever = () => () => {};
-const isHydrated = () => true;
-const isNotHydrated = () => false;
 
 /** El texto del monto sugerido: solo cuando se cobra en dólares y el servicio tiene precio de lista. */
 function suggestedAmount(
@@ -115,7 +108,7 @@ export function SaleForm({ mode, action, initialValues, priceListUsd, invoiced =
   const [editedFields, setEditedFields] = useState<ReadonlySet<string>>(new Set());
   const formRef = useRef<HTMLFormElement>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
-  const hydrated = useSyncExternalStore(subscribeNever, isHydrated, isNotHydrated);
+  const hydrated = useHydrated();
 
   // Una respuesta nueva del servidor: los errores vuelven a valer y, si no hay
   // dólar oficial, el formulario pasa al tipo de cambio manual.
@@ -383,7 +376,7 @@ export function SaleForm({ mode, action, initialValues, priceListUsd, invoiced =
           {isSaving ? "Guardando…" : mode === "create" ? "Guardar venta" : "Guardar cambios"}
         </Button>
         <Button asChild variant="ink-outline">
-          <Link href={SALES_PATH}>Cancelar</Link>
+          <Link href={ADMIN_ROUTES.sales}>Cancelar</Link>
         </Button>
       </div>
     </form>

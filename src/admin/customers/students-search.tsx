@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { STUDENTS_PARAMS, studentsQueryString } from "@/admin/customers/query";
+import { MAX_SEARCH_LENGTH } from "@/admin/limits";
+import { ADMIN_ROUTES } from "@/admin/routes";
 import { Field } from "@/admin/ui/field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +11,6 @@ interface StudentsSearchProps {
   q: string | undefined;
 }
 
-const STUDENTS_PATH = "/admin/alumnos";
 
 /**
  * Buscador de la lista: un formulario `GET`, así que la búsqueda queda en la
@@ -22,7 +23,7 @@ export function StudentsSearch({ q }: StudentsSearchProps) {
       // El campo es "no controlado": al cambiar la búsqueda (volver, limpiar) se arma un formulario nuevo.
       key={studentsQueryString(q)}
       method="get"
-      action={STUDENTS_PATH}
+      action={ADMIN_ROUTES.students}
       aria-label="Buscar alumnos"
       className="mb-5 flex flex-wrap items-end gap-x-4 gap-y-3 border-2 border-ink bg-white p-4"
     >
@@ -33,7 +34,7 @@ export function StudentsSearch({ q }: StudentsSearchProps) {
             type="search"
             name={STUDENTS_PARAMS.q}
             defaultValue={q ?? ""}
-            maxLength={100}
+            maxLength={MAX_SEARCH_LENGTH}
             autoComplete="off"
             placeholder="Nombre o Discord"
           />
@@ -44,7 +45,7 @@ export function StudentsSearch({ q }: StudentsSearchProps) {
       </Button>
       {q ? (
         <Link
-          href={STUDENTS_PATH}
+          href={ADMIN_ROUTES.students}
           prefetch={false}
           className="inline-flex min-h-11 items-center rounded-[2px] font-bold underline underline-offset-4 hover:text-zone"
         >

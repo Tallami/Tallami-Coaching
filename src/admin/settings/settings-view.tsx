@@ -3,6 +3,7 @@ import Link from "next/link";
 import { dateToArgentinaLocal, formatDay } from "@/admin/dates";
 import type { MonotributoSettings } from "@/admin/metrics/monotributo";
 import { settingsToFormValues, type SettingsFormState } from "@/admin/settings/form-state";
+import { ADMIN_ROUTES } from "@/admin/routes";
 import { SettingsForm } from "@/admin/settings/settings-form";
 import { Notice } from "@/admin/ui/notice";
 
@@ -59,7 +60,7 @@ export function SettingsView({ current, updatedAt, justSaved, action }: Settings
       {justSaved ? (
         <Notice tone="ok" className="mb-5">
           Configuración guardada.{" "}
-          <Link href="/admin/facturacion" prefetch={false} className="underline underline-offset-2">
+          <Link href={ADMIN_ROUTES.billing} prefetch={false} className="underline underline-offset-2">
             Ver el medidor en Facturación
           </Link>
         </Notice>

@@ -9,14 +9,13 @@
 
 import { z } from "zod";
 import { INVOICE_TYPES } from "@/admin/catalog";
+import { MAX_INVOICE_NUMBER_LENGTH } from "@/admin/billing/limits";
 import { isPlausibleDay } from "@/admin/dates";
-import { stripNul } from "@/admin/text";
+import { cleanText } from "@/admin/zod-text";
 import { isUuid } from "@/db/uuid";
 
 /** Ventas que se marcan de una vez: las que muestra la lista de pendientes como mucho. */
 export const MAX_INVOICE_BATCH = 1000;
-/** El número de una factura de ARCA ("00003-00000045") mide 14; este margen alcanza para cualquier formato. */
-export const MAX_INVOICE_NUMBER_LENGTH = 30;
 
 const MESSAGES = {
   ids: "Elegí al menos una venta.",
@@ -41,24 +40,17 @@ export const invoiceIdsSchema = z
 
 const typeField = z.enum(INVOICE_TYPES, { error: MESSAGES.type });
 
-const numberField = z
-  .string({ error: MESSAGES.number })
-  .overwrite(stripNul)
-  .trim()
+const numberField = cleanText(MESSAGES.number)
   .min(1, MESSAGES.number)
   .max(MAX_INVOICE_NUMBER_LENGTH, MESSAGES.numberTooLong);
 
-const issuedOnField = z
-  .string({ error: MESSAGES.dateRequired })
-  .overwrite(stripNul)
-  .trim()
-  .superRefine((value, ctx) => {
-    if (value === "") {
-      ctx.addIssue({ code: "custom", message: MESSAGES.dateRequired });
-    } else if (!isPlausibleDay(value)) {
-      ctx.addIssue({ code: "custom", message: MESSAGES.dateInvalid });
-    }
-  });
+const issuedOnField = cleanText(MESSAGES.dateRequired).superRefine((value, ctx) => {
+  if (value === "") {
+    ctx.addIssue({ code: "custom", message: MESSAGES.dateRequired });
+  } else if (!isPlausibleDay(value)) {
+    ctx.addIssue({ code: "custom", message: MESSAGES.dateInvalid });
+  }
+});
 
 /** Marcar como facturadas: las ventas y los datos de la factura. */
 export const markInvoicedSchema = z.object({

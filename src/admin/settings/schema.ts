@@ -9,7 +9,7 @@
 
 import { z } from "zod";
 import { isPlausibleDay } from "@/admin/dates";
-import { stripNul } from "@/admin/text";
+import { cleanText } from "@/admin/zod-text";
 import { InvalidAmountError, parseAmountToMinor } from "@/lib/money";
 
 export const MONOTRIBUTO_CATEGORIES = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K"] as const;
@@ -26,46 +26,35 @@ const MESSAGES = {
   validFromInvalid: "La fecha no es válida.",
 } as const;
 
-const categoryField = z
-  .string({ error: MESSAGES.category })
-  .overwrite(stripNul)
-  .trim()
+const categoryField = cleanText(MESSAGES.category)
   .toUpperCase()
   .refine((value) => (MONOTRIBUTO_CATEGORIES as readonly string[]).includes(value), {
     error: MESSAGES.category,
   });
 
 /** El tope escrito: un monto en pesos válido y dentro del límite. */
-const capField = z
-  .string({ error: MESSAGES.capRequired })
-  .overwrite(stripNul)
-  .trim()
-  .superRefine((text, ctx) => {
-    if (text === "") {
-      ctx.addIssue({ code: "custom", message: MESSAGES.capRequired });
-      return;
+const capField = cleanText(MESSAGES.capRequired).superRefine((text, ctx) => {
+  if (text === "") {
+    ctx.addIssue({ code: "custom", message: MESSAGES.capRequired });
+    return;
+  }
+  try {
+    if (parseAmountToMinor(text) > MAX_ANNUAL_CAP_ARS_MINOR) {
+      ctx.addIssue({ code: "custom", message: MESSAGES.capTooBig });
     }
-    try {
-      if (parseAmountToMinor(text) > MAX_ANNUAL_CAP_ARS_MINOR) {
-        ctx.addIssue({ code: "custom", message: MESSAGES.capTooBig });
-      }
-    } catch (error) {
-      if (!(error instanceof InvalidAmountError)) throw error;
-      ctx.addIssue({ code: "custom", message: error.message });
-    }
-  });
+  } catch (error) {
+    if (!(error instanceof InvalidAmountError)) throw error;
+    ctx.addIssue({ code: "custom", message: error.message });
+  }
+});
 
-const validFromField = z
-  .string({ error: MESSAGES.validFromRequired })
-  .overwrite(stripNul)
-  .trim()
-  .superRefine((value, ctx) => {
-    if (value === "") {
-      ctx.addIssue({ code: "custom", message: MESSAGES.validFromRequired });
-    } else if (!isPlausibleDay(value)) {
-      ctx.addIssue({ code: "custom", message: MESSAGES.validFromInvalid });
-    }
-  });
+const validFromField = cleanText(MESSAGES.validFromRequired).superRefine((value, ctx) => {
+  if (value === "") {
+    ctx.addIssue({ code: "custom", message: MESSAGES.validFromRequired });
+  } else if (!isPlausibleDay(value)) {
+    ctx.addIssue({ code: "custom", message: MESSAGES.validFromInvalid });
+  }
+});
 
 const fieldsSchema = z.object({
   category: categoryField,

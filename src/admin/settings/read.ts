@@ -25,10 +25,18 @@ export const monotributoSettingsSchema = z.object({
   validFrom: z.string().refine(isValidIsoDate, "Se espera una fecha AAAA-MM-DD."),
 });
 
-/** La fila de `settings` del monotributo ya validada: lo cargado y cuándo se actualizó. */
-async function readMonotributoRow(
-  db: Db,
-): Promise<{ settings: MonotributoSettings; updatedAt: Date } | null> {
+/** Lo cargado del monotributo y cuándo se guardó por última vez. */
+export interface MonotributoRecord {
+  settings: MonotributoSettings;
+  updatedAt: Date;
+}
+
+/**
+ * La fila de `settings` del monotributo ya validada, o `null` si no hay fila o
+ * su contenido no es válido. Una sola lectura trae lo cargado y su fecha: la
+ * pantalla de Configuración usa esta en vez de las dos de abajo.
+ */
+export async function getMonotributoRecord(db: Db): Promise<MonotributoRecord | null> {
   const [row] = await db
     .select({ value: settings.value, updatedAt: settings.updatedAt })
     .from(settings)
@@ -41,7 +49,7 @@ async function readMonotributoRow(
 
 /** El monotributo cargado, o `null` si no hay fila o su contenido no es válido. */
 export async function getMonotributoSettings(db: Db): Promise<MonotributoSettings | null> {
-  return (await readMonotributoRow(db))?.settings ?? null;
+  return (await getMonotributoRecord(db))?.settings ?? null;
 }
 
 /**
@@ -49,5 +57,5 @@ export async function getMonotributoSettings(db: Db): Promise<MonotributoSetting
  * cargado (o lo guardado no es válido, igual que en `getMonotributoSettings`).
  */
 export async function getMonotributoUpdatedAt(db: Db): Promise<Date | null> {
-  return (await readMonotributoRow(db))?.updatedAt ?? null;
+  return (await getMonotributoRecord(db))?.updatedAt ?? null;
 }

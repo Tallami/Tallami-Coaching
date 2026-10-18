@@ -114,7 +114,7 @@ export function isInRange(day: string, range: DateRange): boolean {
 }
 
 /** Cantidad de días del rango, contando los dos extremos. */
-function lengthInDays(range: DateRange): number {
+export function lengthInDays(range: DateRange): number {
   const from = parseDay(range.from);
   const to = parseDay(range.to);
   const days = (utcMs(to.year, to.month, to.date) - utcMs(from.year, from.month, from.date)) / MS_PER_DAY;

@@ -10,18 +10,19 @@ import {
 } from "@/admin/billing/invoicing";
 import { invoiceUndoPath, type InvoiceUndoOutcome } from "@/admin/billing/saved-notice";
 import { searchCustomers, type CustomerOption } from "@/admin/customers/repository";
+import { ADMIN_ROUTES } from "@/admin/routes";
+import { MAX_SEARCH_LENGTH } from "@/admin/limits";
 import type { SaleFormState } from "@/admin/sales/form-state";
 import { saveSale } from "@/admin/sales/save-sale";
 import { getDb } from "@/db/client";
 import { isUuid } from "@/db/uuid";
 
 /** La lista de ventas: adonde se vuelve si el id de la venta no es un id. */
-const LIST_PATH = "/admin/ventas";
+const LIST_PATH = ADMIN_ROUTES.sales;
 /** Dónde se vuelve después de guardar; la lista muestra el aviso según `guardada`. */
-const CREATED_PATH = "/admin/ventas?guardada=creada";
-const EDITED_PATH = "/admin/ventas?guardada=editada";
+const CREATED_PATH = `${ADMIN_ROUTES.sales}?guardada=creada`;
+const EDITED_PATH = `${ADMIN_ROUTES.sales}?guardada=editada`;
 
-const MAX_SEARCH_LENGTH = 100;
 const searchSchema = z.string().max(MAX_SEARCH_LENGTH);
 
 /** Alta de una venta. Las acciones del panel verifican la sesión antes de todo. */

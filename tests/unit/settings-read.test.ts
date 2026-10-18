@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { getMonotributoSettings } from "@/admin/settings/read";
+import { getMonotributoRecord, getMonotributoSettings, getMonotributoUpdatedAt } from "@/admin/settings/read";
 import { settings } from "@/db/schema";
 import { createTestDb } from "../helpers/db";
 
@@ -10,6 +10,29 @@ async function dbWith(value: unknown) {
   await db.insert(settings).values({ key: "monotributo", value });
   return db;
 }
+
+describe("getMonotributoRecord", () => {
+  test("is null when nothing was loaded", async () => {
+    expect(await getMonotributoRecord(await createTestDb())).toBeNull();
+  });
+
+  test("brings what was loaded and when it was saved in one read, the same as the two separate reads", async () => {
+    const db = await dbWith(VALID);
+
+    const record = await getMonotributoRecord(db);
+
+    expect(record?.settings).toEqual(VALID);
+    expect(record?.updatedAt).toBeInstanceOf(Date);
+    expect(record?.settings).toEqual(await getMonotributoSettings(db));
+    expect(record?.updatedAt).toEqual(await getMonotributoUpdatedAt(db));
+  });
+
+  test("is null for a stored value that is not valid, like the separate reads", async () => {
+    const db = await dbWith({ ...VALID, annualCapArsMinor: -5 });
+
+    expect(await getMonotributoRecord(db)).toBeNull();
+  });
+});
 
 describe("getMonotributoSettings", () => {
   test("is null when nothing was loaded", async () => {

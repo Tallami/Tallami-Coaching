@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ITEM_LABELS } from "@/admin/catalog";
 import { formatDay } from "@/admin/dates";
 import type { CustomerStats } from "@/admin/customers/repository";
+import { ADMIN_ROUTES, studentHref } from "@/admin/routes";
 import { EmptyState } from "@/admin/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,8 +17,6 @@ import {
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
-const STUDENTS_PATH = "/admin/alumnos";
-const NEW_STUDENT_PATH = "/admin/alumnos/nuevo";
 
 interface StudentsTableProps {
   rows: readonly CustomerStats[];
@@ -41,7 +40,7 @@ export function StudentsTable({ rows, hasSearch }: StudentsTableProps) {
         description="Probá con un texto más corto: se busca en el nombre y en el Discord."
         action={
           <Button asChild variant="ink-outline" size="sm">
-            <Link href={STUDENTS_PATH}>Ver todos los alumnos</Link>
+            <Link href={ADMIN_ROUTES.students}>Ver todos los alumnos</Link>
           </Button>
         }
       />
@@ -51,7 +50,7 @@ export function StudentsTable({ rows, hasSearch }: StudentsTableProps) {
         description="Los alumnos también se crean solos cuando cargás una venta de alguien nuevo. Acá los ves con lo que compró cada uno."
         action={
           <Button asChild>
-            <Link href={NEW_STUDENT_PATH}>Cargá tu primer alumno</Link>
+            <Link href={ADMIN_ROUTES.newStudent}>Cargá tu primer alumno</Link>
           </Button>
         }
       />
@@ -84,7 +83,7 @@ export function StudentsTable({ rows, hasSearch }: StudentsTableProps) {
             <TableRow key={student.id}>
               <TableCell>
                 <Link
-                  href={`${STUDENTS_PATH}/${student.id}`}
+                  href={studentHref(student.id)}
                   prefetch={false}
                   className="rounded-[2px] font-bold underline decoration-ink-2/50 underline-offset-4 hover:decoration-ink"
                 >

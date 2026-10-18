@@ -3,6 +3,7 @@
 // Todo lo que llega de la dirección es texto del usuario: lo que no se
 // reconoce se ignora.
 
+import { MAX_SEARCH_LENGTH } from "@/admin/limits";
 import { stripNul } from "@/admin/text";
 import { firstValue, type SearchParams } from "@/admin/ui/search-params";
 
@@ -12,7 +13,6 @@ export interface StudentsQuery {
   page: number;
 }
 
-const MAX_SEARCH_LENGTH = 100;
 /** Más páginas que esto no existen: el desplazamiento seguiría siendo un entero seguro. */
 const MAX_PAGE = 1_000_000;
 const WHOLE_NUMBER = /^\d{1,9}$/;

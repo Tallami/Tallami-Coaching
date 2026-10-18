@@ -6,18 +6,17 @@ import { getCustomer, type CustomerDetail } from "@/admin/customers/repository";
 import { StudentForm } from "@/admin/customers/student-form";
 import { StudentHistory } from "@/admin/customers/student-history";
 import { StudentSummary } from "@/admin/customers/student-summary";
-import { AdminShell } from "@/admin/ui/admin-shell";
+import { ADMIN_ROUTES } from "@/admin/routes";
 import { EmptyState } from "@/admin/ui/empty-state";
 import { Notice } from "@/admin/ui/notice";
 import { PageHeader } from "@/admin/ui/page-header";
 import { firstValue } from "@/admin/ui/search-params";
 import { Button } from "@/components/ui/button";
 import { getDb } from "@/db/client";
+import { PanelShell } from "@/app/admin/panel-shell";
 import { updateStudentAction } from "../actions";
 
 export const metadata: Metadata = { title: "Alumno" };
-
-const STUDENTS_PATH = "/admin/alumnos";
 
 /** Avisos que deja `?guardado=` después de guardar. Un `Map`: lo que escriba la dirección no puede caer en `Object.prototype`. */
 const SAVED_MESSAGES = new Map([
@@ -41,18 +40,18 @@ export default async function StudentPage(props: PageProps<"/admin/alumnos/[id]"
 
   if (!student) {
     return (
-      <AdminShell active="students">
+      <PanelShell active="students">
         <PageHeader title="Alumno" />
         <EmptyState
           title="No encontramos a ese alumno"
           description="Puede que el enlace esté mal escrito. Volvé a la lista para elegirlo de nuevo."
           action={
             <Button asChild variant="ink-outline">
-              <Link href={STUDENTS_PATH}>Volver a alumnos</Link>
+              <Link href={ADMIN_ROUTES.students}>Volver a alumnos</Link>
             </Button>
           }
         />
-      </AdminShell>
+      </PanelShell>
     );
   }
 
@@ -60,13 +59,13 @@ export default async function StudentPage(props: PageProps<"/admin/alumnos/[id]"
   const formValues = toFormValues(student);
 
   return (
-    <AdminShell active="students">
+    <PanelShell active="students">
       <PageHeader
         title={student.name}
         description="Lo que compró, todas sus ventas y sus datos."
         actions={
           <Button asChild variant="ink-outline">
-            <Link href={STUDENTS_PATH}>Volver a alumnos</Link>
+            <Link href={ADMIN_ROUTES.students}>Volver a alumnos</Link>
           </Button>
         }
       />
@@ -84,9 +83,9 @@ export default async function StudentPage(props: PageProps<"/admin/alumnos/[id]"
           mode="edit"
           action={updateStudentAction.bind(null, student.id)}
           initialValues={formValues}
-          cancelHref={STUDENTS_PATH}
+          cancelHref={ADMIN_ROUTES.students}
         />
       </div>
-    </AdminShell>
+    </PanelShell>
   );
 }

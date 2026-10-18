@@ -1,6 +1,6 @@
 // Textos de la página Servicios.
 
-import { rangeLengthInDays } from "@/admin/overview/labels";
+import { lengthInDays } from "@/admin/metrics/period";
 
 const DAYS_PER_MONTH = 30;
 const SHOW_DAYS_UP_TO = 60;
@@ -11,7 +11,7 @@ const SHOW_DAYS_UP_TO = 60;
  * (no debería haber ninguno: la última venta es hasta hoy) se escribe como "hoy".
  */
 export function formatDaysAgo(day: string, today: string): string {
-  const days = day >= today ? 0 : rangeLengthInDays({ from: day, to: today }) - 1;
+  const days = day >= today ? 0 : lengthInDays({ from: day, to: today }) - 1;
   if (days === 0) return "hoy";
   if (days === 1) return "ayer";
   if (days <= SHOW_DAYS_UP_TO) return `hace ${days} días`;

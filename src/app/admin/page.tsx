@@ -5,11 +5,12 @@ import { loadMetricSales } from "@/admin/metrics/load";
 import { buildOverview } from "@/admin/overview/overview-data";
 import { OverviewView } from "@/admin/overview/overview-view";
 import { parsePeriodParam } from "@/admin/overview/period-param";
+import { ADMIN_ROUTES } from "@/admin/routes";
 import { getMonotributoSettings } from "@/admin/settings/read";
-import { AdminShell } from "@/admin/ui/admin-shell";
 import { PageHeader } from "@/admin/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { getDb } from "@/db/client";
+import { PanelShell } from "@/app/admin/panel-shell";
 
 export const metadata: Metadata = { title: "Resumen" };
 
@@ -25,17 +26,17 @@ export default async function OverviewPage(props: PageProps<"/admin">) {
   const data = buildOverview(sales, monotributo, period, now);
 
   return (
-    <AdminShell active="overview">
+    <PanelShell active="overview">
       <PageHeader
         title="Resumen"
         description="Cuánto ganás, qué se vende y qué tenés pendiente."
         actions={
           <Button asChild>
-            <Link href="/admin/ventas/nueva">Cargar una venta</Link>
+            <Link href={ADMIN_ROUTES.newSale}>Cargar una venta</Link>
           </Button>
         }
       />
       <OverviewView data={data} />
-    </AdminShell>
+    </PanelShell>
   );
 }

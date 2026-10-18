@@ -6,11 +6,11 @@ import { formatPercent } from "@/admin/overview/labels";
 import { monotributoVerdict } from "@/admin/overview/monotributo-verdict";
 import type { OverviewData } from "@/admin/overview/overview-data";
 import { SectionCard } from "@/admin/overview/section-card";
+import { ADMIN_ROUTES } from "@/admin/routes";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
-const CONFIGURATION_HREF = "/admin/configuracion";
 
 const TONE_TEXT: Record<MeterTone, string> = {
   accent: "text-ok-ink",
@@ -40,7 +40,7 @@ export function MonotributoCard({ data }: { data: Pick<OverviewData, "monotribut
         </p>
         <div className="mt-4">
           <Button asChild variant="ink-outline" size="sm">
-            <Link href={CONFIGURATION_HREF}>Cargar categoría y tope</Link>
+            <Link href={ADMIN_ROUTES.settings}>Cargar categoría y tope</Link>
           </Button>
         </div>
       </SectionCard>
@@ -76,7 +76,7 @@ export function MonotributoCard({ data }: { data: Pick<OverviewData, "monotribut
       </dl>
       <p className="mt-3 text-[0.875rem] leading-snug text-ink-2">
         El tope es lo que cargaste en{" "}
-        <Link href={CONFIGURATION_HREF} className="font-semibold underline underline-offset-2">
+        <Link href={ADMIN_ROUTES.settings} className="font-semibold underline underline-offset-2">
           Configuración
         </Link>{" "}
         (categoría {settings.category}, vigente desde el {formatDay(settings.validFrom)}); el panel no lo compara con

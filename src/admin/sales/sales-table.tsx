@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ITEM_LABELS, PAYMENT_LABELS } from "@/admin/catalog";
 import { formatDay } from "@/admin/dates";
+import { ADMIN_ROUTES, saleHref } from "@/admin/routes";
 import type { SaleRow } from "@/admin/sales/repository";
 import { InvoiceStatusBadge, SaleStatusBadge } from "@/admin/sales/status-badge";
 import { EmptyState } from "@/admin/ui/empty-state";
@@ -17,8 +18,6 @@ import {
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
-const SALES_PATH = "/admin/ventas";
-const NEW_SALE_PATH = "/admin/ventas/nueva";
 
 interface SalesTableProps {
   rows: readonly SaleRow[];
@@ -37,7 +36,7 @@ export function SalesTable({ rows, hasFilters }: SalesTableProps) {
         description="Probá con otras fechas o con un texto más corto."
         action={
           <Button asChild variant="ink-outline" size="sm">
-            <Link href={SALES_PATH}>Ver todas las ventas</Link>
+            <Link href={ADMIN_ROUTES.sales}>Ver todas las ventas</Link>
           </Button>
         }
       />
@@ -47,7 +46,7 @@ export function SalesTable({ rows, hasFilters }: SalesTableProps) {
         description="Cada venta que cargues suma a tus ingresos y a lo que tenés para facturar."
         action={
           <Button asChild>
-            <Link href={NEW_SALE_PATH}>Cargá tu primera venta</Link>
+            <Link href={ADMIN_ROUTES.newSale}>Cargá tu primera venta</Link>
           </Button>
         }
       />
@@ -85,7 +84,7 @@ export function SalesTable({ rows, hasFilters }: SalesTableProps) {
               </TableCell>
               <TableCell>
                 <Link
-                  href={`${SALES_PATH}/${sale.id}`}
+                  href={saleHref(sale.id)}
                   prefetch={false}
                   className="rounded-[2px] font-bold underline decoration-ink-2/50 underline-offset-4 hover:decoration-ink"
                 >

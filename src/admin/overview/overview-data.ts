@@ -4,9 +4,8 @@
 // pantalla se prueba sin base de datos.
 
 import type { SaleItem } from "@/admin/catalog";
-import { computeKpis, type Kpis } from "@/admin/metrics/kpis";
-import { sumMinor } from "@/admin/metrics/math";
-import { isIncome, type MetricSale } from "@/admin/metrics/metric-sale";
+import { computeKpisWithPrevious, type Kpis } from "@/admin/metrics/kpis";
+import type { MetricSale } from "@/admin/metrics/metric-sale";
 import {
   monotributoStatus,
   monotributoWindow,
@@ -15,7 +14,7 @@ import {
 } from "@/admin/metrics/monotributo";
 import { pendingWork, type PendingWork } from "@/admin/metrics/pending";
 import {
-  isInRange,
+  lengthInDays,
   periodRange,
   previousPeriodRange,
   todayInArgentina,
@@ -34,7 +33,6 @@ import {
   type MonthlyIncome,
   type PaymentMethodIncome,
 } from "@/admin/metrics/series";
-import { rangeLengthInDays } from "@/admin/overview/labels";
 
 /** Meses del gráfico de ingresos. */
 export const CHART_MONTHS = 12;
@@ -79,19 +77,15 @@ export function buildOverview(
 ): OverviewData {
   const range = periodRange(period, now);
   const previousRange = previousPeriodRange(period, now);
+  const { kpis, previousIncomeUsdMinor } = computeKpisWithPrevious(sales, period, now);
   return {
     period,
     today: todayInArgentina(now),
     range,
     previousRange,
-    rangeDays: rangeLengthInDays(range),
-    kpis: computeKpis(sales, period, now),
-    previousIncomeUsdMinor: sumMinor(
-      sales
-        .filter(isIncome)
-        .filter((sale) => isInRange(sale.paidOn, previousRange))
-        .map((sale) => sale.amountUsdMinor),
-    ),
+    rangeDays: lengthInDays(range),
+    kpis,
+    previousIncomeUsdMinor,
     months: monthlyIncome(sales, CHART_MONTHS, now),
     byItem: incomeByItem(sales, range),
     withoutSales: itemsWithoutSales(sales, DEFAULT_DAYS_WITHOUT_SALES, now),

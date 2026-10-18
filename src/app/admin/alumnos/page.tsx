@@ -6,16 +6,15 @@ import { parseStudentsQuery, studentsQueryString } from "@/admin/customers/query
 import { listCustomersWithStats } from "@/admin/customers/repository";
 import { StudentsSearch } from "@/admin/customers/students-search";
 import { StudentsTable } from "@/admin/customers/students-table";
-import { AdminShell } from "@/admin/ui/admin-shell";
+import { PAGE_SIZE } from "@/admin/limits";
+import { ADMIN_ROUTES } from "@/admin/routes";
 import { PageHeader } from "@/admin/ui/page-header";
 import { Pagination } from "@/admin/ui/pagination";
 import { Button } from "@/components/ui/button";
 import { getDb } from "@/db/client";
+import { PanelShell } from "@/app/admin/panel-shell";
 
 export const metadata: Metadata = { title: "Alumnos" };
-
-const PAGE_SIZE = 25;
-const STUDENTS_PATH = "/admin/alumnos";
 
 export default async function StudentsPage(props: PageProps<"/admin/alumnos">) {
   await requireAdmin();
@@ -26,17 +25,17 @@ export default async function StudentsPage(props: PageProps<"/admin/alumnos">) {
   const total = students.length;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   // Una página que ya no existe (cambió la búsqueda o la lista): a la última.
-  if (page > pageCount) redirect(`${STUDENTS_PATH}${studentsQueryString(q, pageCount)}`);
+  if (page > pageCount) redirect(`${ADMIN_ROUTES.students}${studentsQueryString(q, pageCount)}`);
   const rows = students.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
-    <AdminShell active="students">
+    <PanelShell active="students">
       <PageHeader
         title="Alumnos"
         description="Quiénes te compraron y cuánto gastó cada uno, del que compró hace menos al que compró hace más."
         actions={
           <Button asChild>
-            <Link href={`${STUDENTS_PATH}/nuevo`}>Nuevo alumno</Link>
+            <Link href={ADMIN_ROUTES.newStudent}>Nuevo alumno</Link>
           </Button>
         }
       />
@@ -49,9 +48,9 @@ export default async function StudentsPage(props: PageProps<"/admin/alumnos">) {
           pageSize={PAGE_SIZE}
           total={total}
           noun="alumnos"
-          hrefFor={(target) => `${STUDENTS_PATH}${studentsQueryString(q, target)}`}
+          hrefFor={(target) => `${ADMIN_ROUTES.students}${studentsQueryString(q, target)}`}
         />
       ) : null}
-    </AdminShell>
+    </PanelShell>
   );
 }

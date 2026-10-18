@@ -5,14 +5,13 @@
 // mostrar debajo de cada campo.
 
 import { z } from "zod";
+import {
+  MAX_DISCORD_LENGTH,
+  MAX_NAME_LENGTH,
+  MAX_NOTES_LENGTH,
+} from "@/admin/customers/limits";
 import type { CustomerInput } from "@/admin/customers/repository";
-import { stripNul } from "@/admin/text";
-
-export const MAX_NAME_LENGTH = 120;
-export const MAX_DISCORD_LENGTH = 64;
-export const MAX_NOTES_LENGTH = 2000;
-/** Largo de un código de país (ISO 3166-1 alfa-2). */
-export const COUNTRY_CODE_LENGTH = 2;
+import { cleanText, optionalText, requiredText } from "@/admin/zod-text";
 
 const COUNTRY_CODE = /^[A-Z]{2}$/;
 
@@ -24,26 +23,16 @@ const MESSAGES = {
   notesTooLong: `Las notas son demasiado largas (máximo ${MAX_NOTES_LENGTH} caracteres).`,
 } as const;
 
-/** Texto de un formulario: sin caracteres NUL y sin espacios en los bordes. */
-function cleanText() {
-  return z.string().overwrite(stripNul).trim();
-}
-
 /** Los datos de un alumno: el nombre es obligatorio, lo demás puede quedar vacío. */
 export const customerInputSchema = z
   .object({
-    name: z
-      .string({ error: MESSAGES.name })
-      .overwrite(stripNul)
-      .trim()
-      .min(1, MESSAGES.name)
-      .max(MAX_NAME_LENGTH, MESSAGES.nameTooLong),
-    discord: cleanText().max(MAX_DISCORD_LENGTH, MESSAGES.discordTooLong).optional(),
+    name: requiredText(MESSAGES.name, MAX_NAME_LENGTH, MESSAGES.nameTooLong),
+    discord: optionalText(MAX_DISCORD_LENGTH, MESSAGES.discordTooLong),
     country: cleanText()
       .toUpperCase()
       .refine((value) => value === "" || COUNTRY_CODE.test(value), { error: MESSAGES.country })
       .optional(),
-    notes: cleanText().max(MAX_NOTES_LENGTH, MESSAGES.notesTooLong).optional(),
+    notes: optionalText(MAX_NOTES_LENGTH, MESSAGES.notesTooLong),
   })
   .transform(
     (value): CustomerInput => ({

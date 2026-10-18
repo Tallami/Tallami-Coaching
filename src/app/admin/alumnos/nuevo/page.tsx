@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import { requireAdmin } from "@/admin/auth/require-admin";
 import { EMPTY_STUDENT_FORM_VALUES } from "@/admin/customers/form-state";
 import { StudentForm } from "@/admin/customers/student-form";
-import { AdminShell } from "@/admin/ui/admin-shell";
+import { ADMIN_ROUTES } from "@/admin/routes";
 import { PageHeader } from "@/admin/ui/page-header";
+import { PanelShell } from "@/app/admin/panel-shell";
 import { createStudentAction } from "../actions";
 
 export const metadata: Metadata = { title: "Nuevo alumno" };
@@ -12,7 +13,7 @@ export default async function NewStudentPage() {
   await requireAdmin();
 
   return (
-    <AdminShell active="students">
+    <PanelShell active="students">
       <PageHeader
         title="Nuevo alumno"
         description="Solo el nombre es obligatorio. También se crea un alumno al cargar la venta de alguien nuevo."
@@ -22,9 +23,9 @@ export default async function NewStudentPage() {
           mode="create"
           action={createStudentAction}
           initialValues={EMPTY_STUDENT_FORM_VALUES}
-          cancelHref="/admin/alumnos"
+          cancelHref={ADMIN_ROUTES.students}
         />
       </div>
-    </AdminShell>
+    </PanelShell>
   );
 }

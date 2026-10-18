@@ -6,17 +6,19 @@ import {
   useEffect,
   useRef,
   useState,
-  useSyncExternalStore,
   useTransition,
   type FormEvent,
   type MouseEvent,
 } from "react";
 import { INITIAL_INVOICING_FORM_STATE, type InvoicingAction } from "@/admin/billing/form-state";
+import { MAX_INVOICE_NUMBER_LENGTH } from "@/admin/billing/limits";
 import type { UninvoicedGroupView, UninvoicedRowView } from "@/admin/billing/uninvoiced-views";
 import { INVOICE_TYPES } from "@/admin/catalog";
 import { sumMinor } from "@/admin/metrics/math";
+import { saleHref } from "@/admin/routes";
 import { Field } from "@/admin/ui/field";
 import { Notice } from "@/admin/ui/notice";
+import { useHydrated } from "@/admin/ui/use-hydrated";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,8 +42,6 @@ interface UninvoicedListProps {
   action: InvoicingAction;
 }
 
-const SALES_PATH = "/admin/ventas";
-
 /**
  * Con más ventas elegidas que estas, "No requiere factura" pide confirmar: saca
  * de la lista todas las ventas de una vez (con "Elegir todas", hasta mil) y un
@@ -49,12 +49,6 @@ const SALES_PATH = "/admin/ventas";
  * de a una venta por vez.
  */
 export const CONFIRM_NOT_REQUIRED_ABOVE = 5;
-
-// Un snapshot que siempre es `true` en el navegador y `false` al renderizar en
-// el servidor: dice si la página ya está lista para usarse.
-const subscribeNever = () => () => {};
-const isHydrated = () => true;
-const isNotHydrated = () => false;
 
 const INVOICE_TYPE_LABELS: Record<(typeof INVOICE_TYPES)[number], string> = {
   C: "Factura C",
@@ -122,7 +116,7 @@ function SaleRowView({
       <TableCell className="whitespace-nowrap">{row.paidOn}</TableCell>
       <TableCell>
         <Link
-          href={`${SALES_PATH}/${row.id}`}
+          href={saleHref(row.id)}
           prefetch={false}
           className="rounded-[2px] font-bold underline decoration-ink-2/50 underline-offset-4 hover:decoration-ink"
         >
@@ -180,7 +174,7 @@ export function UninvoicedList({ groups, today, action }: UninvoicedListProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
-  const hydrated = useSyncExternalStore(subscribeNever, isHydrated, isNotHydrated);
+  const hydrated = useHydrated();
 
   // Una respuesta nueva del servidor: los errores vuelven a valer.
   if (state !== handledState) {
@@ -370,7 +364,7 @@ export function UninvoicedList({ groups, today, action }: UninvoicedListProps) {
                   {...control}
                   name="number"
                   autoComplete="off"
-                  maxLength={30}
+                  maxLength={MAX_INVOICE_NUMBER_LENGTH}
                   value={values.number}
                   onChange={(event) => update({ number: event.target.value })}
                 />

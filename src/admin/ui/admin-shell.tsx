@@ -4,32 +4,35 @@ import { ADMIN_SECTIONS, type AdminSectionId } from "@/admin/ui/sections";
 import { SidebarFrame } from "@/admin/ui/sidebar-frame";
 import { SubmitButton } from "@/components/admin/submit-button";
 import { cn } from "@/lib/utils";
-import { logoutAction } from "@/app/admin/actions";
 
 interface AdminShellProps {
   /** La sección que se está viendo; queda marcada en la barra lateral. */
   active: AdminSectionId;
+  /** Lo que hace el botón Salir (cierra la sesión). Las páginas lo reciben ya conectado de `PanelShell`. */
+  logoutAction: () => void | Promise<void>;
   children: ReactNode;
 }
 
 /**
  * El marco de toda página del panel (menos el login y la configuración
  * inicial): barra lateral con las secciones y el botón Salir, y el contenido
- * al lado. Cada página lo usa como raíz, después de `await requireAdmin()`:
+ * al lado. Cada página lo usa como raíz, después de `await requireAdmin()`,
+ * a través de `PanelShell` (`src/app/admin/panel-shell.tsx`), que le da la
+ * acción de salir:
  *
  *   export default async function Page() {
  *     await requireAdmin();
  *     return (
- *       <AdminShell active="sales">
+ *       <PanelShell active="sales">
  *         <PageHeader title="Ventas" />
  *         …
- *       </AdminShell>
+ *       </PanelShell>
  *     );
  *   }
  *
  * No lee datos, así que no verifica la sesión: eso es de la página.
  */
-export function AdminShell({ active, children }: AdminShellProps) {
+export function AdminShell({ active, logoutAction, children }: AdminShellProps) {
   return (
     <>
       <a

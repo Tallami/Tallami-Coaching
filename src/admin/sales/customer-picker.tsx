@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import type { CustomerOption } from "@/admin/customers/repository";
+import { MAX_SEARCH_LENGTH } from "@/admin/limits";
 import { customerLabel, type SaleFormValues } from "@/admin/sales/form-values";
 import { CHOSEN_CHOICE_CLASSES } from "@/admin/ui/choice-classes";
 import { Field } from "@/admin/ui/field";
@@ -244,7 +245,7 @@ function CustomerSearch({ autoFocus, error, onPick }: CustomerSearchProps) {
             aria-activedescendant={activeIndex >= 0 ? `${listId}-${activeIndex}` : undefined}
             autoComplete="off"
             autoFocus={autoFocus}
-            maxLength={100}
+            maxLength={MAX_SEARCH_LENGTH}
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);

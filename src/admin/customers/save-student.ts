@@ -9,6 +9,7 @@ import {
   updateCustomer,
 } from "@/admin/customers/repository";
 import { customerFieldErrors, customerInputSchema } from "@/admin/customers/schema";
+import { formText } from "@/admin/text";
 import type { Db } from "@/db/client";
 
 export type SaveStudentOutcome =
@@ -23,19 +24,13 @@ function rejected(state: Partial<StudentFormState>): SaveStudentOutcome {
   return { saved: false, state: { fieldErrors: {}, ...state } };
 }
 
-function text(formData: FormData, name: string): string | undefined {
-  const value = formData.get(name);
-  // Un archivo o un campo ausente no es texto: la validación lo rechaza.
-  return typeof value === "string" ? value : undefined;
-}
-
 /** Los campos del alumno tal como llegaron, sin validar. */
 function readStudentForm(formData: FormData): Record<string, unknown> {
   return {
-    name: text(formData, "name"),
-    discord: text(formData, "discord"),
-    country: text(formData, "country"),
-    notes: text(formData, "notes"),
+    name: formText(formData, "name"),
+    discord: formText(formData, "discord"),
+    country: formText(formData, "country"),
+    notes: formText(formData, "notes"),
   };
 }
 
