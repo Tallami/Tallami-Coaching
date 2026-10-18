@@ -13,6 +13,12 @@ import { LOGIN_PATH, PANEL_PATH, SETUP_PATH, safeNextPath } from "./redirect";
 import { ADMIN_COOKIE, verifySessionToken } from "./session";
 
 const SERVER_ACTION_HEADER = "next-action";
+/**
+ * Con este encabezado, el cliente de Next entiende que la acción terminó en una redirección y navega
+ * (`<ruta>;<push|replace>`): es el mismo que escribe el servidor cuando una acción llama a `redirect()`.
+ * Lo lee `serverActionReducer` (`next/dist/client/components/router-reducer/reducers/server-action-reducer`).
+ */
+const ACTION_REDIRECT_HEADER = "x-action-redirect";
 /** Parámetro con el que el router de Next pide los datos de una página; no es parte de la dirección. */
 const ROUTER_QUERY = "_rsc";
 
@@ -90,6 +96,12 @@ function redirectTo(request: NextRequest, pathname: string, next?: string): Next
   return withPanelHeaders(NextResponse.redirect(url, isRead ? 307 : 303));
 }
 
+/** Una ruta del panel con `?next=` si hay a dónde volver, como texto relativo (el valor de `x-action-redirect`). */
+function pathWithNext(pathname: string, next?: string): string {
+  if (!next) return pathname;
+  return `${pathname}?${new URLSearchParams({ next })}`;
+}
+
 /** Adónde volver tras el login: la dirección pedida, sin el parámetro interno del router. */
 function destinationOf(request: NextRequest): string {
   const { pathname, searchParams } = request.nextUrl;
@@ -99,24 +111,43 @@ function destinationOf(request: NextRequest): string {
   return safeNextPath(`${stripTransport(pathname)}${search}`);
 }
 
-function unauthorized(): NextResponse {
-  return withPanelHeaders(new NextResponse(null, { status: 401 }));
+/**
+ * La respuesta a un Server Action sin sesión (o con el panel sin configurar): 401 sin cuerpo y con
+ * `x-action-redirect`, para que el navegador de quien tenía el panel abierto termine en `target`
+ * (el login) en vez de en una excepción.
+ *
+ * Por qué se contesta acá y no se deja pasar el pedido hasta `requireAdmin()`, que también redirigiría:
+ * con la sesión vencida el pedido no está autenticado, y dejarlo seguir haría que Next decodifique el
+ * cuerpo de un desconocido (el protocolo Flight de React) antes de que corra código nuestro, como hoy
+ * pasa solo con la acción del login, que es pública a propósito. Así el `proxy` sigue siendo una barrera
+ * de verdad (ningún Server Action sin sesión llega al código de la app) y `requireAdmin()` sigue en cada
+ * acción como la segunda, sin que una dependa de la otra. Un redirect HTTP común no sirve: el navegador
+ * lo seguiría y el cliente de Next recibiría HTML, no la respuesta de una acción.
+ *
+ * El encabezado es el protocolo interno entre el servidor y el cliente de Next, no una API documentada. Si
+ * un cambio de versión lo moviera, el 401 volvería a ser un error del lado del navegador y lo atraparía
+ * `app/admin/error.tsx`, que ofrece ir al login; `tests/e2e/admin-session-expiry.spec.ts` lo avisa antes.
+ */
+function unauthorizedAction(target: string): NextResponse {
+  const response = withPanelHeaders(new NextResponse(null, { status: 401 }));
+  response.headers.set(ACTION_REDIRECT_HEADER, `${target};replace`);
+  return response;
 }
 
 /**
  * Decide qué pasa con un pedido a `/admin…`:
- * - panel sin configurar → `/admin/setup` (o 401 si es un Server Action);
+ * - panel sin configurar → `/admin/setup` (o, si es un Server Action, 401 que manda a ese mismo lugar);
  * - `/admin/login` y `/admin/setup` → pasan (son las puertas);
  * - con sesión válida → pasa;
- * - sin ella → redirección al login con `?next=`, o 401 si es un Server Action
- *   (un redirect no le sirve a quien llama a una acción).
+ * - sin ella → redirección al login con `?next=`; si es un Server Action, 401 con
+ *   `x-action-redirect` al login (ver `unauthorizedAction`).
  */
 export async function guardAdmin(request: NextRequest): Promise<NextResponse> {
   const pathname = normalizePath(request.nextUrl.pathname);
   const isServerAction = request.headers.has(SERVER_ACTION_HEADER);
 
   if (getMissingConfig().length > 0) {
-    if (isServerAction) return unauthorized();
+    if (isServerAction) return unauthorizedAction(SETUP_PATH);
     if (pathname === SETUP_PATH) return withPanelHeaders(NextResponse.next());
     return redirectTo(request, SETUP_PATH);
   }
@@ -129,6 +160,7 @@ export async function guardAdmin(request: NextRequest): Promise<NextResponse> {
     return withPanelHeaders(NextResponse.next());
   }
 
-  if (isServerAction) return unauthorized();
-  return redirectTo(request, LOGIN_PATH, destinationOf(request));
+  const destination = destinationOf(request);
+  if (isServerAction) return unauthorizedAction(pathWithNext(LOGIN_PATH, destination));
+  return redirectTo(request, LOGIN_PATH, destination);
 }

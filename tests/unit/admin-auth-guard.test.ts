@@ -277,6 +277,58 @@ describe("guardAdmin", () => {
     }
   });
 
+  test("tells the client of a server action to go to the login, so an expired session ends there and not in an error", async () => {
+    // El cliente de Next entiende `x-action-redirect: <ruta>;<push|replace>` como la redirección de una acción
+    // (la misma que escribe el servidor cuando una acción llama a `redirect()`). Sin eso, un 401 pelado se vuelve
+    // una excepción en el navegador. El pedido sigue sin llegar a la acción: la respuesta es un 401 sin cuerpo.
+    const action = { "next-action": "40abc", "content-type": "text/plain" };
+
+    const anonymous = await guardAdmin(get("/admin/ventas/nueva", action, "POST"));
+    const forged = await guardAdmin(
+      get("/admin/ventas/nueva", { ...action, cookie: `${ADMIN_COOKIE}=falsa` }, "POST"),
+    );
+
+    for (const response of [anonymous, forged]) {
+      expect(response.status).toBe(401);
+      expect(response.headers.get("location")).toBeNull();
+      expect(response.headers.get("x-action-redirect")).toBe(
+        "/admin/login?next=%2Fadmin%2Fventas%2Fnueva;replace",
+      );
+      expect(response.headers.get("cache-control")).toBe("no-store");
+      expect(response.headers.get("x-robots-tag")).toBe("noindex, nofollow");
+      expect(response.body).toBeNull();
+    }
+  });
+
+  test("the action redirect remembers the page with its query, without the router parameter", async () => {
+    const response = await guardAdmin(
+      get("/admin/ventas?mes=2026-10&_rsc=abc123", { "next-action": "40abc" }, "POST"),
+    );
+
+    expect(response.headers.get("x-action-redirect")).toBe(
+      "/admin/login?next=%2Fadmin%2Fventas%3Fmes%3D2026-10;replace",
+    );
+  });
+
+  test("the action redirect cannot be bent into another site or loop on the login", async () => {
+    for (const path of ["/admin/login.segments/x", "/admin//evil.com", "/admin/%2e%2e/es"]) {
+      const response = await guardAdmin(get(path, { "next-action": "40abc" }, "POST"));
+      const redirect = response.headers.get("x-action-redirect") ?? "";
+      const [target] = redirect.split(";");
+
+      expect(target.startsWith("/admin/login?next=%2Fadmin"), path).toBe(true);
+      expect(redirect.endsWith(";replace"), path).toBe(true);
+    }
+  });
+
+  test("a server action with a valid session gets no redirect header", async () => {
+    const response = await guardAdmin(
+      get("/admin/ventas", { "next-action": "40abc", cookie: await validCookie() }, "POST"),
+    );
+
+    expect(response.headers.get("x-action-redirect")).toBeNull();
+  });
+
   test("lets a server action with a valid session through", async () => {
     const response = await guardAdmin(
       get("/admin/ventas", { "next-action": "40abc", cookie: await validCookie() }, "POST"),
@@ -404,10 +456,11 @@ describe("guardAdmin", () => {
       expect(isPassThrough(await guardAdmin(get("/admin/setup")))).toBe(true);
     });
 
-    test("answers 401 to server actions", async () => {
+    test("answers 401 to server actions and sends their client to the setup page", async () => {
       const response = await guardAdmin(get("/admin/login", { "next-action": "40abc" }, "POST"));
 
       expect(response.status).toBe(401);
+      expect(response.headers.get("x-action-redirect")).toBe("/admin/setup;replace");
     });
   });
 });
