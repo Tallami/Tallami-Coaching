@@ -29,16 +29,20 @@ async function closeOpenDb(): Promise<void> {
 }
 
 describe("REMOTE_DB_OPTIONS", () => {
-  // Los números salen de la guía de Supabase para funciones serverless con el
-  // pooler de transacciones (un solo cliente por instancia, SSL `require`, sin
-  // sentencias preparadas) y del ejemplo de postgres.js para `idle_timeout`.
+  // SSL `require` y sin sentencias preparadas salen de la guía de Supabase para
+  // el pooler de transacciones; `idle_timeout`, del ejemplo de postgres.js.
+  // `max: 5` y no 1: ver el comentario de `REMOTE_DB_OPTIONS` (pipelining).
   test("encrypts the connection, keeps prepared statements off and sizes the pool for serverless", () => {
     expect(REMOTE_DB_OPTIONS).toEqual({
       ssl: "require",
       prepare: false,
-      max: 1,
+      max: 5,
       idle_timeout: 20,
     });
+  });
+
+  test("leaves postgres.js pipelining at its default: max_pipeline 0 breaks transactions", () => {
+    expect(REMOTE_DB_OPTIONS).not.toHaveProperty("max_pipeline");
   });
 });
 
@@ -100,7 +104,7 @@ describe("getDb", () => {
       }
     ).$client;
     expect(options.ssl).toBe("require");
-    expect(options.max).toBe(1);
+    expect(options.max).toBe(5);
     expect(options.idle_timeout).toBe(20);
   });
 

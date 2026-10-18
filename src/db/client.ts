@@ -33,10 +33,15 @@ const DEFAULT_PGLITE_DIR = ".data/pglite";
  *   y alumnos nunca viajan en claro. `require` cifra pero no verifica el
  *   certificado del servidor (eso pide bajar el certificado raíz de Supabase);
  * - `prepare: false`: el pooler de transacciones no soporta sentencias preparadas;
- * - `max: 1`: un cliente por instancia de la función, que atiende todos los
- *   pedidos de esa instancia. El valor por defecto (10) abriría 10 conexiones
- *   por cada instancia en ejecución; la guía dice subirlo solo si hay pedidos
- *   haciendo cola en una misma instancia;
+ * - `max: 5`: hasta 5 conexiones por instancia de la función. No 1: el pooler de
+ *   transacciones no soporta pipelining (Supabase avisa que con postgres.js
+ *   puede colgar consultas o devolver filas cruzadas) y postgres.js encola una
+ *   consulta sobre una conexión ocupada solo cuando no le queda ninguna libre
+ *   ni por abrir. Con 1, un `Promise.all` de una página o un clic de
+ *   `/api/interest` al mismo tiempo ya caen en ese caso; con 5 alcanza para la
+ *   página más pedida (4 consultas en Facturación) con margen, y sigue lejos
+ *   del cupo del pooler. `max_pipeline: 0` no sirve para apagarlo: rompe
+ *   `sql.begin()` (las transacciones de ventas y facturas);
  * - `idle_timeout: 20`: una conexión sin uso se cierra a los 20 segundos (el
  *   ejemplo de la documentación de postgres.js), así una instancia dormida no
  *   ocupa un lugar del pooler; la siguiente consulta la reabre sola.
@@ -44,7 +49,7 @@ const DEFAULT_PGLITE_DIR = ".data/pglite";
 export const REMOTE_DB_OPTIONS = {
   ssl: "require",
   prepare: false,
-  max: 1,
+  max: 5,
   idle_timeout: 20,
 } as const satisfies postgres.Options<Record<string, never>>;
 
