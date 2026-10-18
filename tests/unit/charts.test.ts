@@ -115,6 +115,15 @@ describe("BarChart", () => {
     expect(large).toBe(small * 4);
   });
 
+  test("no label of the chart is smaller than 11 px, on the phone either", () => {
+    const sizes = [...barChart().matchAll(/(?:^|[\s:"[])(?:max-\[\d+px\]:)?text-\[(\d+)px\]/g)].map((match) => Number(match[1]));
+
+    expect(sizes.length).toBeGreaterThan(0);
+    expect(Math.min(...sizes)).toBeGreaterThanOrEqual(11);
+    // Ninguna variante para pantallas angostas achica las etiquetas.
+    expect(barChart()).not.toMatch(/max-\[\d+px\]:text-/);
+  });
+
   test("a partial month is drawn lighter than the complete ones", () => {
     const markup = barChart();
     expect(markup).toContain("fill-zone-soft");

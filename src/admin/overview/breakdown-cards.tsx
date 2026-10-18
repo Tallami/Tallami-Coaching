@@ -8,7 +8,8 @@ import type { OverviewData } from "@/admin/overview/overview-data";
 import { SectionCard } from "@/admin/overview/section-card";
 import { formatMoney } from "@/lib/money";
 
-const SHARE_NOTE = "Porcentajes redondeados a un decimal; el reparto hace que sumen 100 %.";
+const SHARE_NOTE =
+  "Las barras son relativas a la mayor. Porcentajes redondeados a un decimal; el reparto hace que sumen 100 %.";
 
 interface Group {
   count: number;

@@ -10,8 +10,8 @@ import { ADMIN_ROUTES, saleHref } from "@/admin/routes";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/lib/money";
 
-/** Cuántas sesiones por marcar se ven de entrada; el resto, al desplegar. */
-const TO_MARK_VISIBLE = 5;
+/** Cuántas filas de una lista de pendientes se ven de entrada (entregas, sesiones por marcar); el resto, al desplegar. */
+const ROWS_VISIBLE = 5;
 
 interface PendingRowProps {
   sale: PendingSaleRef;
@@ -78,6 +78,38 @@ function NothingPending({ children = "Nada pendiente." }: { children?: ReactNode
 
 const UNPAID_BADGE = <Badge variant="warn">Sin cobrar</Badge>;
 
+interface FoldedRowsProps<T extends { id: string }> {
+  items: readonly T[];
+  renderRow: (item: T) => ReactNode;
+}
+
+/**
+ * Las filas de una lista larga: las primeras `ROWS_VISIBLE` a la vista y, si hay más,
+ * el resto detrás de un "Ver las N restantes" (un `<details>`, que no necesita
+ * JavaScript). Así una lista que crece no empuja a las otras fuera de la pantalla.
+ */
+function FoldedRows<T extends { id: string }>({ items, renderRow }: FoldedRowsProps<T>) {
+  const visible = items.slice(0, ROWS_VISIBLE);
+  const rest = items.slice(ROWS_VISIBLE);
+  return (
+    <>
+      <ul className="m-0 list-none p-0">{visible.map((item) => renderRow(item))}</ul>
+      {rest.length > 0 ? (
+        <details className="group/rest">
+          <summary className="flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-[4px] font-semibold text-ink-2 hover:text-ink [&::-webkit-details-marker]:hidden">
+            <ArrowRightIcon
+              className="size-4 transition-transform duration-150 group-open/rest:rotate-90"
+              aria-hidden="true"
+            />
+            {rest.length === 1 ? "Ver 1 más" : `Ver las ${rest.length} restantes`}
+          </summary>
+          <ul className="m-0 list-none p-0">{rest.map((item) => renderRow(item))}</ul>
+        </details>
+      ) : null}
+    </>
+  );
+}
+
 function deliveryWhen(delivery: PendingDelivery, today: string): string {
   if (delivery.dueAt === null) return "sin fecha de entrega";
   const day = formatDueDay(delivery.dueAt, today);
@@ -95,16 +127,17 @@ function Deliveries({ deliveries, today }: { deliveries: readonly PendingDeliver
       {deliveries.length === 0 ? (
         <NothingPending />
       ) : (
-        <ul className="m-0 list-none p-0">
-          {deliveries.map((delivery) => (
+        <FoldedRows
+          items={deliveries}
+          renderRow={(delivery) => (
             <PendingRow
               key={delivery.id}
               sale={delivery}
               when={deliveryWhen(delivery, today)}
               badge={delivery.overdue ? <Badge variant="danger">Vencida</Badge> : null}
             />
-          ))}
-        </ul>
+          )}
+        />
       )}
     </Block>
   );
@@ -139,6 +172,7 @@ function Sessions({ sessions }: { sessions: readonly UpcomingSession[] }) {
 function ToMarkRow({ session }: { session: SessionToMark }) {
   return (
     <PendingRow
+      key={session.id}
       sale={session}
       when={`fue el ${formatSessionWhen(session.dueAt)}`}
       badge={session.unpaid ? UNPAID_BADGE : null}
@@ -147,8 +181,6 @@ function ToMarkRow({ session }: { session: SessionToMark }) {
 }
 
 function ToMark({ sessions }: { sessions: readonly SessionToMark[] }) {
-  const visible = sessions.slice(0, TO_MARK_VISIBLE);
-  const rest = sessions.slice(TO_MARK_VISIBLE);
   return (
     <Block
       testId="pending-to-mark"
@@ -159,29 +191,7 @@ function ToMark({ sessions }: { sessions: readonly SessionToMark[] }) {
       {sessions.length === 0 ? (
         <NothingPending />
       ) : (
-        <>
-          <ul className="m-0 list-none p-0">
-            {visible.map((session) => (
-              <ToMarkRow key={session.id} session={session} />
-            ))}
-          </ul>
-          {rest.length > 0 ? (
-            <details className="group/rest">
-              <summary className="flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-[4px] font-semibold text-ink-2 hover:text-ink [&::-webkit-details-marker]:hidden">
-                <ArrowRightIcon
-                  className="size-4 transition-transform duration-150 group-open/rest:rotate-90"
-                  aria-hidden="true"
-                />
-                {rest.length === 1 ? "Ver 1 más" : `Ver las ${rest.length} restantes`}
-              </summary>
-              <ul className="m-0 list-none p-0">
-                {rest.map((session) => (
-                  <ToMarkRow key={session.id} session={session} />
-                ))}
-              </ul>
-            </details>
-          ) : null}
-        </>
+        <FoldedRows items={sessions} renderRow={(session) => <ToMarkRow key={session.id} session={session} />} />
       )}
     </Block>
   );

@@ -184,12 +184,12 @@ export function BarChart({
                   x={center}
                   y={BASELINE + 17}
                   textAnchor="middle"
-                  className={cn("text-[11px] max-[520px]:text-[10px]", datum.isPartial ? "fill-ink font-bold" : "fill-ink-2")}
+                  className={cn("text-[11px]", datum.isPartial ? "fill-ink font-bold" : "fill-ink-2")}
                 >
                   {datum.axisLabel}
                 </text>
                 {datum.yearLabel ? (
-                  <text x={center} y={BASELINE + 31} textAnchor="middle" className="fill-ink-2 text-[11px] max-[520px]:text-[10px]">
+                  <text x={center} y={BASELINE + 31} textAnchor="middle" className="fill-ink-2 text-[11px]">
                     {datum.yearLabel}
                   </text>
                 ) : null}

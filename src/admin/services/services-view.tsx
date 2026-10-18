@@ -25,7 +25,7 @@ function Notes() {
       <h2 id="como-leer-title" className="text-[1.25rem] leading-tight font-extrabold [font-stretch:75%]">
         Cómo leer esta tabla
       </h2>
-      <ul className="mt-3 flex list-disc flex-col gap-2 pl-5 text-[0.9375rem] leading-snug text-ink-2">
+      <ul className="mt-3 flex max-w-prose list-disc flex-col gap-2 pl-5 text-[0.9375rem] leading-snug text-ink-2">
         <li>
           <strong className="font-bold text-ink">Más de 100 %.</strong> La conversión puede pasar de 100 %: también se
           vende por fuera del sitio (Discord, mensajes) y una compra puede cerrarse en otro período que el clic.

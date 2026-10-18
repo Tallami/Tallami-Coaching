@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 interface SectionCardProps {
-  /** Distingue el `id` del título; único en la página. */
+  /** Distingue el `id` de la sección (para enlazarla con `#id`) y el de su título; único en la página. */
   id: string;
   title: string;
   /** Una línea chica bajo el título: qué período o qué ventana mira. */
@@ -27,6 +27,7 @@ export function SectionCard({
   const titleId = `${id}-title`;
   return (
     <section
+      id={id}
       aria-labelledby={titleId}
       data-testid={testId}
       className={cn(

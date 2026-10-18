@@ -1,3 +1,4 @@
+import { ArrowDownIcon } from "lucide-react";
 import Link from "next/link";
 import { CountriesCard, ItemsCard, PaymentsCard } from "@/admin/overview/breakdown-cards";
 import { KpiSection } from "@/admin/overview/kpi-section";
@@ -15,7 +16,8 @@ import { Button } from "@/components/ui/button";
  * métricas no leen ninguna venta (ni cobrada ni pendiente de trabajo) no hay
  * nada que resumir: queda la invitación a cargar una. Con ventas, de arriba abajo: período, tarjetas, ingresos por mes
  * junto al monotributo, desgloses del período y pendientes. En pantallas
- * angostas todo se apila en ese orden.
+ * angostas todo se apila en ese orden, y como los pendientes quedan al final de
+ * una página larga, arriba de todo hay un enlace "Ir a pendientes".
  */
 export function OverviewView({ data }: { data: OverviewData }) {
   if (!data.hasSales) {
@@ -34,6 +36,13 @@ export function OverviewView({ data }: { data: OverviewData }) {
 
   return (
     <>
+      <a
+        href="#pendientes"
+        className="mb-4 hidden min-h-11 items-center gap-2 rounded-[4px] font-bold underline decoration-ink-2/50 underline-offset-4 hover:decoration-ink narrow:inline-flex"
+      >
+        Ir a pendientes
+        <ArrowDownIcon className="size-4" aria-hidden="true" />
+      </a>
       <div className="mb-5">
         <PeriodSelector current={data.period} />
       </div>

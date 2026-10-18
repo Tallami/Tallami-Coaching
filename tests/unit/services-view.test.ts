@@ -100,6 +100,15 @@ describe("ServicesView", () => {
     expect(render()).toContain("la conversión de Clase 1 a 1 cuenta también las ventas del pack");
   });
 
+  test("the notes under the table, the pack one included, keep a line length that reads well", () => {
+    const markup = render();
+    const notes = /<ul class="([^"]*)">\s*<li>\s*<strong[^>]*>Más de 100 %\./.exec(markup)?.[1] ?? "";
+
+    expect(notes).toContain("max-w-prose");
+    // El pack y la conversión de Clase 1 a 1 están en esa misma lista.
+    expect(markup.indexOf("El pack de 4 clases y Otro no tienen botón propio")).toBeGreaterThan(markup.indexOf(notes));
+  });
+
   test("the trend column says right in its header that each row has its own scale", () => {
     expect(render()).toMatch(/>Últimos 6 meses\s?<span[^>]*>\(escala propia\)<\/span><\/th>/);
   });

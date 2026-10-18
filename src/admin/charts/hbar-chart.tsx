@@ -42,8 +42,11 @@ function Bar({ widthPct, className }: { widthPct: number; className: string }) {
 /**
  * Barras horizontales de una sola serie: nombre y valor arriba, la barra
  * debajo, desde un mismo borde izquierdo y con el largo proporcional al mayor
- * valor. El texto va en HTML (se ajusta solo en el celular) y la barra es un
- * SVG chico; la lista misma es la alternativa para lectores de pantalla.
+ * valor. Sin pista de fondo: una pista completa haría leer la barra como un
+ * "porcentaje de 100" cuando es relativa a la mayor (esa, además, siempre
+ * llena el ancho). El texto va en HTML (se ajusta solo en el celular) y la
+ * barra es un SVG chico; la lista misma es la alternativa para lectores de
+ * pantalla.
  */
 export function HBarChart({ rows, ariaLabel, className }: HBarChartProps) {
   const max = Math.max(0, ...rows.map((row) => row.value));
@@ -57,7 +60,6 @@ export function HBarChart({ rows, ariaLabel, className }: HBarChartProps) {
             <span className="shrink-0 font-bold tabular-nums">{row.valueText}</span>
           </div>
           <svg width="100%" height={BAR_HEIGHT} aria-hidden="true" focusable="false" className="mt-1 block">
-            <Bar widthPct={100} className="fill-neutral-tint" />
             <Bar widthPct={barLength(row.value, max, FULL_LENGTH) / UNITS_PER_PERCENT} className="fill-zone" />
           </svg>
           {row.detail ? <p className="mt-1 text-[0.875rem] text-ink-2">{row.detail}</p> : null}
