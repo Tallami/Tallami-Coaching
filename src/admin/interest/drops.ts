@@ -4,8 +4,12 @@
 // verdad: la página Servicios muestra cuántos fueron en el período.
 //
 // Es un solo número por día de Argentina (`interest_drops`), sin ningún dato del
-// pedido. Contarlo es un `insert … on conflict do update` de una fila: no crece
-// la tabla con el abuso.
+// pedido. Contarlo es un `insert … on conflict do update` de una fila: la tabla
+// no suma filas con el abuso (sigue siendo una por día), pero cada descarte deja
+// una versión vieja de esa fila que Postgres limpia después con su vacuum
+// automático, así que un abuso sostenido sí le da trabajo a la base. La defensa
+// de verdad es la regla de límite de pedidos del Firewall de Vercel sobre
+// `POST /api/interest` (ver el README); esto solo cuenta lo que el tope tapó.
 
 import { sql } from "drizzle-orm";
 import { todayInArgentina } from "@/admin/dates";

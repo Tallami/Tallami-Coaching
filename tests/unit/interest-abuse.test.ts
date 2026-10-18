@@ -5,7 +5,7 @@ import { count } from "drizzle-orm";
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { loginIpHash } from "@/admin/auth/login-ip";
 import { handleInterestRequest } from "@/admin/interest/endpoint";
-import { interestIpHash, interestIpKey } from "@/admin/interest/ip-key";
+import { interestIpHash } from "@/admin/interest/ip-key";
 import {
   INTEREST_GLOBAL_MAX_PER_WINDOW,
   INTEREST_MAX_PER_WINDOW,
@@ -19,6 +19,7 @@ import {
   purgeInterestIfDue,
   purgeOldInterest,
 } from "@/admin/interest/retention";
+import { interestIpKey } from "@/admin/net/ip-key";
 import type { Db } from "@/db/client";
 import { interestEvents } from "@/db/schema";
 import { createTestDb } from "../helpers/db";
@@ -304,6 +305,26 @@ describe("the global ceiling", () => {
     await db.delete(interestEvents);
     expect(await recordInterest(db, event("x"), NOW, tight)).toBe("stored");
     expect(await recordInterest(db, event("x"), NOW, tight)).toBe("rate-limited");
+  });
+
+  test("checks the visitor, the minute and the hour with one query each time it counts", async () => {
+    const event = (ipHash: string): InterestEventInput => ({ item: "lesson", locale: "es", country: null, ipHash });
+    const select = vi.spyOn(db, "select");
+
+    // Una vez antes de reservar y otra con el evento ya anotado: dos consultas en total, no seis.
+    expect(await recordInterest(db, event("a"), NOW)).toBe("stored");
+    expect(select).toHaveBeenCalledTimes(2);
+
+    // Quien ya pasó su tope se entera en la primera consulta y no escribe nada.
+    select.mockClear();
+    expect(await recordInterest(db, event("a"), NOW, { perIp: 1 })).toBe("rate-limited");
+    expect(select).toHaveBeenCalledTimes(1);
+
+    // Lo mismo con el tope global.
+    select.mockClear();
+    expect(await recordInterest(db, event("b"), NOW, { global: 1 })).toBe("dropped");
+    expect(select).toHaveBeenCalledTimes(1);
+    select.mockRestore();
   });
 
   test("a burst of simultaneous visitors never stores more than the ceiling", async () => {

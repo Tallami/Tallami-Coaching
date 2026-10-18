@@ -19,9 +19,11 @@
 // nunca sobreviven más del tope (en una ráfaga muy apretada pueden borrarse más
 // de los necesarios: de quien insiste, eso no importa). Antes de reservar se
 // mira el conteo una vez, para que un abuso sostenido no escriba ni borre filas
-// de eventos (lo único que escribe un descarte es sumar uno al día).
+// de eventos (lo único que escribe un descarte es sumar uno al día). Cada
+// conteo es una sola consulta (`count(*) filter (…)` para el visitante, el
+// minuto y la hora): dos por clic guardado, no seis.
 
-import { and, count, eq, gt } from "drizzle-orm";
+import { and, count, eq, gt, sql } from "drizzle-orm";
 import type { InterestItem, InterestLocale } from "@/admin/catalog";
 import type { Db } from "@/db/client";
 import { interestEvents } from "@/db/schema";
@@ -77,22 +79,32 @@ function windowStart(at: Date, windowMs: number): Date {
   return new Date(at.getTime() - windowMs);
 }
 
-/** Eventos de este hash de IP en el último minuto, contando hasta `at`. */
-async function countVisitor(db: Db, ipHash: string, at: Date): Promise<number> {
-  const [row] = await db
-    .select({ events: count() })
-    .from(interestEvents)
-    .where(and(eq(interestEvents.ipHash, ipHash), gt(interestEvents.createdAt, windowStart(at, INTEREST_WINDOW_MS))));
-  return row?.events ?? 0;
+/** Los eventos de las tres ventanas que mira el registro, contando hasta `at`. */
+interface WindowCounts {
+  /** De este hash de IP, en el último minuto. */
+  visitor: number;
+  /** De todos, en el último minuto. */
+  minute: number;
+  /** De todos, en la última hora. */
+  hour: number;
 }
 
-/** Eventos de todos en la ventana de `windowMs` que termina en `at`. */
-async function countAll(db: Db, at: Date, windowMs: number): Promise<number> {
+/**
+ * Cuenta las tres ventanas de una vez: la consulta mira solo la última hora (lo
+ * que sirve el índice de `created_at`) y cuenta, de esas filas, las del minuto
+ * y las del visitante con `filter`.
+ */
+async function countWindows(db: Db, ipHash: string, at: Date): Promise<WindowCounts> {
+  const minuteStart = windowStart(at, INTEREST_WINDOW_MS);
   const [row] = await db
-    .select({ events: count() })
+    .select({
+      visitor: sql<number>`count(*) filter (where ${and(eq(interestEvents.ipHash, ipHash), gt(interestEvents.createdAt, minuteStart))})`.mapWith(Number),
+      minute: sql<number>`count(*) filter (where ${gt(interestEvents.createdAt, minuteStart)})`.mapWith(Number),
+      hour: count(),
+    })
     .from(interestEvents)
-    .where(gt(interestEvents.createdAt, windowStart(at, windowMs)));
-  return row?.events ?? 0;
+    .where(gt(interestEvents.createdAt, windowStart(at, INTEREST_HOUR_MS)));
+  return row ?? { visitor: 0, minute: 0, hour: 0 };
 }
 
 /**
@@ -108,10 +120,11 @@ async function verdict(
   limits: InterestLimits,
   includesOwnRow: boolean,
 ): Promise<"ok" | "rate-limited" | "dropped"> {
+  const counts = await countWindows(db, ipHash, at);
   const over = (events: number, max: number) => (includesOwnRow ? events > max : events >= max);
-  if (over(await countVisitor(db, ipHash, at), limits.perIp)) return "rate-limited";
-  if (over(await countAll(db, at, INTEREST_WINDOW_MS), limits.global)) return "dropped";
-  if (over(await countAll(db, at, INTEREST_HOUR_MS), limits.hourly)) return "dropped";
+  if (over(counts.visitor, limits.perIp)) return "rate-limited";
+  if (over(counts.minute, limits.global)) return "dropped";
+  if (over(counts.hour, limits.hourly)) return "dropped";
   return "ok";
 }
 
