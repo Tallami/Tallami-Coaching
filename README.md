@@ -167,13 +167,35 @@ Si Excel te cambia el formato de la columna "Número" (por ejemplo le saca los c
 Para que el panel funcione en internet (en Vercel) la base no puede ser la local: usa Supabase. Una sola vez:
 
 1. **Crear la base.** En [supabase.com](https://supabase.com) creá un proyecto nuevo, con la región São Paulo (la más cercana a Argentina y Brasil).
-2. **Copiar la conexión.** En el panel de tu proyecto de Supabase buscá la cadena de conexión del pooler de transacciones («Transaction pooler»); la guía oficial [Connecting to Postgres](https://supabase.com/docs/guides/database/connecting-to-postgres) dice dónde está y cómo se ve. Completá la contraseña de la base donde la cadena trae `[YOUR-PASSWORD]`. Es el valor de `DATABASE_URL`. Tiene que ser la del pooler de transacciones y no la conexión directa: la web corre en Vercel y abre muchas conexiones cortas.
-3. **Crear las tablas.** En tu compu, en una terminal, definí esa variable solo para ese comando y corré `npm run db:migrate`: en PowerShell, `$env:DATABASE_URL="la cadena"; npm run db:migrate`; en Git Bash, `DATABASE_URL="la cadena" npm run db:migrate`. Si la contraseña tiene símbolos (`@`, `:`, `/`, `#`…) la cadena no funciona tal cual: cambiala por una sin símbolos. Hay que repetirlo después de cada migración nueva que se suba al repo (carpeta `drizzle/`); sin `DATABASE_URL` el comando avisa y no hace nada.
-4. **Usar el rol dueño de las tablas.** La cadena del paso 2 entra como el usuario `postgres` (en el pooler se escribe `postgres.` y el código de tu proyecto), que es el dueño de las tablas: dejala así. Todas las tablas tienen la seguridad por filas (RLS) activada y sin políticas, para que la API pública de Supabase no vea nada; el dueño es el único que pasa, así que con otro rol el panel no podría leer ni escribir.
-5. **Cargar las variables en Vercel.** En el proyecto, Settings → Environment Variables: las tres de "Dejarlo listo" (`ADMIN_PASSWORD_HASH`, `ADMIN_SESSION_SECRET` y `DATABASE_URL`). Volvé a desplegar y entrá a `/admin`.
+2. **Copiar las conexiones.** En Supabase abrí tu proyecto y tocá **Connect** (arriba de la página): ahí están las cadenas de conexión, y la guía oficial [Connecting to Postgres](https://supabase.com/docs/guides/database/connecting-to-postgres) explica cuándo sirve cada una. Completá la contraseña de la base donde la cadena trae `[YOUR-PASSWORD]`. Necesitás dos cadenas distintas, una para la web y otra para crear las tablas:
+   - **Para la web** (es el valor de `DATABASE_URL` en Vercel): el pooler de transacciones («Transaction pooler», puerto `6543`). La web corre en Vercel y abre muchas conexiones cortas, que es para lo que sirve.
+   - **Para crear las tablas** (solo se usa en tu compu, en el paso 3): la conexión directa («Direct connection», puerto `5432`), que es la que la guía de Supabase recomienda para las migraciones. La directa usa IPv6: si tu red es solo IPv4 y no conecta, usá en su lugar el pooler de sesión («Session pooler», también puerto `5432`). No uses el pooler de transacciones para migrar: no soporta las sentencias preparadas que usa `drizzle-kit`.
+3. **Crear las tablas.** Abrí una terminal nueva solo para esto, con la cadena de migración del paso 2, y corré `npm run db:migrate`. En PowerShell:
 
-Dos protecciones más, que se hacen en los paneles de Vercel y Supabase:
+   ```powershell
+   $env:DATABASE_URL = Read-Host "Cadena de conexión"
+   npm run db:migrate
+   Remove-Item Env:DATABASE_URL
+   ```
 
+   En Git Bash:
+
+   ```bash
+   read -r -s -p "Cadena de conexión: " DATABASE_URL; export DATABASE_URL
+   npm run db:migrate
+   unset DATABASE_URL
+   ```
+
+   Pegá la cadena cuando te la pida (en PowerShell se ve en pantalla mientras la pegás) y cerrá la terminal al terminar. La variable dura hasta que la borrás o cerrás la terminal, no solo un comando: si en esa misma ventana corrieras después `npm run dev`, el panel local escribiría en la base de producción. Por eso la última línea la borra y por eso conviene usar una terminal que sea solo para esto. Pidiéndola con `Read-Host` o con `read -s` la cadena no queda escrita en el historial de comandos (escribirla en la línea del comando sí la deja: la contraseña de la base quedaría guardada en texto). Si la contraseña tiene símbolos (`@`, `:`, `/`, `#`…) la cadena no funciona tal cual: cambiala por una sin símbolos. Hay que repetirlo después de cada migración nueva que se suba al repo (carpeta `drizzle/`); sin `DATABASE_URL` el comando avisa y no hace nada.
+
+   La conexión de la migración va siempre cifrada: `drizzle.config.ts` le agrega `sslmode=require` a la cadena (`src/db/migrate-url.ts`), la traiga o no y aunque diga `sslmode=disable`; si la cadena ya pide `verify-ca` o `verify-full`, se respeta. La conexión de la web también se cifra siempre, desde el código (`src/db/client.ts`).
+4. **Usar el rol dueño de las tablas.** Las cadenas del paso 2 entran como el usuario `postgres` (en los poolers se escribe `postgres.` y el código de tu proyecto; en la conexión directa, solo `postgres`), que es el dueño de las tablas: dejalas así. Todas las tablas tienen la seguridad por filas (RLS) activada y sin políticas, para que la API pública de Supabase no vea nada; el dueño es el único que pasa, así que con otro rol el panel no podría leer ni escribir.
+5. **Cargar las variables en Vercel.** En el proyecto, Settings → Environment Variables: las tres de "Dejarlo listo" (`ADMIN_PASSWORD_HASH`, `ADMIN_SESSION_SECRET` y `DATABASE_URL`, esta última con la cadena del pooler de transacciones, no la de migración).
+6. **Acercar las funciones a la base.** Por defecto las funciones de Vercel corren en Washington D.C. (`iad1`), lejos de una base en São Paulo, y cada consulta suma demora de ida y vuelta. En el proyecto, Settings → Functions → «Function Regions», elegí São Paulo (`gru1`); la guía oficial [Configuring regions for Vercel Functions](https://vercel.com/docs/functions/configuring-functions/region) lo explica. Después volvé a desplegar y entrá a `/admin`.
+
+Tres protecciones más, que se hacen en los paneles de Supabase y Vercel:
+
+- **Exigir SSL en la base (Supabase).** La web y el comando de migración ya cifran su conexión, pero la base también tiene que negarse a las que no vengan cifradas: por defecto Supabase las acepta. En Supabase, Database → Settings, sección «SSL Configuration», activá «Enforce SSL on incoming connections». Reinicia la base y hay unos minutos sin servicio: hacelo cuando no estés usando el panel. Los pasos oficiales están en la guía [SSL Enforcement](https://supabase.com/docs/guides/platform/ssl-enforcement). El cifrado que usa la app (`require`) protege contra quien mira el tráfico, pero no verifica que el servidor sea el de Supabase; esa verificación (`verify-full`) pide bajar el certificado raíz que ofrece esa misma sección y no está activada.
 - **Límite de pedidos para los clics (Firewall de Vercel).** Es la defensa de verdad contra alguien que le pegue sin parar a `POST /api/interest`: la app tiene sus propios topes, pero cada pedido descartado igual le da trabajo a la base. En el proyecto de Vercel, el Firewall permite crear una regla de límite de pedidos ("rate limiting"). La regla que conviene: que valga solo para el método `POST` en la ruta `/api/interest`, que cuente los pedidos por IP en una ventana de 60 segundos con un tope de 30 (lo mismo que el límite propio de la app por visitante) y que, al pasarse, conteste 429. Los pasos exactos, los planes en los que está disponible y lo que cuesta cambian con el tiempo: seguilos desde la [guía oficial de Vercel](https://vercel.com/docs/vercel-firewall/vercel-waf/rate-limiting).
 - **Vigilar el uso de la base (Supabase).** El panel guarda poco (ventas, alumnos y clics, que se borran a los 400 días), pero conviene enterarse si algo crece de más. Supabase muestra en su panel cuánto usa tu proyecto contra la cuota de tu plan; mirá ese uso de vez en cuando y activá los avisos que ofrezca. Dónde está y cómo se configura lo explica la guía oficial [Manage your usage](https://supabase.com/docs/guides/platform/manage-your-usage).
 
@@ -189,6 +211,7 @@ Dos protecciones más, que se hacen en los paneles de Vercel y Supabase:
 | IP del visitante | Primer valor de `x-forwarded-for`. En Vercel lo escribe Vercel y no se puede falsificar; fuera de Vercel lo manda el propio cliente, así que el límite solo es una defensa real detrás de Vercel |
 | Doble verificación | El `proxy` (`src/proxy.ts`) manda a `/admin/login` a quien no tenga sesión válida; además cada página y cada Server Action del panel llama a `requireAdmin()` (`src/admin/auth/require-admin.ts`). Una página o acción nueva sin esa llamada queda abierta: es obligatoria |
 | Redirecciones | `?next=` del login solo acepta rutas `/admin…` del mismo sitio |
+| Conexión a la base | Siempre cifrada: `ssl: "require"` en `src/db/client.ts` (ninguna `DATABASE_URL` puede apagarlo) y `sslmode=require` en `drizzle.config.ts` para las migraciones. Una sola conexión por instancia de la función (`max: 1`) y se cierra a los 20 s sin uso (`idle_timeout`), como pide la guía de Supabase para el pooler de transacciones desde funciones serverless |
 
 ### Interés por servicio (clics en "Reservar")
 
