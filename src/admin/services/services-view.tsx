@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { INTEREST_GLOBAL_MAX_PER_HOUR, INTEREST_GLOBAL_MAX_PER_WINDOW } from "@/admin/interest/limits";
 import { PERIOD_LABELS } from "@/admin/metrics/period";
 import { formatRangeLabel } from "@/admin/overview/labels";
 import { PeriodSelector } from "@/admin/overview/period-selector";
@@ -10,6 +11,9 @@ import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
 
 const SERVICES_PATH = "/admin/servicios";
+
+/** Los topes con el separador de miles de Argentina: 2000 se escribe "2.000". */
+const numberText = (value: number) => new Intl.NumberFormat("es-AR").format(value);
 
 /** Cómo leer la tabla: lo que no se ve a simple vista y puede llevar a una mala conclusión. */
 function Notes() {
@@ -33,8 +37,9 @@ function Notes() {
         </li>
         <li>
           Los clics son anónimos (sin cookies ni datos personales). Se descartan los bots, las ráfagas de una misma
-          conexión y todo lo que pase de 200 clics por minuto o de 2.000 por hora entre todos (si pasó en el período,
-          arriba figura cuántos), así que son una guía y no un conteo exacto de personas.
+          conexión y todo lo que pase de {numberText(INTEREST_GLOBAL_MAX_PER_WINDOW)} clics por minuto o de{" "}
+          {numberText(INTEREST_GLOBAL_MAX_PER_HOUR)} por hora entre todos (si pasó en el período, arriba figura
+          cuántos), así que son una guía y no un conteo exacto de personas.
         </li>
         <li>
           Los gráficos muestran los dólares cobrados por mes en los últimos 6 meses, el último todavía abierto.

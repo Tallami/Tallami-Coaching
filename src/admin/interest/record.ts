@@ -26,26 +26,23 @@ import type { InterestItem, InterestLocale } from "@/admin/catalog";
 import type { Db } from "@/db/client";
 import { interestEvents } from "@/db/schema";
 import { countDroppedClick } from "./drops";
+import {
+  INTEREST_GLOBAL_MAX_PER_HOUR,
+  INTEREST_GLOBAL_MAX_PER_WINDOW,
+  INTEREST_HOUR_MS,
+  INTEREST_MAX_PER_WINDOW,
+  INTEREST_WINDOW_MS,
+} from "./limits";
 import { purgeInterestIfDue } from "./retention";
 
-/** Eventos que acepta un visitante por ventana. */
-export const INTEREST_MAX_PER_WINDOW = 30;
-/**
- * Eventos que acepta el sitio entero por ventana. Es generoso (el tráfico real
- * son unos pocos clics por minuto) y tiene un solo trabajo: que quien rote IPs
- * no pueda escribir sin límite. Se lee con el índice de `created_at`.
- */
-export const INTEREST_GLOBAL_MAX_PER_WINDOW = 200;
-/**
- * Eventos que acepta el sitio entero por hora. El tope por minuto solo permitiría
- * 12.000 por hora; este corta antes a quien reparte un abuso en muchos minutos.
- * También es holgado: el tráfico real es una fracción de esto.
- */
-export const INTEREST_GLOBAL_MAX_PER_HOUR = 2000;
-/** Largo de la ventana deslizante: un minuto. */
-export const INTEREST_WINDOW_MS = 60_000;
-/** Largo de la ventana del tope por hora. */
-export const INTEREST_HOUR_MS = 60 * INTEREST_WINDOW_MS;
+// Los topes viven en `limits.ts` y se vuelven a exportar acá: es lo que importan los tests.
+export {
+  INTEREST_GLOBAL_MAX_PER_HOUR,
+  INTEREST_GLOBAL_MAX_PER_WINDOW,
+  INTEREST_HOUR_MS,
+  INTEREST_MAX_PER_WINDOW,
+  INTEREST_WINDOW_MS,
+};
 
 export interface InterestLimits {
   perIp: number;

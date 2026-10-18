@@ -191,6 +191,7 @@ describe("ServicesView", () => {
     });
 
     test("explains the ceilings in the notes below the table", () => {
+      // Los números de hoy (200 por minuto, 2.000 por hora); que salgan de las constantes lo prueba services-view-limits.test.ts.
       expect(render()).toContain("200 clics por minuto o de 2.000 por hora");
     });
   });
