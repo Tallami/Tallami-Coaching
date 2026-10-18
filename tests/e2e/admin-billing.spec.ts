@@ -187,11 +187,18 @@ test.describe("billing", () => {
     await expect(rowOf(page, second)).toHaveCount(1);
   });
 
-  test("the notice stays when the last pending sale was marked and there is no list left", async ({ page }) => {
-    // El aviso lo trae la dirección: con todo facturado no hay formulario y el aviso se ve igual.
+  test("the notice comes from the address: it shows on the screen and marks nothing", async ({ page }) => {
+    // Que el aviso se vea también cuando ya no queda ninguna venta por facturar (sin lista ni formulario) se
+    // prueba a nivel de componente, en `billing-view.test.ts`: acá la base se comparte con los otros tests, que
+    // cargan ventas en paralelo, y nunca se puede dar la lista por vacía. Lo que sí se prueba es que el aviso es
+    // solo lo que dice la dirección: una venta propia, cobrada y sin facturar, sigue en la lista.
+    const student = uniqueName("Gero con aviso");
+    await createSale(page, { student });
+
     await page.goto(`${BILLING_PATH}?guardada=facturadas&cantidad=3`);
 
     await expect(page.getByRole("status").filter({ hasText: "3 ventas marcadas como facturadas." })).toBeVisible();
+    await expect(rowOf(page, student)).toHaveCount(1);
   });
 
   test("a batch with one sale that can no longer be marked changes nothing", async ({ context, page }) => {
@@ -1011,6 +1018,9 @@ test.describe("a download that could not be built", () => {
   });
 
   test("the export form comes back with the dates and the invoice state that were asked for", async ({ page }) => {
+    // Sin ventas cobradas Facturación muestra solo el estado vacío, sin el formulario de exportación: la
+    // venta es propia para no depender de lo que hayan cargado los otros tests.
+    await createSale(page, { student: uniqueName("Hilda exporta") });
     await page.goto(`${BILLING_PATH}?desde=2026-02-01&hasta=2026-03-31&factura=issued&exportacion=demasiadas`);
 
     const form = page.getByRole("form", { name: "Exportar para el contador" });
