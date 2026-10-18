@@ -19,6 +19,16 @@ export const ADMIN_TEST_PASSWORD = "clave-de-prueba-del-panel";
  */
 export const ADMIN_TEST_PASSWORD_HASH =
   "scrypt$131072$8$1$zASgC6oh0nRcKv2kEl3tbQ==$tQGqq7QyqTr/jXICWaMh8tbjhxd18TqxqeHLEHdIxfg=";
+/**
+ * El hash de una contraseña anterior: mismo formato y mismos parámetros, otra
+ * sal. Sirve para firmar una sesión de "antes de cambiar la contraseña": la
+ * firma es válida pero su claim no coincide con el hash vigente. Lo usan los
+ * tests unitarios y los e2e.
+ */
+export const ADMIN_TEST_OLD_PASSWORD_HASH = ADMIN_TEST_PASSWORD_HASH.replace(
+  "zASgC6oh0nRcKv2kEl3tbQ==",
+  "AAAAAAAAAAAAAAAAAAAAAA==",
+);
 /** Más de 32 caracteres, el mínimo que exige el panel. */
 export const ADMIN_TEST_SESSION_SECRET =
   "secreto-de-prueba-solo-para-los-e2e-0123456789";

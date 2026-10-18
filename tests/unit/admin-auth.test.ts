@@ -19,7 +19,7 @@ import {
 } from "@/admin/auth/session";
 import type { Db } from "@/db/client";
 import { loginAttempts } from "@/db/schema";
-import { ADMIN_TEST_PASSWORD_HASH } from "../helpers/admin-server";
+import { ADMIN_TEST_OLD_PASSWORD_HASH, ADMIN_TEST_PASSWORD_HASH } from "../helpers/admin-server";
 import { createTestDb } from "../helpers/db";
 
 // `verifyPassword` (scrypt) queda envuelta en un espía que conserva su
@@ -33,8 +33,6 @@ vi.mock("@/admin/auth/password", async (importOriginal) => {
 const PASSWORD = "una-clave-larga-de-prueba";
 const SECRET = "secreto-de-prueba-de-mas-de-32-caracteres";
 const OTHER_SECRET = "otro-secreto-de-prueba-de-mas-de-32-caracteres";
-/** Otro hash con el formato válido (cambia solo la sal): la contraseña después de un cambio. */
-const OTHER_PASSWORD_HASH = ADMIN_TEST_PASSWORD_HASH.replace("zASgC6oh0nRcKv2kEl3tbQ==", "AAAAAAAAAAAAAAAAAAAAAA==");
 const MINUTE_MS = 60_000;
 const HOUR_SECONDS = 3600;
 
@@ -161,7 +159,7 @@ describe("session tokens", () => {
       const claim = passwordClaim(encoder.encode(SECRET), ADMIN_TEST_PASSWORD_HASH);
 
       expect(passwordClaim(encoder.encode(SECRET), ADMIN_TEST_PASSWORD_HASH)).toBe(claim);
-      expect(passwordClaim(encoder.encode(SECRET), OTHER_PASSWORD_HASH)).not.toBe(claim);
+      expect(passwordClaim(encoder.encode(SECRET), ADMIN_TEST_OLD_PASSWORD_HASH)).not.toBe(claim);
       expect(passwordClaim(encoder.encode(OTHER_SECRET), ADMIN_TEST_PASSWORD_HASH)).not.toBe(claim);
     });
 
@@ -169,7 +167,7 @@ describe("session tokens", () => {
       const token = await createSessionToken();
       expect(await verifySessionToken(token)).toBe(true);
 
-      vi.stubEnv("ADMIN_PASSWORD_HASH", OTHER_PASSWORD_HASH);
+      vi.stubEnv("ADMIN_PASSWORD_HASH", ADMIN_TEST_OLD_PASSWORD_HASH);
 
       expect(await verifySessionToken(token)).toBe(false);
       const fresh = await createSessionToken();
@@ -182,7 +180,7 @@ describe("session tokens", () => {
     });
 
     test.each([
-      ["from another password hash", () => passwordClaim(encoder.encode(SECRET), OTHER_PASSWORD_HASH)],
+      ["from another password hash", () => passwordClaim(encoder.encode(SECRET), ADMIN_TEST_OLD_PASSWORD_HASH)],
       ["from another secret", () => passwordClaim(encoder.encode(OTHER_SECRET), ADMIN_TEST_PASSWORD_HASH)],
       ["of the wrong length", () => passwordClaim(encoder.encode(SECRET), ADMIN_TEST_PASSWORD_HASH).slice(0, 15)],
       ["empty", () => ""],

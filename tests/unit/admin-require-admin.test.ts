@@ -7,6 +7,7 @@ import { PASSWORD_CLAIM, passwordClaim } from "@/admin/auth/password-claim";
 import { loginPath } from "@/admin/auth/redirect";
 import { hasAdminSession, requireAdmin } from "@/admin/auth/require-admin";
 import { ADMIN_COOKIE, createSessionToken } from "@/admin/auth/session";
+import { ADMIN_TEST_OLD_PASSWORD_HASH } from "../helpers/admin-server";
 
 vi.mock("next/headers", () => ({ cookies: vi.fn() }));
 // `redirect` de Next interrumpe tirando un error; el doble hace lo mismo.
@@ -78,7 +79,7 @@ describe("requireAdmin", () => {
     ["a forged cookie", async () => "una-cookie-inventada"],
     ["an expired session", () => signed({ expiresInSeconds: -60 })],
     ["a session for another audience", () => signed({ audience: "otro-sitio" })],
-    ["a session from before the password changed", () => signed({ hash: "scrypt$131072$8$1$AAAAAAAAAAAAAAAAAAAAAA==$tQGqq7QyqTr/jXICWaMh8tbjhxd18TqxqeHLEHdIxfg=" })],
+    ["a session from before the password changed", () => signed({ hash: ADMIN_TEST_OLD_PASSWORD_HASH })],
   ])("sends %s to the login", async (_label, makeCookie) => {
     requestWithCookie(await makeCookie());
 

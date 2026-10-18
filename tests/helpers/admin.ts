@@ -5,12 +5,18 @@ import { expect, test as base, type Page } from "@playwright/test";
 import { SignJWT } from "jose";
 import { PASSWORD_CLAIM, passwordClaim } from "../../src/admin/auth/password-claim";
 import {
+  ADMIN_TEST_OLD_PASSWORD_HASH,
   ADMIN_TEST_PASSWORD,
   ADMIN_TEST_PASSWORD_HASH,
   ADMIN_TEST_SESSION_SECRET,
 } from "./admin-server";
 
-export { ADMIN_TEST_PASSWORD, ADMIN_TEST_PASSWORD_HASH, ADMIN_TEST_SESSION_SECRET };
+export {
+  ADMIN_TEST_OLD_PASSWORD_HASH,
+  ADMIN_TEST_PASSWORD,
+  ADMIN_TEST_PASSWORD_HASH,
+  ADMIN_TEST_SESSION_SECRET,
+};
 
 /** Cookie y audiencia del panel (los valores reales viven en `src/admin/auth/session.ts`). */
 export const ADMIN_COOKIE = "tallami_admin";

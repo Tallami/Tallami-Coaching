@@ -3,8 +3,8 @@ import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import {
   ADMIN_COOKIE,
+  ADMIN_TEST_OLD_PASSWORD_HASH,
   ADMIN_TEST_PASSWORD,
-  ADMIN_TEST_PASSWORD_HASH,
   expect,
   loginAsAdmin,
   signTestToken,
@@ -15,11 +15,6 @@ import {
 const LOGIN_URL = /\/admin\/login(\?|$)/;
 const LOCKED_AFTER = 5;
 const SESSION_SECONDS = 12 * 60 * 60;
-/** El hash de una contraseña anterior: mismo formato, otra sal. */
-const OLD_PASSWORD_HASH = ADMIN_TEST_PASSWORD_HASH.replace(
-  "zASgC6oh0nRcKv2kEl3tbQ==",
-  "AAAAAAAAAAAAAAAAAAAAAA==",
-);
 /** La línea bajo el título del resumen: solo aparece con la sesión iniciada. */
 const PANEL_MARKER = "Cuánto ganás, qué se vende y qué tenés pendiente.";
 
@@ -110,7 +105,7 @@ test.describe("without a session", () => {
       // Firmada con el secreto correcto, pero con el claim de otra contraseña: la
       // sesión de antes de que Tallami cambiara la contraseña.
       "from before the password changed": await signTestToken({
-        passwordHash: OLD_PASSWORD_HASH,
+        passwordHash: ADMIN_TEST_OLD_PASSWORD_HASH,
       }),
       "from before the password claim existed": await signTestToken({ passwordHash: null }),
       "without a signature": [

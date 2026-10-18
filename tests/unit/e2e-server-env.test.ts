@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { verifyPassword } from "@/admin/auth/password";
 import {
+  ADMIN_TEST_OLD_PASSWORD_HASH,
   ADMIN_TEST_PASSWORD,
   ADMIN_TEST_PASSWORD_HASH,
   adminServerEnv,
@@ -49,6 +50,15 @@ describe("environment of the e2e servers", () => {
     expect((await adminServerEnv()).ADMIN_PASSWORD_HASH).toBe(ADMIN_TEST_PASSWORD_HASH);
     expect((await demoServerEnv()).ADMIN_PASSWORD_HASH).toBe(ADMIN_TEST_PASSWORD_HASH);
     expect(await verifyPassword(ADMIN_TEST_PASSWORD, ADMIN_TEST_PASSWORD_HASH)).toBe(true);
+  });
+
+  test("the old password hash is a valid hash that is not the current one and does not open the test password", async () => {
+    // Una sola definición para los tests unitarios y los e2e: una sesión firmada
+    // con este hash tiene que dejar de valer, y un hash que no se puede leer
+    // la haría fallar por otro motivo.
+    expect(ADMIN_TEST_OLD_PASSWORD_HASH).not.toBe(ADMIN_TEST_PASSWORD_HASH);
+    expect(ADMIN_TEST_OLD_PASSWORD_HASH.split("$")).toHaveLength(ADMIN_TEST_PASSWORD_HASH.split("$").length);
+    expect(await verifyPassword(ADMIN_TEST_PASSWORD, ADMIN_TEST_OLD_PASSWORD_HASH)).toBe(false);
   });
 
   test("each server has its own database folder and the fixed exchange rates", async () => {

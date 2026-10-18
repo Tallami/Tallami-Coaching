@@ -5,6 +5,7 @@ import { BarChart, type BarDatum } from "@/admin/charts/bar-chart";
 import { DeltaBadge } from "@/admin/charts/delta-badge";
 import { HBarChart, type HBarRow } from "@/admin/charts/hbar-chart";
 import { Meter, type MeterTone } from "@/admin/charts/meter";
+import { MiniBars, type MiniBar } from "@/admin/charts/mini-bars";
 
 function html(element: ReturnType<typeof createElement>): string {
   return renderToStaticMarkup(element);
@@ -38,6 +39,21 @@ function barChart(data: BarDatum[] = MONTHS): string {
       table: { summary: "Ver la tabla", caption: "Ingresos", headers: ["Mes", "Ingresos"] },
     }),
   );
+}
+
+/**
+ * El alto dibujado de cada barra de un grupo `data-testid`: el del rectángulo
+ * más alto del grupo que no es el de fondo transparente (una barra con plata son
+ * dos rectángulos, la punta redonda y la base recta).
+ */
+function drawnHeights(markup: string, testId: string): number[] {
+  const groups = new RegExp(String.raw`<g [^>]*data-testid="${testId}"[^>]*>([\s\S]*?)</g>`, "g");
+  return [...markup.matchAll(groups)].map(([, body]) => {
+    const heights = [...body.matchAll(/<rect [^>]*?height="([\d.]+)"[^>]*?class="([^"]*)"/g)]
+      .filter(([, , classes]) => !classes.includes("fill-transparent"))
+      .map(([, height]) => Number(height));
+    return Math.max(...heights);
+  });
 }
 
 describe("BarChart", () => {
@@ -77,6 +93,26 @@ describe("BarChart", () => {
     expect(visible.map(([, , text]) => text)).toEqual(["USD 1.000,00"]);
     // La parcial usa el valor corto.
     expect(labels.map(([, , text]) => text)).toContain("USD 500");
+  });
+
+  test("each bar is as tall as its value against the top of the scale", () => {
+    // La escala llega a 1.000 dólares sobre 200 px: 1.000 → 200 px; 500 → 100 px;
+    // un mes sin plata deja solo la marca de 2 px.
+    expect(drawnHeights(barChart(), "bar")).toEqual([200, 2, 100]);
+  });
+
+  test("bar heights keep the proportion between values", () => {
+    const data: BarDatum[] = [10_000, 20_000, 40_000].map((value, index) => ({
+      key: `2026-0${index + 1}`,
+      axisLabel: "m",
+      name: `mes ${index + 1}`,
+      value,
+      valueText: `USD ${value / 100}`,
+    }));
+    const [small, medium, large] = drawnHeights(barChart(data), "bar");
+
+    expect(medium).toBe(small * 2);
+    expect(large).toBe(small * 4);
   });
 
   test("a partial month is drawn lighter than the complete ones", () => {
@@ -124,6 +160,22 @@ describe("HBarChart", () => {
     expect(markup).toContain('width="25%"');
     expect(markup).toContain('width="12.5%"');
     expect(markup).toContain('aria-hidden="true"');
+  });
+});
+
+describe("MiniBars", () => {
+  const bars = (values: number[]): MiniBar[] =>
+    values.map((value, index) => ({ key: `m${index}`, name: `mes ${index}`, value, valueText: `USD ${value}` }));
+  const render = (values: number[]) =>
+    html(createElement(MiniBars, { bars: bars(values), label: "Ingresos", partialNote: "mes en curso" }));
+
+  test("each bar is as tall as its value against the highest month of its own series", () => {
+    // 30 px de alto: el mayor lo llena, la mitad llega a 15 y la cuarta parte a 8 (7,5 redondeado).
+    expect(drawnHeights(render([10, 20, 40]), "mini-bar")).toEqual([8, 15, 30]);
+  });
+
+  test("a month without income keeps a stub so its place does not look empty", () => {
+    expect(drawnHeights(render([0, 40]), "mini-bar")).toEqual([2, 30]);
   });
 });
 
