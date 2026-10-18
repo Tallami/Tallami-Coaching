@@ -38,14 +38,32 @@ describe("assertDatabaseUrlForMigrate", () => {
     ).toThrow(/DATABASE_URL/);
   });
 
-  test("looks only at the command, not at the value of an option that happens to say migrate", () => {
+  test("lets a migration be named migrate: the value of --name and --prefix is not the command", () => {
     for (const args of [
       ["generate", "--name", "migrate"],
       ["generate", "--name=migrate"],
       ["generate", "--custom", "--name", "migrate"],
-      ["check", "migrate"],
+      ["generate", "--prefix", "migrate"],
+      ["--name", "migrate", "generate"],
     ]) {
       expect(() => assertDatabaseUrlForMigrate([...NODE, ...args], {}), args.join(" ")).not.toThrow();
+    }
+  });
+
+  test("fails closed: any other \"migrate\" among the arguments counts as the command", () => {
+    for (const args of [
+      ["check", "migrate"],
+      // Una opción que la lista no conoce con su valor separado por un espacio: el valor se toma por un argumento más.
+      ["--una-opcion-nueva", "valor", "migrate"],
+      ["--otra-opcion", "archivo.ts", "--verbose", "migrate"],
+      ["generate", "--una-opcion-nueva", "migrate"],
+      ["migrate", "migrate"],
+    ]) {
+      expect(() => assertDatabaseUrlForMigrate([...NODE, ...args], {}), args.join(" ")).toThrow(/DATABASE_URL/);
+      expect(
+        () => assertDatabaseUrlForMigrate([...NODE, ...args], { DATABASE_URL: URL }),
+        args.join(" "),
+      ).not.toThrow();
     }
   });
 

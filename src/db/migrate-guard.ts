@@ -9,9 +9,15 @@
 const MIGRATE_COMMAND = "migrate";
 
 /**
- * Las opciones de drizzle-kit que llevan un valor. Escritas con espacio
- * (`--config archivo.ts`) el valor es el argumento que sigue y no puede
- * tomarse por el comando; con `=` (`--config=archivo.ts`) ya viene adentro.
+ * Las opciones de drizzle-kit que llevan un valor y que se conocen. Escritas con
+ * espacio (`--name algo`) el valor es el argumento que sigue, y no es un comando;
+ * con `=` (`--name=algo`) ya viene adentro. Es lo que deja ponerle `migrate` de
+ * nombre a una migración (`generate --name migrate`).
+ *
+ * Es una lista de excepciones y no la de lo que cuenta: una opción que no esté
+ * acá (una de una versión nueva de drizzle-kit) deja su valor entre los
+ * argumentos sueltos y, si dice `migrate`, la guarda se activa. Falla del lado
+ * seguro: a lo sumo pide `DATABASE_URL` de más, nunca se saltea la verificación.
  */
 const OPTIONS_WITH_VALUE: ReadonlySet<string> = new Set([
   "config",
@@ -37,32 +43,37 @@ const OPTIONS_WITH_VALUE: ReadonlySet<string> = new Set([
   "migrations-schema",
 ]);
 
-/** El comando: el primer argumento que no es una opción ni el valor de una opción. */
-function commandOf(args: readonly string[]): string | undefined {
+/** Los argumentos sueltos: lo que no es una opción ni el valor de una opción conocida. */
+function looseArguments(args: readonly string[]): string[] {
+  const loose: string[] = [];
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
-    if (!argument.startsWith("-")) return argument;
+    if (!argument.startsWith("-")) {
+      loose.push(argument);
+      continue;
+    }
     const takesNextArgument = !argument.includes("=") && OPTIONS_WITH_VALUE.has(argument.replace(/^-+/, ""));
     if (takesNextArgument) index += 1;
   }
-  return undefined;
+  return loose;
 }
 
 export const MIGRATE_WITHOUT_DATABASE_URL_MESSAGE =
   "Falta DATABASE_URL. `npm run db:migrate` aplica las migraciones a la base de Supabase y necesita la variable de entorno DATABASE_URL con su URL de conexión. Definila en esta terminal y volvé a correr el comando.";
 
 /**
- * Tira un error en español si el comando que corre drizzle-kit es `migrate` y
- * `DATABASE_URL` falta o está vacía. `argv` es `process.argv`; el comando es el
- * primer argumento que no es una opción ni el valor de una (después del
- * ejecutable y del script): `generate --name migrate` no es `migrate`, y
- * `--config archivo.ts migrate` sí lo es.
+ * Tira un error en español si drizzle-kit va a correr `migrate` y `DATABASE_URL`
+ * falta o está vacía. `argv` es `process.argv`. Cuenta como `migrate` cualquier
+ * argumento suelto (después del ejecutable y del script) que sea `migrate`, salvo
+ * el valor de una opción conocida: `generate --name migrate` es una migración que
+ * se llama así, y `--config archivo.ts migrate` o `--opcion-nueva valor migrate`
+ * son el comando.
  */
 export function assertDatabaseUrlForMigrate(
   argv: readonly string[],
   env: Readonly<Record<string, string | undefined>>,
 ): void {
-  const isMigrate = commandOf(argv.slice(2)) === MIGRATE_COMMAND;
+  const isMigrate = looseArguments(argv.slice(2)).includes(MIGRATE_COMMAND);
   if (isMigrate && !env.DATABASE_URL?.trim()) {
     throw new Error(MIGRATE_WITHOUT_DATABASE_URL_MESSAGE);
   }
