@@ -1,7 +1,7 @@
 import { count } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, test, vi } from "vitest";
 import { createCustomer } from "@/admin/customers/repository";
-import { RATE_UNAVAILABLE_MESSAGE } from "@/admin/sales/form-state";
+import { RATE_UNAVAILABLE_MESSAGE, rateUnavailableMessage } from "@/admin/sales/form-state";
 import { getSale, listSales } from "@/admin/sales/repository";
 import { saveSale } from "@/admin/sales/save-sale";
 import type { Db } from "@/db/client";
@@ -90,6 +90,27 @@ describe("saveSale", () => {
     expect(RATE_UNAVAILABLE_MESSAGE).toBe("No pudimos traer el dólar oficial; cargalo a mano.");
     // Ni la venta ni el alumno nuevo quedaron a medias.
     expect(await totals(db)).toEqual(before);
+  });
+
+  test("the message names the currency that is missing: the dollar, or the real with the dollar", async () => {
+    vi.stubEnv("EXCHANGE_RATE_SOURCE", "fixed");
+
+    const inReais = await saveSale(db, form({ paidOn: "2019-12-31", currency: "BRL", amount: "100", customerName: "Sin real" }));
+    const inDollars = await saveSale(db, form({ paidOn: "2019-12-31", customerName: "Sin dólar" }));
+    const inPesos = await saveSale(db, form({ paidOn: "2019-12-31", currency: "ARS", amount: "50000", customerName: "Sin dólar" }));
+
+    for (const outcome of [inReais, inDollars, inPesos]) {
+      expect(outcome.saved).toBe(false);
+      if (outcome.saved) return;
+      expect(outcome.state.needsManualRate).toBe(true);
+    }
+    const message = (outcome: typeof inReais) => (outcome.saved ? "" : outcome.state.fieldErrors.rateMode);
+    expect(message(inReais)).toBe(rateUnavailableMessage("BRL"));
+    expect(message(inReais)).toContain("real");
+    expect(message(inReais)).toContain("dólar");
+    expect(message(inDollars)).toBe(RATE_UNAVAILABLE_MESSAGE);
+    expect(message(inPesos)).toBe(RATE_UNAVAILABLE_MESSAGE);
+    expect(message(inDollars)).not.toContain("real");
   });
 
   test("with the rate typed by hand, the same sale is saved", async () => {

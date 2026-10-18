@@ -248,6 +248,96 @@ test.describe("panel accessibility with the demo data", () => {
   });
 });
 
+test.describe("panel details with the demo data", () => {
+  test.beforeEach(async ({ page }) => {
+    await loginAsAdmin(page);
+  });
+
+  test("the labels of the charts are at least 11px on the phone", async ({ page }) => {
+    await openPanelPage(page, PANEL_PAGES[0], PHONE_WIDTH);
+
+    const sizes = await page
+      .locator("main svg text")
+      .evaluateAll((nodes) => nodes.map((node) => parseFloat(getComputedStyle(node).fontSize)));
+
+    expect(sizes.length).toBeGreaterThan(20);
+    expect(Math.min(...sizes)).toBeGreaterThanOrEqual(11);
+  });
+
+  test("on the phone the overview starts with a link to the pending list, and it works", async ({ page }) => {
+    await openPanelPage(page, PANEL_PAGES[0], PHONE_WIDTH);
+
+    const link = page.getByRole("link", { name: "Ir a pendientes" });
+    await expect(link).toBeVisible();
+    // Es lo primero del contenido, antes que el selector de período y las tarjetas.
+    const linkTop = (await link.boundingBox())?.y ?? Number.POSITIVE_INFINITY;
+    const cardsTop = (await page.getByTestId("kpi-income-usd").boundingBox())?.y ?? 0;
+    expect(linkTop).toBeLessThan(cardsTop);
+
+    await link.click();
+
+    await expect(page).toHaveURL(/\/admin#pendientes$/);
+    await expect(page.locator("#pendientes")).toBeInViewport();
+  });
+
+  test("on the desktop that link is not there: the pending list is already within reach", async ({ page }) => {
+    await openPanelPage(page, PANEL_PAGES[0], DESKTOP_WIDTH);
+
+    await expect(page.getByRole("link", { name: "Ir a pendientes" })).toBeHidden();
+  });
+
+  test("the pending deliveries show five and fold the rest, like the sessions to mark", async ({ page }) => {
+    await openPanelPage(page, PANEL_PAGES[0], DESKTOP_WIDTH);
+
+    const deliveries = page.getByTestId("pending-deliveries");
+    const total = Number(await deliveries.locator("h3 span").first().innerText());
+    const visibleRows = deliveries.locator(":scope > div > ul > li");
+
+    await expect(visibleRows).toHaveCount(Math.min(total, 5));
+    if (total > 5) {
+      await expect(deliveries.locator("details")).toHaveCount(1);
+      await expect(deliveries.locator("details > ul > li")).toHaveCount(total - 5);
+    } else {
+      await expect(deliveries.locator("details")).toHaveCount(0);
+    }
+  });
+
+  test("the notes under the Servicios table keep a line length that reads well", async ({ page }) => {
+    await openPanelPage(page, PANEL_PAGES[7], DESKTOP_WIDTH);
+
+    const widths = await page
+      .getByRole("region", { name: "Cómo leer esta tabla" })
+      .locator("li")
+      .evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().width));
+
+    expect(widths.length).toBeGreaterThanOrEqual(4);
+    // Unos 65 caracteres por renglón (`max-w-prose`, ~635 px acá); sin tope eran ~700 px (el ancho de la tarjeta).
+    expect(Math.max(...widths)).toBeLessThanOrEqual(660);
+  });
+
+  test("the edit link of each sale has its own name", async ({ page }) => {
+    await openPanelPage(page, PANEL_PAGES[1], DESKTOP_WIDTH);
+
+    const names = await page
+      .getByRole("region", { name: "Ventas" })
+      .locator("tbody a")
+      .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("aria-label")));
+
+    expect(names.length).toBe(25);
+    for (const name of names) expect(name).toMatch(/^Editar venta de .+ (del \d{2}\/\d{2}\/\d{4}|\(sin fecha de cobro\))$/);
+  });
+
+  test("every table header says it heads a column or a row", async ({ page }) => {
+    for (const target of PANEL_PAGES.filter((candidate) => ["Ventas", "Alumnos", "Servicios", "Facturación"].includes(candidate.name))) {
+      await openPanelPage(page, target, DESKTOP_WIDTH);
+
+      const withoutScope = await page.locator("th:not([scope])").count();
+
+      expect(withoutScope, target.name).toBe(0);
+    }
+  });
+});
+
 test.describe("panel pages without a session", () => {
   for (const width of AXE_WIDTHS) {
     test(`login has no serious or critical axe violations at ${width}px`, async ({ page }) => {

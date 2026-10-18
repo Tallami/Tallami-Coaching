@@ -77,6 +77,36 @@ describe("SalesTable", () => {
     expect(markup).toContain(`href="/admin/ventas/${ROW.id}"`);
   });
 
+  test("the link of each row names its own sale, so a screen reader can tell the rows apart", () => {
+    const markup = render([ROW, { ...ROW, id: "2f4f3f64-7c5c-4a43-9d4c-3f6a3a2f1b10", paidOn: "2026-10-05" }]);
+    const labels = [...markup.matchAll(/<a [^>]*aria-label="([^"]*)"/g)].map((match) => match[1]);
+
+    expect(labels).toEqual([
+      "Editar venta de Ana Pérez del 12/10/2026",
+      "Editar venta de Ana Pérez del 05/10/2026",
+    ]);
+  });
+
+  test("the name of a sale that was not collected yet says so instead of a date", () => {
+    const markup = render([{ ...ROW, status: "pending", paidOn: null }]);
+
+    expect(markup).toContain('aria-label="Editar venta de Ana Pérez (sin fecha de cobro)"');
+  });
+
+  test("the accessible name still contains the visible text of the link", () => {
+    const markup = render([ROW]);
+
+    expect(markup).toMatch(/aria-label="[^"]*Ana Pérez[^"]*"[^>]*>Ana Pérez<\/a>/);
+  });
+
+  test("every column header says it heads a column", () => {
+    const markup = render([ROW]);
+    const headers = markup.match(/<th [^>]*>/g) ?? [];
+
+    expect(headers).toHaveLength(9);
+    for (const header of headers) expect(header).toContain('scope="col"');
+  });
+
   test("a sale not collected yet has no payment date, and 'Otro' shows its description", () => {
     const markup = render([
       { ...ROW, status: "pending", paidOn: null, item: "other", description: "Revisión de clip" },

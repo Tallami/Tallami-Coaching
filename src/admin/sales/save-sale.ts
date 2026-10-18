@@ -2,7 +2,7 @@
 // de cambio y escribir. Lo usan las acciones de alta y de edición; vive acá y no
 // en el archivo de acciones para poder probarlo con una base de prueba.
 
-import { RATE_UNAVAILABLE_MESSAGE, type SaleFormState } from "@/admin/sales/form-state";
+import { rateUnavailableMessage, type SaleFormState } from "@/admin/sales/form-state";
 import { readSaleForm } from "@/admin/sales/form-data";
 import { resolveSaleRates } from "@/admin/sales/rates";
 import {
@@ -54,7 +54,7 @@ export async function saveSale(db: Db, formData: FormData, saleId?: string): Pro
     const resolution = await resolveSaleRates(db, input, previous ? { previous } : {});
     if (!resolution.ok) {
       return rejected({
-        fieldErrors: { rateMode: RATE_UNAVAILABLE_MESSAGE },
+        fieldErrors: { rateMode: rateUnavailableMessage(input.currency) },
         needsManualRate: true,
       });
     }

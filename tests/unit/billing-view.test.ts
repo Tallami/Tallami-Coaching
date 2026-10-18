@@ -224,3 +224,58 @@ describe("BillingView", () => {
     expect(markup).toContain("cotización del dólar (con su fuente y su fecha)");
   });
 });
+
+describe("the count at the top of the list", () => {
+  /** Lo que lee la lista (la página la corta en 1.000) y el total que cuenta la base aparte. */
+  function withTotals(totals: { count: number; arsMinor: number; usdMinor: number }, truncated = true) {
+    return buildBilling({
+      uninvoiced: { rows: [saleRow(), saleRow()], truncated, totals },
+      sales: [],
+      settings: SETTINGS,
+      now: NOW,
+    });
+  }
+
+  test("comes from the separate count, not from the length of the list that was cut", () => {
+    const data = withTotals({ count: 1500, arsMinor: 90_000_000, usdMinor: 60_000 });
+
+    expect(data.uninvoiced.count).toBe(1500);
+    expect(data.uninvoiced).toMatchObject({ arsMinor: 90_000_000, usdMinor: 60_000, truncated: true });
+    // Las filas que se muestran son las que llegaron: la lista sigue siendo la cortada.
+    expect(data.uninvoiced.groups.flatMap((group) => group.rows)).toHaveLength(2);
+    const markup = render(data);
+    expect(markup).toContain("1500 ventas sin facturar");
+    expect(markup).toContain("$ 900.000,00");
+    expect(markup).toContain("USD 600,00");
+  });
+
+  test("without a separate count it is what the listed rows add up to", () => {
+    const data = build({ rows: [saleRow(), saleRow(), saleRow()] });
+
+    expect(data.uninvoiced.count).toBe(3);
+  });
+});
+
+describe("the scope of the list against the 12-month table", () => {
+  const NOTE = "Esta lista trae todo lo cobrado sin facturar, de cualquier fecha";
+
+  test("says so when something to invoice was collected before the 12 months of the table", () => {
+    const markup = render(build({ rows: [saleRow({ paidOn: "2025-06-10" }), saleRow({ paidOn: "2026-10-05" })] }));
+
+    expect(markup).toContain(NOTE);
+    expect(markup).toContain("de los últimos 12 meses");
+  });
+
+  test("says nothing when everything is inside those 12 months", () => {
+    // La tabla empieza en noviembre de 2025: octubre de 2026 y noviembre de 2025 entran.
+    const markup = render(build({ rows: [saleRow({ paidOn: "2025-11-02" }), saleRow({ paidOn: "2026-10-05" })] }));
+
+    expect(markup).not.toContain(NOTE);
+  });
+
+  test("with the list cut it still says it: the older sales may be the ones left out", () => {
+    const markup = render(build({ rows: [saleRow({ paidOn: "2026-10-05" })], truncated: true }));
+
+    expect(markup).toContain(NOTE);
+  });
+});

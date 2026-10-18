@@ -5,7 +5,6 @@ import type { MonotributoSettings } from "@/admin/metrics/monotributo";
 import { settingsToFormValues, type SettingsFormState } from "@/admin/settings/form-state";
 import { ADMIN_ROUTES } from "@/admin/routes";
 import { SettingsForm } from "@/admin/settings/settings-form";
-import { Notice } from "@/admin/ui/notice";
 
 /**
  * La tabla de categorías y montos vigentes del Monotributo en ARCA. Verificada
@@ -57,15 +56,17 @@ function SourceNote() {
 export function SettingsView({ current, updatedAt, justSaved, action }: SettingsViewProps) {
   return (
     <div className="max-w-3xl">
-      {justSaved ? (
-        <Notice tone="ok" className="mb-5">
-          Configuración guardada.{" "}
-          <Link href={ADMIN_ROUTES.billing} prefetch={false} className="underline underline-offset-2">
-            Ver el medidor en Facturación
-          </Link>
-        </Notice>
-      ) : null}
       <SettingsForm
+        savedNotice={
+          justSaved ? (
+            <>
+              Configuración guardada.{" "}
+              <Link href={ADMIN_ROUTES.billing} prefetch={false} className="underline underline-offset-2">
+                Ver el medidor en Facturación
+              </Link>
+            </>
+          ) : undefined
+        }
         // Lo guardado puede volver normalizado (el tope con sus centavos): el formulario se arma de nuevo.
         key={updatedAt?.toISOString() ?? "sin-configuracion"}
         action={action}

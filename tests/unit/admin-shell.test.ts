@@ -123,4 +123,30 @@ describe("Pagination", () => {
   test("with nothing to show it says so", () => {
     expect(render(1, 0)).toContain("Sin ventas");
   });
+
+  describe("when there is exactly one", () => {
+    const renderWithSingular = (total: number) =>
+      renderToStaticMarkup(
+        createElement(Pagination, { page: 1, pageSize: 25, total, noun: "alumnos", singularNoun: "alumno", hrefFor }),
+      );
+
+    test("it counts one student, not 1 alumnos", () => {
+      expect(renderWithSingular(1)).toContain("Mostrando 1 a 1 de 1 alumno");
+      expect(renderWithSingular(1)).not.toContain("1 alumnos");
+    });
+
+    test("the plural stays for two or more and for none", () => {
+      expect(renderWithSingular(2)).toContain("Mostrando 1 a 2 de 2 alumnos");
+      expect(renderWithSingular(0)).toContain("Sin alumnos");
+    });
+
+    test("a single sale reads 1 venta", () => {
+      const markup = renderToStaticMarkup(
+        createElement(Pagination, { page: 1, pageSize: 25, total: 1, noun: "ventas", singularNoun: "venta", hrefFor }),
+      );
+
+      expect(markup).toContain("de 1 venta");
+      expect(markup).not.toContain("1 ventas");
+    });
+  });
 });

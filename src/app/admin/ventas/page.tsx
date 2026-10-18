@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/admin/auth/require-admin";
+import { exportErrorNotice } from "@/admin/export/notices";
 import { PAGE_SIZE } from "@/admin/limits";
 import { ADMIN_ROUTES } from "@/admin/routes";
 import {
@@ -33,6 +34,8 @@ export default async function SalesPage(props: PageProps<"/admin/ventas">) {
   if (page > pageCount) redirect(`${ADMIN_ROUTES.sales}${salesQueryString(filter, pageCount)}`);
 
   const savedMessage = savedSaleMessage(params.guardada);
+  // Una descarga que no se pudo armar vuelve acá con el motivo en la dirección.
+  const exportError = exportErrorNotice(params.exportacion);
 
   return (
     <PanelShell active="sales">
@@ -41,12 +44,14 @@ export default async function SalesPage(props: PageProps<"/admin/ventas">) {
         description="Todo lo que cobraste, con su valor en pesos y en dólares."
         actions={
           <>
-            {/* Un archivo, no una página: un enlace común (con `Link` Next intentaría navegar a él). */}
+            {/*
+              Un archivo, no una página: un enlace común (con `Link` Next intentaría navegar a él),
+              sin `download`: la respuesta ya es un adjunto, y si no se puede armar vuelve a esta
+              lista con un aviso (con `download` el navegador bajaría ese aviso como si fuera el archivo).
+            */}
             {total > 0 ? (
               <Button asChild variant="ink-outline">
-                <a href={`${ADMIN_ROUTES.salesExport}${salesQueryString(filter)}`} download>
-                  Exportar CSV
-                </a>
+                <a href={`${ADMIN_ROUTES.salesExport}${salesQueryString(filter)}`}>Exportar CSV</a>
               </Button>
             ) : null}
             <Button asChild>
@@ -60,6 +65,11 @@ export default async function SalesPage(props: PageProps<"/admin/ventas">) {
           {savedMessage}
         </Notice>
       ) : null}
+      {exportError ? (
+        <Notice tone="error" className="mb-5">
+          {exportError}
+        </Notice>
+      ) : null}
       {/* Sin ventas ni filtros no hay nada que filtrar: queda solo la invitación a cargar la primera. */}
       {total > 0 || hasActiveFilters(filter) ? <SalesFilters filter={filter} /> : null}
       <SalesTable rows={rows} hasFilters={hasActiveFilters(filter)} />
@@ -69,6 +79,7 @@ export default async function SalesPage(props: PageProps<"/admin/ventas">) {
           pageSize={PAGE_SIZE}
           total={total}
           noun="ventas"
+          singularNoun="venta"
           hrefFor={(target) => `${ADMIN_ROUTES.sales}${salesQueryString(filter, target)}`}
         />
       ) : null}

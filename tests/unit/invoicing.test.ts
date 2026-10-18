@@ -5,6 +5,7 @@ import {
   InvoiceNotAllowedError,
   InvoiceNotCollectedError,
   MAX_INVOICE_BATCH,
+  countUninvoicedSales,
   listUninvoicedSales,
   markInvoiceNotRequired,
   markInvoicePending,
@@ -371,6 +372,85 @@ describe("listUninvoicedSales", () => {
 
   test("is empty without sales", async () => {
     expect(await listUninvoicedSales(await createTestDb(), NOW)).toEqual({ rows: [], truncated: false });
+  });
+});
+
+describe("the invoice date", () => {
+  test("can be today, or any day before", async () => {
+    const db = await createTestDb();
+    const today = await seedSale(db);
+    const earlier = await seedSale(db);
+
+    await markInvoiced(db, [today], { ...INVOICE, issuedOn: "2026-10-13" }, NOW);
+    await markInvoiced(db, [earlier], { ...INVOICE, issuedOn: "2026-08-01" }, NOW);
+
+    expect((await invoiceOf(db, today)).on).toBe("2026-10-13");
+    expect((await invoiceOf(db, earlier)).on).toBe("2026-08-01");
+  });
+
+  test("cannot be after today in Argentina, and nothing is marked", async () => {
+    const db = await createTestDb();
+    const id = await seedSale(db);
+
+    const error = await markInvoiced(db, [id], { ...INVOICE, issuedOn: "2026-10-14" }, NOW).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(InvalidInvoiceError);
+    expect((error as InvalidInvoiceError).fieldErrors).toEqual({
+      issuedOn: "La fecha de la factura no puede ser posterior a hoy.",
+    });
+    expect(await invoiceOf(db, id)).toEqual(PENDING_INVOICE);
+  });
+
+  test("the day that counts is the Argentine one, not the UTC one", async () => {
+    const db = await createTestDb();
+    const id = await seedSale(db);
+    // 02:00 UTC del 14/10 son las 23:00 del 13/10 en Argentina: el 14 todavía no llegó.
+    const lateAtNight = new Date("2026-10-14T02:00:00.000Z");
+
+    await expect(markInvoiced(db, [id], { ...INVOICE, issuedOn: "2026-10-14" }, lateAtNight)).rejects.toBeInstanceOf(
+      InvalidInvoiceError,
+    );
+    await markInvoiced(db, [id], { ...INVOICE, issuedOn: "2026-10-13" }, lateAtNight);
+
+    expect((await invoiceOf(db, id)).on).toBe("2026-10-13");
+  });
+});
+
+describe("countUninvoicedSales", () => {
+  test("counts and adds up everything that can still be invoiced, however old, with no limit", async () => {
+    const db = await createTestDb();
+    await seedSale(db, { paidOn: "2024-03-05", amount: "40" });
+    await seedSale(db, { paidOn: "2026-09-30", amount: "120.5", currency: "USD" });
+    await seedSale(db, { paidOn: "2026-10-13", amount: "10" });
+    await seedSale(db, { paidOn: "2026-10-14" });
+    await seedSale(db, { status: "cancelled", paidOn: "" });
+    const invoiced = await seedSale(db, { paidOn: "2026-10-02" });
+    await markInvoiced(db, [invoiced], INVOICE, NOW);
+
+    const totals = await countUninvoicedSales(db, NOW);
+    const { rows } = await listUninvoicedSales(db, NOW);
+
+    expect(totals.count).toBe(3);
+    expect(totals).toEqual({
+      count: rows.length,
+      arsMinor: sumMinor(rows.map((row) => row.amountArsMinor)),
+      usdMinor: sumMinor(rows.map((row) => row.amountUsdMinor)),
+    });
+  });
+
+  test("keeps counting past the limit of the list", async () => {
+    const db = await createTestDb();
+    for (const day of ["2026-10-01", "2026-10-02", "2026-10-03"]) await seedSale(db, { paidOn: day });
+
+    const { rows, truncated } = await listUninvoicedSales(db, NOW, 2);
+
+    expect(rows).toHaveLength(2);
+    expect(truncated).toBe(true);
+    expect((await countUninvoicedSales(db, NOW)).count).toBe(3);
+  });
+
+  test("is zero without sales", async () => {
+    expect(await countUninvoicedSales(await createTestDb(), NOW)).toEqual({ count: 0, arsMinor: 0, usdMinor: 0 });
   });
 });
 

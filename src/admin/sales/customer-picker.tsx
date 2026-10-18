@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import {
+  COUNTRY_CODE_LENGTH,
+  MAX_DISCORD_LENGTH,
+  MAX_NAME_LENGTH,
+} from "@/admin/customers/limits";
 import type { CustomerOption } from "@/admin/customers/repository";
 import { MAX_SEARCH_LENGTH } from "@/admin/limits";
 import { customerLabel, type SaleFormValues } from "@/admin/sales/form-values";
@@ -107,7 +112,7 @@ export function CustomerPicker({ values, errors, onChange }: CustomerPickerProps
                 {...control}
                 name="customerName"
                 autoComplete="off"
-                maxLength={200}
+                maxLength={MAX_NAME_LENGTH}
                 value={values.customerName}
                 onChange={(event) => onChange({ customerName: event.target.value })}
               />
@@ -119,7 +124,7 @@ export function CustomerPicker({ values, errors, onChange }: CustomerPickerProps
                 {...control}
                 name="customerDiscord"
                 autoComplete="off"
-                maxLength={200}
+                maxLength={MAX_DISCORD_LENGTH}
                 value={values.customerDiscord}
                 onChange={(event) => onChange({ customerDiscord: event.target.value })}
               />
@@ -137,7 +142,7 @@ export function CustomerPicker({ values, errors, onChange }: CustomerPickerProps
                 {...control}
                 name="customerCountry"
                 autoComplete="off"
-                maxLength={8}
+                maxLength={COUNTRY_CODE_LENGTH}
                 value={values.customerCountry}
                 onChange={(event) => onChange({ customerCountry: event.target.value })}
               />

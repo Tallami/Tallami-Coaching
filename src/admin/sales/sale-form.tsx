@@ -26,9 +26,11 @@ import {
 import { CustomerPicker } from "@/admin/sales/customer-picker";
 import type { SaleFormValues } from "@/admin/sales/form-values";
 import { INITIAL_SALE_FORM_STATE, type SaleFormState } from "@/admin/sales/form-state";
+import { MAX_DESCRIPTION_LENGTH, MAX_SALE_NOTES_LENGTH } from "@/admin/sales/limits";
 import { RateFields } from "@/admin/sales/rate-fields";
 import { ADMIN_ROUTES } from "@/admin/routes";
 import { Field } from "@/admin/ui/field";
+import { NoScriptNote } from "@/admin/ui/no-script-note";
 import { Notice } from "@/admin/ui/notice";
 import { useHydrated } from "@/admin/ui/use-hydrated";
 import { Button } from "@/components/ui/button";
@@ -215,7 +217,7 @@ export function SaleForm({ mode, action, initialValues, priceListUsd, invoiced =
                 <Input
                   {...control}
                   name="description"
-                  maxLength={400}
+                  maxLength={MAX_DESCRIPTION_LENGTH}
                   autoComplete="off"
                   value={values.description}
                   onChange={(event) => update({ description: event.target.value })}
@@ -363,7 +365,7 @@ export function SaleForm({ mode, action, initialValues, priceListUsd, invoiced =
             <Textarea
               {...control}
               name="notes"
-              maxLength={2200}
+              maxLength={MAX_SALE_NOTES_LENGTH}
               value={values.notes}
               onChange={(event) => update({ notes: event.target.value })}
             />
@@ -378,6 +380,7 @@ export function SaleForm({ mode, action, initialValues, priceListUsd, invoiced =
         <Button asChild variant="ink-outline">
           <Link href={ADMIN_ROUTES.sales}>Cancelar</Link>
         </Button>
+        <NoScriptNote />
       </div>
     </form>
   );

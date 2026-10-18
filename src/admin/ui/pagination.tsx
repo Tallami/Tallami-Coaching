@@ -7,6 +7,8 @@ interface PaginationProps {
   total: number;
   /** Lo que se cuenta, en plural: "ventas". */
   noun: string;
+  /** Lo mismo cuando hay uno solo: "venta". Sin él se usa `noun`. */
+  singularNoun?: string;
   /** A dónde lleva la página `n`; solo se llama para las páginas que existen. */
   hrefFor: (page: number) => string;
 }
@@ -16,7 +18,7 @@ const linkClasses =
 const disabledClasses = "inline-flex min-h-11 items-center gap-1 rounded-[4px] border-2 border-rule px-3 font-bold text-ink-2";
 
 /** "Mostrando 26 a 50 de 120 ventas" con enlaces a la página anterior y a la siguiente. */
-export function Pagination({ page, pageSize, total, noun, hrefFor }: PaginationProps) {
+export function Pagination({ page, pageSize, total, noun, singularNoun, hrefFor }: PaginationProps) {
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const first = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const last = Math.min(page * pageSize, total);
@@ -29,7 +31,7 @@ export function Pagination({ page, pageSize, total, noun, hrefFor }: PaginationP
       <p className="text-ink-2" aria-live="polite">
         {total === 0
           ? `Sin ${noun}`
-          : `Mostrando ${first} a ${last} de ${total} ${noun}`}
+          : `Mostrando ${first} a ${last} de ${total} ${total === 1 ? (singularNoun ?? noun) : noun}`}
       </p>
       {pageCount > 1 ? (
         <div className="flex items-center gap-3">

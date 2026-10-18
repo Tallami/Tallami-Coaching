@@ -21,6 +21,7 @@ import {
   MAX_NOTES_LENGTH,
 } from "@/admin/customers/limits";
 import { Field } from "@/admin/ui/field";
+import { NoScriptNote } from "@/admin/ui/no-script-note";
 import { Notice } from "@/admin/ui/notice";
 import { useHydrated } from "@/admin/ui/use-hydrated";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,12 @@ export interface StudentFormProps {
   initialValues: StudentFormValues;
   /** A dónde lleva "Cancelar". */
   cancelHref: string;
+  /**
+   * Lo que avisa un guardado que salió bien (lo trae la dirección después de
+   * guardar). Se ve mientras el formulario no recibe ninguna respuesta: si un
+   * guardado posterior falla, deja de mostrarse, porque ya no es cierto.
+   */
+  savedNotice?: string;
 }
 
 /**
@@ -47,7 +54,7 @@ export interface StudentFormProps {
  * guardar (el país en mayúsculas), la página pasa un `key` nuevo para que el
  * formulario vuelva a armarse con lo guardado.
  */
-export function StudentForm({ mode, action, initialValues, cancelHref }: StudentFormProps) {
+export function StudentForm({ mode, action, initialValues, cancelHref, savedNotice }: StudentFormProps) {
   const [values, setValues] = useState(initialValues);
   const [state, dispatch, isSaving] = useActionState(action, INITIAL_STUDENT_FORM_STATE);
   const [, startTransition] = useTransition();
@@ -96,6 +103,7 @@ export function StudentForm({ mode, action, initialValues, cancelHref }: Student
       data-hydrated={hydrated ? "true" : "false"}
       className="border-2 border-ink bg-white"
     >
+      {savedNotice && state === INITIAL_STUDENT_FORM_STATE ? <Notice tone="ok">{savedNotice}</Notice> : null}
       <div ref={summaryRef} tabIndex={-1} className="outline-offset-0 empty:hidden">
         {state.formError ? (
           <Notice tone="error" className="border-l-8">
@@ -172,6 +180,7 @@ export function StudentForm({ mode, action, initialValues, cancelHref }: Student
         <Button asChild variant="ink-outline">
           <Link href={cancelHref}>Cancelar</Link>
         </Button>
+        <NoScriptNote />
       </div>
     </form>
   );

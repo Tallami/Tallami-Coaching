@@ -593,6 +593,20 @@ test.describe("settings", () => {
     await expect(page.getByText("Cargá desde qué fecha rige el tope.")).toBeVisible();
   });
 
+  test("the saved notice goes away when a later save fails", async ({ page }) => {
+    // El aviso lo trae la dirección: no hace falta guardar nada (la configuración es una sola y la comparten los otros tests).
+    await page.goto(`${SETTINGS_PATH}?guardada=1`);
+    const notice = page.getByRole("status").filter({ hasText: "Configuración guardada." });
+    await expect(notice).toBeVisible();
+    await expect(page.locator("form[data-hydrated='true']")).toBeVisible();
+
+    await page.getByLabel("Tope anual en pesos").fill("");
+    await page.getByRole("button", { name: "Guardar configuración" }).click();
+
+    await expect(page.getByText("Cargá el tope anual en pesos.")).toBeVisible();
+    await expect(notice).toHaveCount(0);
+  });
+
   test("links to the ARCA table in a new tab and does not present the cap as official", async ({ page }) => {
     await page.goto(SETTINGS_PATH);
 
@@ -911,5 +925,76 @@ test.describe("confirming a big batch of not-required invoices", () => {
     await expect(page).toHaveURL(/guardada=sin-factura&cantidad=\d+$/);
     for (const student of students) await expect(rowOf(page, student)).toHaveCount(0);
     await expect(page.getByRole("dialog")).toHaveCount(0);
+  });
+});
+
+test.describe("the invoice date", () => {
+  test.beforeEach(async ({ page }) => {
+    await loginAsAdmin(page);
+  });
+
+  test("cannot be after today in Argentina: the field stops at today and the server refuses a later day", async ({
+    page,
+  }) => {
+    const student = uniqueName("Eli fecha futura");
+    await createSale(page, { student });
+    await openBilling(page);
+    const today = todayInArgentina();
+    await expect(page.getByLabel("Fecha de la factura")).toHaveAttribute("max", today);
+
+    await pickerOf(page, student).check();
+    await page.getByLabel("Tipo de factura").selectOption("C");
+    await page.getByLabel("Número de factura").fill(uniqueInvoiceNumber());
+    await page.getByLabel("Fecha de la factura").fill(addDays(today, 1));
+    await mark(page, "Marcar como facturadas");
+
+    await expect(page.getByText("La fecha de la factura no puede ser posterior a hoy.")).toBeVisible();
+    await expect(page.getByLabel("Fecha de la factura")).toHaveAttribute("aria-invalid", "true");
+    await expect(rowOf(page, student)).toHaveCount(1);
+
+    // Con la fecha de hoy se marca.
+    await page.getByLabel("Fecha de la factura").fill(today);
+    await mark(page, "Marcar como facturadas");
+    await expect(page).toHaveURL(/guardada=facturadas&cantidad=1$/);
+    await expect(rowOf(page, student)).toHaveCount(0);
+  });
+});
+
+test.describe("a download that could not be built", () => {
+  test.beforeEach(async ({ page }) => {
+    await loginAsAdmin(page);
+  });
+
+  test("Facturación and Ventas say so in Spanish inside the panel, not as plain text", async ({ page }) => {
+    await page.goto(`${BILLING_PATH}?exportacion=demasiadas`);
+    await expect(
+      page.getByRole("alert").filter({ hasText: "Hay demasiadas ventas para un solo archivo. Acotá las fechas y probá de nuevo." }),
+    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Facturación", level: 1 })).toBeVisible();
+
+    await page.goto("/admin/ventas?exportacion=error");
+    await expect(
+      page.getByRole("alert").filter({ hasText: "No pudimos preparar el archivo. Probá de nuevo en unos minutos." }),
+    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Ventas", level: 1 })).toBeVisible();
+  });
+
+  test("a value that is not one of the two says nothing", async ({ page }) => {
+    for (const value of ["otra-cosa", "__proto__", "constructor"]) {
+      await page.goto(`/admin/ventas?exportacion=${value}`);
+      await expect(page.getByRole("heading", { name: "Ventas", level: 1 })).toBeVisible();
+      await expect(page.getByRole("alert").filter({ hasText: "archivo" })).toHaveCount(0);
+    }
+  });
+
+  test("the sales download link is a plain link, so a failure lands on the list and not in a file", async ({
+    page,
+  }) => {
+    await createSale(page, { student: uniqueName("Fran descarga") });
+    await page.goto("/admin/ventas");
+
+    const link = page.getByRole("link", { name: "Exportar CSV" });
+    await expect(link).toHaveAttribute("href", /^\/admin\/ventas\/exportar/);
+    await expect(link).not.toHaveAttribute("download", /.*/);
   });
 });

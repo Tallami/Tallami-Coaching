@@ -31,7 +31,8 @@ test.describe("sales", () => {
     await page.getByRole("radio", { name: "Alumno nuevo" }).check();
     await page.getByLabel("Nombre", { exact: true }).fill(student);
     await page.getByLabel("Discord", { exact: false }).fill("ana.e2e");
-    await page.getByLabel("País", { exact: false }).fill(" ar ");
+    // El campo se corta en 2 letras (el largo de un país); quitar espacios y pasar a mayúsculas lo prueba el esquema.
+    await page.getByLabel("País", { exact: false }).fill("ar");
     await page.getByLabel("Servicio", { exact: true }).selectOption("vodLive");
     await page.getByLabel("Medio de pago", { exact: true }).selectOption("paypal");
     await page.getByLabel("Estado", { exact: true }).selectOption("paid");
@@ -45,6 +46,7 @@ test.describe("sales", () => {
     await expect(row).toHaveCount(1);
     // El precio sugerido del VOD en vivo (45) y su valor en pesos con el dólar fijo (1500).
     await expect(row).toContainText("ana.e2e");
+    await expect(row).toContainText("AR");
     await expect(row).toContainText("VOD review en vivo");
     await expect(row).toContainText("PayPal");
     await expect(row).toContainText("Cobrada");

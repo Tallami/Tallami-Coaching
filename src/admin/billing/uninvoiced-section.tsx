@@ -53,6 +53,12 @@ export function UninvoicedSection({ data, action }: UninvoicedSectionProps) {
               <span className="text-ink-2"> ({formatMoney(uninvoiced.usdMinor, "USD")})</span>
             </span>
           </p>
+          {uninvoiced.reachesBeyondTwelveMonths ? (
+            <p data-testid="uninvoiced-scope" className="mt-3 max-w-prose text-[0.9375rem] text-ink-2">
+              Esta lista trae todo lo cobrado sin facturar, de cualquier fecha. El resumen de 12 meses de más abajo
+              cuenta solo los cobros de los últimos 12 meses, así que su «Sin facturar» puede ser menor.
+            </p>
+          ) : null}
           {uninvoiced.truncated ? (
             <Notice tone="info" className="mt-4">
               Hay más ventas sin facturar de las que se muestran: acá están las más nuevas. Marcalas y vas a ver las

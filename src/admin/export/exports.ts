@@ -6,10 +6,16 @@
 // Los filtros son los mismos de la lista de ventas (`parseSalesQuery`): lo que
 // no se reconoce se ignora, nunca da error. La página (`pagina`) no cuenta: el
 // archivo trae todo lo que cumple el filtro.
+//
+// Si el archivo no se puede armar (hay demasiadas ventas o falla la base) no se
+// contesta un texto suelto: se vuelve a la pantalla de origen con un aviso en
+// español (`notices.ts`).
 
 import { csvFilename, csvResponse, salesToCsv } from "@/admin/export/csv";
+import { exportFailurePath, type ExportFailure } from "@/admin/export/notices";
 import { todayInArgentina } from "@/admin/dates";
-import { parseSalesQuery } from "@/admin/sales/filters";
+import { ADMIN_ROUTES } from "@/admin/routes";
+import { parseSalesQuery, salesQueryString } from "@/admin/sales/filters";
 import { ExportTooLargeError, listSalesForExport, type SaleFilter } from "@/admin/sales/repository";
 import { searchParamsRecord } from "@/admin/ui/search-params";
 import type { Db } from "@/db/client";
@@ -22,20 +28,27 @@ export interface ExportResponseOptions {
   limit?: number;
 }
 
-const TOO_LARGE_MESSAGE =
-  "Hay demasiadas ventas para un solo archivo. Acotá las fechas y probá de nuevo.";
-const FAILED_MESSAGE = "No pudimos preparar el archivo. Probá de nuevo en unos minutos.";
-
-/** Un aviso de texto en lugar del archivo, que tampoco se guarda en ninguna caché. */
-function textResponse(status: number, message: string): Response {
-  return new Response(message, {
-    status,
+/**
+ * Vuelve a la pantalla de origen (`backTo`, con sus filtros) con el motivo en la
+ * dirección. Es una redirección sin cuerpo y sin caché: no hay ningún archivo y
+ * la pantalla es la que explica.
+ */
+function backWithNotice(backTo: ExportBack, failure: ExportFailure): Response {
+  return new Response(null, {
+    status: 303,
     headers: {
-      "Content-Type": "text/plain; charset=utf-8",
+      Location: exportFailurePath(backTo.path, backTo.query, failure),
       "Cache-Control": "no-store",
       "X-Content-Type-Options": "nosniff",
     },
   });
+}
+
+/** La pantalla a la que se vuelve si no hay archivo, y los filtros con que se la dejó. */
+interface ExportBack {
+  path: string;
+  /** Empieza con `?`, o está vacía. */
+  query: string;
 }
 
 interface ExportPlan {
@@ -43,6 +56,8 @@ interface ExportPlan {
   name: string;
   filter: SaleFilter;
   collectedBy?: string;
+  /** Adónde se vuelve si el archivo no se puede armar. */
+  back: ExportBack;
 }
 
 async function runExport(db: Db, plan: ExportPlan, today: string, limit: number): Promise<Response> {
@@ -51,9 +66,9 @@ async function runExport(db: Db, plan: ExportPlan, today: string, limit: number)
     const filename = csvFilename(plan.name, { from: plan.filter.from, to: plan.filter.to }, today);
     return csvResponse(salesToCsv(rows), filename);
   } catch (error) {
-    if (error instanceof ExportTooLargeError) return textResponse(413, TOO_LARGE_MESSAGE);
+    if (error instanceof ExportTooLargeError) return backWithNotice(plan.back, "demasiadas");
     console.error("Panel: no se pudo armar la exportación.", error);
-    return textResponse(500, FAILED_MESSAGE);
+    return backWithNotice(plan.back, "error");
   }
 }
 
@@ -69,7 +84,8 @@ export function salesExportResponse(
   options: ExportResponseOptions = {},
 ): Promise<Response> {
   const { filter } = parseSalesQuery(searchParamsRecord(params));
-  return runExport(db, { name: "ventas", filter }, todayInArgentina(now), options.limit ?? MAX_EXPORT_ROWS);
+  const back = { path: ADMIN_ROUTES.sales, query: salesQueryString(filter) };
+  return runExport(db, { name: "ventas", filter, back }, todayInArgentina(now), options.limit ?? MAX_EXPORT_ROWS);
 }
 
 /**
@@ -87,5 +103,6 @@ export function billingExportResponse(
   const { filter: parsed } = parseSalesQuery(searchParamsRecord(params));
   const filter: SaleFilter = { ...parsed, status: undefined };
   const today = todayInArgentina(now);
-  return runExport(db, { name: "facturacion", filter, collectedBy: today }, today, options.limit ?? MAX_EXPORT_ROWS);
+  const back = { path: ADMIN_ROUTES.billing, query: "" };
+  return runExport(db, { name: "facturacion", filter, collectedBy: today, back }, today, options.limit ?? MAX_EXPORT_ROWS);
 }

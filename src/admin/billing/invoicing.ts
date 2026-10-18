@@ -14,11 +14,16 @@
 // las pedidas, se deshace. Así tampoco hay carreras: dos pedidos a la vez sobre
 // la misma venta no la marcan dos veces.
 
-import { and, desc, eq, inArray, isNotNull, lte } from "drizzle-orm";
-import { markInvoicedSchema, markNotRequiredSchema } from "@/admin/billing/schema";
+import { and, count, desc, eq, inArray, isNotNull, lte, sql } from "drizzle-orm";
+import {
+  INVOICE_DATE_IN_FUTURE_MESSAGE,
+  markInvoicedSchema,
+  markNotRequiredSchema,
+} from "@/admin/billing/schema";
 import { INCOME_STATUSES, type InvoiceType } from "@/admin/catalog";
 import { todayInArgentina } from "@/admin/dates";
 import { fieldErrorsOf } from "@/admin/form-errors";
+import type { UninvoicedTotals } from "@/admin/metrics/pending";
 import { saleRowColumns, toSaleRow, type SaleRow } from "@/admin/sales/sale-row";
 import type { Db } from "@/db/client";
 import { customers, sales } from "@/db/schema";
@@ -120,11 +125,14 @@ export async function markInvoiced(
   const parsed = markInvoicedSchema.safeParse({ ...invoice, ids });
   if (!parsed.success) throw new InvalidInvoiceError(fieldErrorsOf(parsed.error));
   const { ids: chosen, type, number, issuedOn } = parsed.data;
+  const today = todayInArgentina(now);
+  // Una factura no puede ser de mañana: el día que cuenta es el de Argentina, no el de UTC.
+  if (issuedOn > today) throw new InvalidInvoiceError({ issuedOn: INVOICE_DATE_IN_FUTURE_MESSAGE });
   return applyInvoice(
     db,
     chosen,
     { invoiceStatus: "issued", invoiceType: type, invoiceNumber: number, invoicedOn: issuedOn },
-    todayInArgentina(now),
+    today,
   );
 }
 
@@ -185,6 +193,33 @@ export async function markInvoicePending(db: Db, id: string): Promise<{ updated:
   return { updated: updated.length };
 }
 
+/** Las ventas que se pueden facturar (las que acepta `markInvoiced`), con `today` como último día de cobro. */
+function uninvoicedCondition(today: string) {
+  return and(
+    inArray(sales.status, [...INCOME_STATUSES]),
+    isNotNull(sales.paidOn),
+    lte(sales.paidOn, today),
+    eq(sales.invoiceStatus, "pending"),
+  );
+}
+
+/**
+ * Cuántas ventas se pueden facturar y cuánto suman en pesos y en dólares, de
+ * cualquier fecha: un conteo aparte en la base, sin el tope de la lista. Es lo
+ * que dice el encabezado de Facturación aunque la lista esté cortada.
+ */
+export async function countUninvoicedSales(db: Db, now: Date): Promise<UninvoicedTotals> {
+  const [row] = await db
+    .select({
+      count: count(),
+      arsMinor: sql<number>`coalesce(sum(${sales.amountArsMinor}), 0)`.mapWith(Number),
+      usdMinor: sql<number>`coalesce(sum(${sales.amountUsdMinor}), 0)`.mapWith(Number),
+    })
+    .from(sales)
+    .where(uninvoicedCondition(todayInArgentina(now)));
+  return row ?? { count: 0, arsMinor: 0, usdMinor: 0 };
+}
+
 /**
  * Las ventas que se pueden facturar (las que acepta `markInvoiced`), las más
  * nuevas primero, con los datos de su alumno. Si hay más que `limit` devuelve
@@ -199,14 +234,7 @@ export async function listUninvoicedSales(
     .select(saleRowColumns)
     .from(sales)
     .innerJoin(customers, eq(sales.customerId, customers.id))
-    .where(
-      and(
-        inArray(sales.status, [...INCOME_STATUSES]),
-        isNotNull(sales.paidOn),
-        lte(sales.paidOn, todayInArgentina(now)),
-        eq(sales.invoiceStatus, "pending"),
-      ),
-    )
+    .where(uninvoicedCondition(todayInArgentina(now)))
     .orderBy(desc(sales.paidOn), desc(sales.createdAt), desc(sales.id))
     .limit(limit + 1);
   return { rows: rows.slice(0, limit).map(toSaleRow), truncated: rows.length > limit };

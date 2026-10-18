@@ -2,10 +2,11 @@
 // formulario: ids de ventas y texto. Los mensajes están en español, listos
 // para mostrar debajo de cada campo.
 //
-// La fecha de la factura solo se revisa que sea un día real entre 2000 y 2100
-// (Chrome vuelve "26" el año 0026). No se compara con la fecha de cobro: una
-// factura puede emitirse antes de cobrar (por adelantado) o después, así que
-// ninguna de las dos órdenes es un error.
+// La fecha de la factura tiene que ser un día real entre 2000 y 2100 (Chrome
+// vuelve "26" el año 0026). No se compara con la fecha de cobro: una factura
+// puede emitirse antes de cobrar (por adelantado) o después, así que ninguna de
+// las dos órdenes es un error. Que no sea posterior a hoy (en Argentina) lo
+// revisa `markInvoiced`, que es quien conoce el día de hoy.
 
 import { z } from "zod";
 import { INVOICE_TYPES } from "@/admin/catalog";
@@ -16,6 +17,9 @@ import { isUuid } from "@/db/uuid";
 
 /** Ventas que se marcan de una vez: las que muestra la lista de pendientes como mucho. */
 export const MAX_INVOICE_BATCH = 1000;
+
+/** La fecha de una factura no puede ser de un día que todavía no llegó. */
+export const INVOICE_DATE_IN_FUTURE_MESSAGE = "La fecha de la factura no puede ser posterior a hoy.";
 
 const MESSAGES = {
   ids: "Elegí al menos una venta.",

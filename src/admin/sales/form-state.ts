@@ -3,9 +3,22 @@
 // Vive aparte de las acciones porque un archivo `"use server"` solo puede
 // exportar funciones.
 
-/** El aviso cuando no hay dólar oficial para el día de cobro. */
+import { needsOwnRate, type Currency } from "@/admin/catalog";
+
+/** El aviso cuando no hay dólar oficial para el día de cobro (la venta es en dólares o en pesos). */
 export const RATE_UNAVAILABLE_MESSAGE =
   "No pudimos traer el dólar oficial; cargalo a mano.";
+
+/**
+ * El aviso de que no hay cotización oficial, con la moneda que de verdad falta:
+ * una venta en reales necesita la cotización del real y la del dólar, y el
+ * formulario pide las dos a mano; las demás solo necesitan el dólar.
+ */
+export function rateUnavailableMessage(currency: Currency): string {
+  return needsOwnRate(currency)
+    ? "No pudimos traer las cotizaciones oficiales del real y del dólar; cargalas a mano."
+    : RATE_UNAVAILABLE_MESSAGE;
+}
 
 export interface SaleFormState {
   /** Un mensaje por campo con problema, con los nombres de campo del formulario. */

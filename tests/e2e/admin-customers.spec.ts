@@ -133,6 +133,21 @@ test.describe("students", () => {
     await expect(row).toContainText("Sin compras");
   });
 
+  test("the saved notice goes away when a later save fails", async ({ page }) => {
+    await createStudent(page, { name: uniqueName("Dani aviso") });
+    const notice = page.getByRole("status").filter({ hasText: "Alumno guardado." });
+    await expect(notice).toBeVisible();
+    const form = studentForm(page);
+    await expect(form).toHaveAttribute("data-hydrated", "true");
+
+    // Un país que no es de dos letras: el guardado falla y el aviso de antes ya no es cierto.
+    await form.getByLabel("País").fill("12");
+    await page.getByRole("button", { name: "Guardar cambios" }).click();
+
+    await expect(page.getByText("El país va con 2 letras, como AR, BR o MX.")).toBeVisible();
+    await expect(notice).toHaveCount(0);
+  });
+
   test("a new student needs a name, and the messages are in spanish", async ({ page }) => {
     await page.goto("/admin/alumnos/nuevo");
     const form = studentForm(page);

@@ -1,7 +1,8 @@
-import { beforeAll, describe, expect, test } from "vitest";
+import { beforeAll, describe, expect, test, vi } from "vitest";
 import { markInvoiceNotRequired, markInvoiced } from "@/admin/billing/invoicing";
 import { CSV_HEADERS } from "@/admin/export/csv";
 import { billingExportResponse, salesExportResponse } from "@/admin/export/exports";
+import { exportErrorNotice } from "@/admin/export/notices";
 import { searchParamsRecord } from "@/admin/ui/search-params";
 import type { Db } from "@/db/client";
 import { parseCsv } from "../helpers/csv";
@@ -148,14 +149,57 @@ describe("salesExportResponse", () => {
     expect(rows).toHaveLength(31);
   });
 
-  test("refuses, without a file, when there are more sales than the limit", async () => {
+  test("with more sales than the limit it sends you back to the list, with a notice, and no file", async () => {
     const response = await salesExportResponse(db, new URLSearchParams(), NOW, { limit: 3 });
 
-    expect(response.status).toBe(413);
-    expect(response.headers.get("Content-Type")).toContain("text/plain");
+    expect(response.status).toBe(303);
+    expect(response.headers.get("Location")).toBe("/admin/ventas?exportacion=demasiadas");
     expect(response.headers.get("Content-Disposition")).toBeNull();
+    expect(response.headers.get("Content-Type")).toBeNull();
     expect(response.headers.get("Cache-Control")).toBe("no-store");
-    expect(await response.text()).toContain("Acotá las fechas");
+    expect(await response.text()).toBe("");
+  });
+
+  test("the way back keeps the filters, so the person finds the list as they left it", async () => {
+    const response = await salesExportResponse(db, new URLSearchParams("estado=paid&q=Export"), NOW, { limit: 1 });
+
+    const location = new URL(response.headers.get("Location") ?? "", "http://panel.test");
+    expect(location.pathname).toBe("/admin/ventas");
+    expect(Object.fromEntries(location.searchParams)).toEqual({ estado: "paid", q: "Export", exportacion: "demasiadas" });
+  });
+
+  test("when the database fails it sends you back too, in the panel, and logs the cause", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const broken = {
+      select: () => {
+        throw new Error("la base no contesta");
+      },
+    } as unknown as Db;
+
+    const response = await salesExportResponse(broken, new URLSearchParams(), NOW);
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("Location")).toBe("/admin/ventas?exportacion=error");
+    expect(error).toHaveBeenCalledTimes(1);
+    error.mockRestore();
+  });
+});
+
+describe("the notice of a download that did not happen", () => {
+  test("is in Spanish and says what to do", () => {
+    expect(exportErrorNotice("demasiadas")).toBe(
+      "Hay demasiadas ventas para un solo archivo. Acotá las fechas y probá de nuevo.",
+    );
+    expect(exportErrorNotice("error")).toBe("No pudimos preparar el archivo. Probá de nuevo en unos minutos.");
+  });
+
+  test("reads the first value of a repeated parameter and nothing for what it does not know", () => {
+    expect(exportErrorNotice(["error", "demasiadas"])).toBe(
+      "No pudimos preparar el archivo. Probá de nuevo en unos minutos.",
+    );
+    for (const value of [undefined, "", "otra-cosa", "__proto__", "constructor", "toString", "hasOwnProperty"]) {
+      expect(exportErrorNotice(value), String(value)).toBeNull();
+    }
   });
 });
 
@@ -223,6 +267,27 @@ describe("billingExportResponse", () => {
     );
 
     expect(response.status).toBe(200);
+  });
+
+  test("when it cannot be built it sends you back to Facturación, with a notice and no file", async () => {
+    const tooMany = await billingExportResponse(db, new URLSearchParams("desde=2026-01-01"), NOW, { limit: 1 });
+
+    expect(tooMany.status).toBe(303);
+    expect(tooMany.headers.get("Location")).toBe("/admin/facturacion?exportacion=demasiadas");
+    expect(tooMany.headers.get("Content-Disposition")).toBeNull();
+    expect(tooMany.headers.get("Cache-Control")).toBe("no-store");
+
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const broken = {
+      select: () => {
+        throw new Error("la base no contesta");
+      },
+    } as unknown as Db;
+    const failed = await billingExportResponse(broken, new URLSearchParams(), NOW);
+    error.mockRestore();
+
+    expect(failed.status).toBe(303);
+    expect(failed.headers.get("Location")).toBe("/admin/facturacion?exportacion=error");
   });
 });
 

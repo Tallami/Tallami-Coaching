@@ -72,10 +72,12 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
   )
 }
 
-function TableHead({ className, ...props }: React.ComponentProps<"th">) {
+/** Encabezado de columna: `scope="col"` salvo que se diga otra cosa (`scope="row"` en el de una fila). */
+function TableHead({ className, scope = "col", ...props }: React.ComponentProps<"th">) {
   return (
     <th
       data-slot="table-head"
+      scope={scope}
       className={cn(
         "h-11 px-3 text-left align-middle text-[0.875rem] font-bold whitespace-nowrap",
         className

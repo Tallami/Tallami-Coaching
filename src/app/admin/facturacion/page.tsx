@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { requireAdmin } from "@/admin/auth/require-admin";
 import { buildBilling } from "@/admin/billing/billing-data";
+import { exportErrorNotice } from "@/admin/export/notices";
 import { BillingView } from "@/admin/billing/billing-view";
-import { listUninvoicedSales } from "@/admin/billing/invoicing";
+import { countUninvoicedSales, listUninvoicedSales } from "@/admin/billing/invoicing";
 import { invoicingNotice } from "@/admin/billing/saved-notice";
 import { loadMetricSales } from "@/admin/metrics/load";
 import { getMonotributoSettings } from "@/admin/settings/read";
@@ -18,16 +19,20 @@ export const metadata: Metadata = { title: "Facturación" };
 export default async function BillingPage(props: PageProps<"/admin/facturacion">) {
   await requireAdmin();
   // El aviso de después de marcar viene de la dirección: lo que no se reconoce no muestra nada.
-  const notice = invoicingNotice(await props.searchParams);
+  const params = await props.searchParams;
+  const notice = invoicingNotice(params);
+  // Una descarga que no se pudo armar vuelve acá con el motivo en la dirección.
+  const exportError = exportErrorNotice(params.exportacion);
 
   const db = await getDb();
   const now = new Date();
-  const [uninvoiced, sales, settings] = await Promise.all([
+  const [uninvoiced, totals, sales, settings] = await Promise.all([
     listUninvoicedSales(db, now),
+    countUninvoicedSales(db, now),
     loadMetricSales(db, now),
     getMonotributoSettings(db),
   ]);
-  const data = buildBilling({ uninvoiced, sales, settings, now });
+  const data = buildBilling({ uninvoiced: { ...uninvoiced, totals }, sales, settings, now });
 
   return (
     <PanelShell active="billing">
@@ -38,6 +43,11 @@ export default async function BillingPage(props: PageProps<"/admin/facturacion">
       {notice ? (
         <Notice tone="ok" className="mb-5">
           {notice}
+        </Notice>
+      ) : null}
+      {exportError ? (
+        <Notice tone="error" className="mb-5">
+          {exportError}
         </Notice>
       ) : null}
       <BillingView data={data} invoiceAction={invoicingAction} />

@@ -48,6 +48,7 @@ export default async function StudentsPage(props: PageProps<"/admin/alumnos">) {
           pageSize={PAGE_SIZE}
           total={total}
           noun="alumnos"
+          singularNoun="alumno"
           hrefFor={(target) => `${ADMIN_ROUTES.students}${studentsQueryString(q, target)}`}
         />
       ) : null}

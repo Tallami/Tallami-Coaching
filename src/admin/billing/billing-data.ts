@@ -23,6 +23,7 @@ import {
   monotributoWindow,
   type MonotributoSettings,
 } from "@/admin/metrics/monotributo";
+import type { UninvoicedTotals } from "@/admin/metrics/pending";
 import { todayInArgentina, type DateRange } from "@/admin/metrics/period";
 import type { OverviewData } from "@/admin/overview/overview-data";
 import type { SaleRow } from "@/admin/sales/sale-row";
@@ -43,6 +44,12 @@ export interface BillingData {
     usdMinor: number;
     /** La lista se cortó: hay más ventas sin facturar que las que se muestran. */
     truncated: boolean;
+    /**
+     * La lista llega más atrás que la tabla de 12 meses (o está cortada y puede
+     * llegar): el "Sin facturar" de la tabla y esta lista cubren períodos
+     * distintos y la pantalla lo aclara.
+     */
+    reachesBeyondTwelveMonths: boolean;
   };
   /** Los últimos 12 meses, el actual primero. */
   months: MonthBilling[];
@@ -54,8 +61,13 @@ export interface BillingData {
 }
 
 export interface BillingInput {
-  /** Lo que se puede facturar (ver `listUninvoicedSales`). */
-  uninvoiced: { rows: readonly SaleRow[]; truncated: boolean };
+  /**
+   * Lo que se puede facturar (ver `listUninvoicedSales`). `totals` es el conteo
+   * aparte de TODO lo que se puede facturar (ver `countUninvoicedSales`): con él,
+   * la cantidad y los montos del encabezado no dependen de que la lista esté
+   * cortada. Sin él son los de las filas que llegaron.
+   */
+  uninvoiced: { rows: readonly SaleRow[]; truncated: boolean; totals?: UninvoicedTotals };
   /** Las ventas que leen las métricas (ver `loadMetricSales`). */
   sales: readonly MetricSale[];
   settings: MonotributoSettings | null;
@@ -67,15 +79,25 @@ export function buildBilling({ uninvoiced, sales, settings, now }: BillingInput)
   const groups = groupUninvoicedByMonth(uninvoiced.rows);
   const months = monthlyBilling(sales, BILLING_MONTHS, now);
   const window = monotributoWindow(now);
+  const oldestTableMonth = months[0]?.month;
+  const totals: UninvoicedTotals = uninvoiced.totals ?? {
+    count: sumMinor(groups.map((group) => group.count)),
+    arsMinor: sumMinor(groups.map((group) => group.arsMinor)),
+    usdMinor: sumMinor(groups.map((group) => group.usdMinor)),
+  };
   return {
     today,
     hasIncome: uninvoiced.rows.length > 0 || sales.some((sale) => isIncome(sale) && sale.paidOn <= today),
     uninvoiced: {
       groups,
-      count: sumMinor(groups.map((group) => group.count)),
-      arsMinor: sumMinor(groups.map((group) => group.arsMinor)),
-      usdMinor: sumMinor(groups.map((group) => group.usdMinor)),
+      count: totals.count,
+      arsMinor: totals.arsMinor,
+      usdMinor: totals.usdMinor,
       truncated: uninvoiced.truncated,
+      reachesBeyondTwelveMonths:
+        uninvoiced.truncated ||
+        (oldestTableMonth !== undefined &&
+          groups.some((group) => group.month < oldestTableMonth)),
     },
     months: [...months].reverse(),
     total: sumBilling(months),

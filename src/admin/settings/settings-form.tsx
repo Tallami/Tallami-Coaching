@@ -16,6 +16,7 @@ import {
 } from "@/admin/settings/form-state";
 import { MONOTRIBUTO_CATEGORIES } from "@/admin/settings/schema";
 import { Field } from "@/admin/ui/field";
+import { NoScriptNote } from "@/admin/ui/no-script-note";
 import { Notice } from "@/admin/ui/notice";
 import { useHydrated } from "@/admin/ui/use-hydrated";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,12 @@ export interface SettingsFormProps {
   footnote: ReactNode;
   /** Lo que va debajo de los campos: de dónde sale cada dato y el link a la tabla. */
   children?: ReactNode;
+  /**
+   * Lo que avisa un guardado que salió bien (lo trae la dirección después de
+   * guardar). Se ve mientras el formulario no recibe ninguna respuesta: si un
+   * guardado posterior falla, deja de mostrarse, porque ya no es cierto.
+   */
+  savedNotice?: ReactNode;
 }
 
 /**
@@ -41,7 +48,7 @@ export interface SettingsFormProps {
  * escrito. Al guardar, la acción redirige y la página pasa un `key` nuevo para
  * que el formulario vuelva a armarse con lo guardado.
  */
-export function SettingsForm({ action, initialValues, footnote, children }: SettingsFormProps) {
+export function SettingsForm({ action, initialValues, footnote, children, savedNotice }: SettingsFormProps) {
   const [values, setValues] = useState(initialValues);
   const [state, dispatch, isSaving] = useActionState(action, INITIAL_SETTINGS_FORM_STATE);
   const [, startTransition] = useTransition();
@@ -90,6 +97,7 @@ export function SettingsForm({ action, initialValues, footnote, children }: Sett
       data-hydrated={hydrated ? "true" : "false"}
       className="border-2 border-ink bg-white"
     >
+      {savedNotice && state === INITIAL_SETTINGS_FORM_STATE ? <Notice tone="ok">{savedNotice}</Notice> : null}
       <div ref={summaryRef} tabIndex={-1} className="outline-offset-0 empty:hidden">
         {state.formError ? (
           <Notice tone="error" className="border-l-8">
@@ -175,6 +183,7 @@ export function SettingsForm({ action, initialValues, footnote, children }: Sett
         <Button type="submit" disabled={!hydrated || isSaving}>
           {isSaving ? "Guardando…" : "Guardar configuración"}
         </Button>
+        <NoScriptNote />
         <p className="text-[0.9375rem] text-ink-2">{footnote}</p>
       </div>
     </form>

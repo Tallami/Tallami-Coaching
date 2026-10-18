@@ -17,6 +17,7 @@ import { INVOICE_TYPES } from "@/admin/catalog";
 import { sumMinor } from "@/admin/metrics/math";
 import { saleHref } from "@/admin/routes";
 import { Field } from "@/admin/ui/field";
+import { NoScriptNote } from "@/admin/ui/no-script-note";
 import { Notice } from "@/admin/ui/notice";
 import { useHydrated } from "@/admin/ui/use-hydrated";
 import { Badge } from "@/components/ui/badge";
@@ -376,6 +377,7 @@ export function UninvoicedList({ groups, today, action }: UninvoicedListProps) {
                   {...control}
                   type="date"
                   name="issuedOn"
+                  max={today}
                   value={values.issuedOn}
                   onChange={(event) => update({ issuedOn: event.target.value })}
                 />
@@ -396,6 +398,7 @@ export function UninvoicedList({ groups, today, action }: UninvoicedListProps) {
             >
               {isSaving ? "Guardando…" : "No requiere factura"}
             </Button>
+            <NoScriptNote />
           </div>
         </div>
       </div>

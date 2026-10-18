@@ -8,7 +8,6 @@ import { StudentHistory } from "@/admin/customers/student-history";
 import { StudentSummary } from "@/admin/customers/student-summary";
 import { ADMIN_ROUTES } from "@/admin/routes";
 import { EmptyState } from "@/admin/ui/empty-state";
-import { Notice } from "@/admin/ui/notice";
 import { PageHeader } from "@/admin/ui/page-header";
 import { firstValue } from "@/admin/ui/search-params";
 import { Button } from "@/components/ui/button";
@@ -69,11 +68,6 @@ export default async function StudentPage(props: PageProps<"/admin/alumnos/[id]"
           </Button>
         }
       />
-      {savedMessage ? (
-        <Notice tone="ok" className="mb-5">
-          {savedMessage}
-        </Notice>
-      ) : null}
       <StudentSummary student={student} />
       <div className="grid grid-cols-1 items-start gap-x-8 gap-y-8 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <StudentHistory sales={student.sales} />
@@ -84,6 +78,7 @@ export default async function StudentPage(props: PageProps<"/admin/alumnos/[id]"
           action={updateStudentAction.bind(null, student.id)}
           initialValues={formValues}
           cancelHref={ADMIN_ROUTES.students}
+          savedNotice={savedMessage}
         />
       </div>
     </PanelShell>

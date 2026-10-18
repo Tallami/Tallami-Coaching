@@ -27,6 +27,16 @@ interface SalesTableProps {
 
 const numberCell = "text-right whitespace-nowrap tabular-nums";
 
+/**
+ * El nombre accesible del enlace de una fila, que abre la venta para editarla:
+ * un lector de pantalla lista los enlaces de la página y "Ana Pérez" repetido
+ * en varias filas no dice cuál es cuál. Contiene el texto visible (el nombre).
+ */
+function editLabel(sale: SaleRow): string {
+  const when = sale.paidOn ? `del ${formatDay(sale.paidOn)}` : "(sin fecha de cobro)";
+  return `Editar venta de ${sale.customerName} ${when}`;
+}
+
 /** La lista de ventas. Si es más ancha que la pantalla, se desplaza dentro de su recuadro. */
 export function SalesTable({ rows, hasFilters }: SalesTableProps) {
   if (rows.length === 0) {
@@ -85,6 +95,7 @@ export function SalesTable({ rows, hasFilters }: SalesTableProps) {
               <TableCell>
                 <Link
                   href={saleHref(sale.id)}
+                  aria-label={editLabel(sale)}
                   prefetch={false}
                   className="rounded-[2px] font-bold underline decoration-ink-2/50 underline-offset-4 hover:decoration-ink"
                 >
