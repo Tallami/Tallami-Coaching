@@ -19,6 +19,7 @@ import { saleHref } from "@/admin/routes";
 import { Field } from "@/admin/ui/field";
 import { NoScriptNote } from "@/admin/ui/no-script-note";
 import { Notice } from "@/admin/ui/notice";
+import { PhoneSummary } from "@/admin/ui/phone-summary";
 import { useHydrated } from "@/admin/ui/use-hydrated";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -114,21 +115,30 @@ function SaleRowView({
           onChange={onToggle}
         />
       </TableCell>
-      <TableCell className="whitespace-nowrap">{row.paidOn}</TableCell>
-      <TableCell>
-        <Link
-          href={saleHref(row.id)}
-          prefetch={false}
-          className="rounded-[2px] font-bold underline decoration-ink-2/50 underline-offset-4 hover:decoration-ink"
-        >
-          {row.customerName}
-        </Link>
-        {row.customerDiscord || row.customerCountry ? (
-          <div className="mt-0.5 flex items-center gap-2 text-[0.875rem] text-ink-2">
-            {row.customerDiscord ? <span>{row.customerDiscord}</span> : null}
-            {row.customerCountry ? <Badge variant="outline">{row.customerCountry}</Badge> : null}
-          </div>
-        ) : null}
+      <TableCell className="whitespace-nowrap narrow:px-2">{row.paidOn}</TableCell>
+      <TableCell className="narrow:px-2">
+        {/*
+          En el celular esta celda trae también el servicio y el monto (ver PhoneSummary) y tiene que
+          entrar entera en lo que se ve de la tabla (unos 300 px, con la casilla y la fecha): el
+          recuadro interior fija su ancho y parte las palabras largas (un Discord) en lugar de
+          ensancharla. Con 900 px o más no hace nada.
+        */}
+        <div className="narrow:w-[8rem] narrow:[overflow-wrap:anywhere]">
+          <Link
+            href={saleHref(row.id)}
+            prefetch={false}
+            className="rounded-[2px] font-bold underline decoration-ink-2/50 underline-offset-4 hover:decoration-ink"
+          >
+            {row.customerName}
+          </Link>
+          {row.customerDiscord || row.customerCountry ? (
+            <div className="mt-0.5 flex items-center gap-2 text-[0.875rem] text-ink-2 narrow:flex-wrap">
+              {row.customerDiscord ? <span>{row.customerDiscord}</span> : null}
+              {row.customerCountry ? <Badge variant="outline">{row.customerCountry}</Badge> : null}
+            </div>
+          ) : null}
+          <PhoneSummary service={row.item} amount={row.charged} />
+        </div>
       </TableCell>
       <TableCell>
         <span className="font-semibold">{row.item}</span>

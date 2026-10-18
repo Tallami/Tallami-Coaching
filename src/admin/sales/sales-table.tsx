@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { ITEM_LABELS, PAYMENT_LABELS } from "@/admin/catalog";
+import { ITEM_LABELS, PAYMENT_LABELS, STATUS_LABELS } from "@/admin/catalog";
 import { formatDay } from "@/admin/dates";
 import { ADMIN_ROUTES, saleHref } from "@/admin/routes";
 import type { SaleRow } from "@/admin/sales/repository";
 import { InvoiceStatusBadge, SaleStatusBadge } from "@/admin/sales/status-badge";
 import { EmptyState } from "@/admin/ui/empty-state";
+import { PhoneSummary } from "@/admin/ui/phone-summary";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -93,20 +94,33 @@ export function SalesTable({ rows, hasFilters }: SalesTableProps) {
                 )}
               </TableCell>
               <TableCell>
-                <Link
-                  href={saleHref(sale.id)}
-                  aria-label={editLabel(sale)}
-                  prefetch={false}
-                  className="rounded-[2px] font-bold underline decoration-ink-2/50 underline-offset-4 hover:decoration-ink"
-                >
-                  {sale.customerName}
-                </Link>
-                {sale.customerDiscord || sale.customerCountry ? (
-                  <div className="mt-0.5 flex items-center gap-2 text-[0.875rem] text-ink-2">
-                    {sale.customerDiscord ? <span>{sale.customerDiscord}</span> : null}
-                    {sale.customerCountry ? <Badge variant="outline">{sale.customerCountry}</Badge> : null}
-                  </div>
-                ) : null}
+                {/*
+                  En el celular esta celda trae también el servicio, el monto y el estado (ver
+                  PhoneSummary) y tiene que entrar entera en lo que se ve de la tabla: el recuadro
+                  interior fija su ancho y parte las palabras largas (un Discord) en lugar de
+                  ensancharla. Con 900 px o más no hace nada.
+                */}
+                <div className="narrow:w-[11rem] narrow:[overflow-wrap:anywhere]">
+                  <Link
+                    href={saleHref(sale.id)}
+                    aria-label={editLabel(sale)}
+                    prefetch={false}
+                    className="rounded-[2px] font-bold underline decoration-ink-2/50 underline-offset-4 hover:decoration-ink"
+                  >
+                    {sale.customerName}
+                  </Link>
+                  {sale.customerDiscord || sale.customerCountry ? (
+                    <div className="mt-0.5 flex items-center gap-2 text-[0.875rem] text-ink-2 narrow:flex-wrap">
+                      {sale.customerDiscord ? <span>{sale.customerDiscord}</span> : null}
+                      {sale.customerCountry ? <Badge variant="outline">{sale.customerCountry}</Badge> : null}
+                    </div>
+                  ) : null}
+                  <PhoneSummary
+                    service={ITEM_LABELS[sale.item]}
+                    amount={formatMoney(sale.amountMinor, sale.currency)}
+                    status={STATUS_LABELS[sale.status]}
+                  />
+                </div>
               </TableCell>
               <TableCell>
                 <span className="font-semibold">{ITEM_LABELS[sale.item]}</span>

@@ -163,7 +163,7 @@ function readFocusRing(): FocusReading | null {
   const style = getComputedStyle(element);
   const ring = toRgba(style.outlineColor);
   const [lighter, darker] = [luminance(ring), luminance(backdrop)].sort((a, b) => b - a);
-  const text = (element.getAttribute("aria-label") ?? element.textContent ?? "").trim().replace(/s+/g, " ");
+  const text = (element.getAttribute("aria-label") ?? element.textContent ?? "").trim().replace(/\s+/g, " ");
   const type = element.getAttribute("type");
   const name = element.getAttribute("name") ?? element.id;
   element.dataset.focusAuditSeq ??= String(document.querySelectorAll("[data-focus-audit-seq]").length);
@@ -314,6 +314,49 @@ test.describe("panel details with the demo data", () => {
     // Unos 65 caracteres por renglón (`max-w-prose`, ~635 px acá); sin tope eran ~700 px (el ancho de la tarjeta).
     expect(Math.max(...widths)).toBeLessThanOrEqual(660);
   });
+
+  for (const [name, region] of [
+    ["Ventas", "Ventas"],
+    ["Facturación", "Ventas sin facturar"],
+  ] as const) {
+    test(`on the phone the first row of ${name} shows its service and amount without scrolling the table`, async ({ page }) => {
+      const target = PANEL_PAGES.find((candidate) => candidate.name === name);
+      if (!target) throw new Error(`No hay una pantalla ${name}.`);
+      await openPanelPage(page, target, PHONE_WIDTH);
+
+      const table = page.getByRole("region", { name: region });
+      const summary = table.getByTestId("phone-summary").first();
+      const amount = table.getByTestId("phone-amount").first();
+      await expect(summary).toBeVisible();
+      await expect(amount).toBeVisible();
+      // La misma línea ya la dicen las columnas: los lectores de pantalla no la leen dos veces.
+      await expect(summary).toHaveAttribute("aria-hidden", "true");
+      await expect(amount).toHaveText(/^(USD|\$|R\$|USDT) [\d.]+,\d{2}$/);
+
+      // Todo entra en la parte de la tabla que se ve de entrada: ni el monto ni el nombre quedan detrás del desplazamiento.
+      const tableBox = await table.boundingBox();
+      const amountBox = await amount.boundingBox();
+      const nameBox = await table.locator("tbody a").first().boundingBox();
+      const summaryBox = await summary.boundingBox();
+      for (const box of [amountBox, nameBox, summaryBox]) {
+        expect(box).not.toBeNull();
+        if (!box || !tableBox) return;
+        expect(box.x).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width).toBeLessThanOrEqual(PHONE_WIDTH);
+        expect(box.x + box.width).toBeLessThanOrEqual(tableBox.x + tableBox.width + 0.5);
+      }
+      // Y la tabla sigue desplazándose por dentro: la página no.
+      expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+    });
+
+    test(`that line is only for the phone: at 1440 px ${name} shows the columns and not the line`, async ({ page }) => {
+      const target = PANEL_PAGES.find((candidate) => candidate.name === name);
+      if (!target) throw new Error(`No hay una pantalla ${name}.`);
+      await openPanelPage(page, target, DESKTOP_WIDTH);
+
+      await expect(page.getByRole("region", { name: region }).getByTestId("phone-summary").first()).toBeHidden();
+    });
+  }
 
   test("the edit link of each sale has its own name", async ({ page }) => {
     await openPanelPage(page, PANEL_PAGES[1], DESKTOP_WIDTH);

@@ -99,6 +99,42 @@ describe("SalesTable", () => {
     expect(markup).toMatch(/aria-label="[^"]*Ana Pérez[^"]*"[^>]*>Ana Pérez<\/a>/);
   });
 
+  describe("the line for the phone", () => {
+    /** La línea del celular de cada fila: sus clases y su texto sin etiquetas. */
+    function summaries(markup: string): { className: string; text: string }[] {
+      return [...markup.matchAll(/<p aria-hidden="true" data-testid="phone-summary" class="([^"]*)">(.*?)<\/p>/g)].map(
+        ([, className, inner]) => ({ className, text: inner.replace(/<[^>]+>/g, "") }),
+      );
+    }
+
+    test("the student cell says the service, the amount and the status, for screens up to 900 px only", () => {
+      const [line] = summaries(render([ROW]));
+
+      expect(line.text).toBe("Plan de juego personalizado · USD 120,00 · Cobrada");
+      expect(line.className).toMatch(/\bhidden\b/);
+      expect(line.className).toContain("narrow:block");
+    });
+
+    test("is hidden from screen readers, because the columns already say it", () => {
+      expect(render([ROW])).toContain('<p aria-hidden="true" data-testid="phone-summary"');
+    });
+
+    test("writes the amount in the currency that was charged, and the status of a sale not collected yet", () => {
+      const [line] = summaries(
+        render([{ ...ROW, currency: "BRL", amountMinor: 10000, status: "pending", paidOn: null }]),
+      );
+
+      expect(line.text).toBe("Plan de juego personalizado · R$ 100,00 · Pendiente");
+    });
+
+    test("there is one line per row, inside the student cell", () => {
+      const markup = render([ROW, { ...ROW, id: "3f4f3f64-7c5c-4a43-9d4c-3f6a3a2f1b10" }]);
+
+      expect(summaries(markup)).toHaveLength(2);
+      expect(markup).toMatch(/<td[^>]*><div class="[^"]*narrow:w-\[11rem\][^"]*"><a [^>]*>Ana Pérez<\/a>[\s\S]*?phone-summary/);
+    });
+  });
+
   test("every column header says it heads a column", () => {
     const markup = render([ROW]);
     const headers = markup.match(/<th [^>]*>/g) ?? [];
