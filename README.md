@@ -25,10 +25,10 @@ La web queda en http://localhost:3000 (redirige a `/es`, `/pt` o `/en` según el
 | `npm run lint` | ESLint |
 | `npm run typecheck` | TypeScript sin emitir archivos (corré antes `npm run build` o `npx next typegen`) |
 | `npm run test` | Tests unitarios (Vitest) |
-| `npm run test:e2e` | Tests end to end (Playwright), en dos tandas: la web en el puerto 3100 (hace el build) y el resumen y Servicios del panel con datos de ejemplo en el 3101 (reutiliza ese build). `test:e2e:main` y `test:e2e:demo` corren cada una por separado (la segunda siempre arma el build antes) |
+| `npm run test:e2e` | Tests end to end (Playwright), en dos tandas: la web en el puerto 3100 (hace el build) y las pantallas del panel que se prueban con datos de ejemplo (resumen, Servicios, Facturación y la calidad de todo el panel: accesibilidad, scroll y teclado) en el 3101 (reutiliza ese build). `test:e2e:main` y `test:e2e:demo` corren cada una por separado (la segunda siempre arma el build antes) |
 | `npm run db:generate` | Genera en `drizzle/` la migración SQL de los cambios hechos en `src/db/schema.ts` (la migración se sube al repo) |
 | `npm run db:migrate` | Aplica las migraciones de `drizzle/` a la base de `DATABASE_URL` (Supabase); sin esa variable avisa en español y no hace nada. La base local (PGlite) se migra sola al abrirse. Todas las tablas llevan RLS activada y sin políticas (la Data API de Supabase no ve nada; la app se conecta como dueño de las tablas): toda tabla nueva termina en `.enableRLS()` en `src/db/schema.ts` y un test lo exige |
-| `npm run db:seed:demo` | Carga en la base local (PGlite) 25 alumnos, unas 120 ventas y unos 750 clics en "Reservar" ficticios de los últimos 14 meses, para ver el resumen y Servicios con números. Se niega a correr si hay `DATABASE_URL`; se puede repetir (refresca las fechas) |
+| `npm run db:seed:demo` | Carga en la base local (PGlite) 25 alumnos, unas 120 ventas y unos 750 clics en "Reservar" ficticios de los últimos 14 meses, para ver el resumen y Servicios con números. Se niega a correr si hay `DATABASE_URL`; se puede repetir (refresca las fechas). Con `npm run db:seed:demo -- --clear` los borra, y nada más |
 | `npm run admin:password` | Genera el hash de la contraseña del panel (`ADMIN_PASSWORD_HASH`) y un secreto para las sesiones (`ADMIN_SESSION_SECRET`). Ver "Panel de admin" |
 | `npm run players:photo -- <usuario>` | Baja la foto de perfil de X de un jugador a `src/assets/players/` |
 | `npm run tweets:record -- <id> [<id> …]` | Guarda la respuesta de X de uno o más tweets en `src/content/tweet-snapshots/` y rehace su índice (necesita internet) |
@@ -87,6 +87,98 @@ El panel privado de Tallami vive en `/admin` (solo en español, fuera de los idi
 
 Localmente entrá por `http://localhost:3000/admin`, no por la IP de tu red: la cookie de sesión lleva `Secure` en cualquier dirección que no sea `localhost`, y el navegador no la guarda sobre http.
 
+### Usarlo en tu compu
+
+Una vez que hiciste lo de "Dejarlo listo" (la contraseña y el secreto en `.env.local`):
+
+1. Corré `npm run dev` y abrí `http://localhost:3000/admin`.
+2. Entrá con tu contraseña.
+
+No hace falta ninguna cuenta ni internet: el panel guarda todo en una base de datos que corre dentro de tu propia compu.
+
+- **La base.** Se llama PGlite (es Postgres, pero adentro de Node) y vive en la carpeta `.data/pglite` del proyecto. La crea sola la primera vez que abrís el panel. Esa carpeta no se sube a GitHub: lo que cargues acá queda solo en esta compu. Para hacer una copia, cerrá el panel y copiá la carpeta.
+- **Empezar de cero.** Cerrá `npm run dev`, borrá la carpeta `.data/pglite` y volvé a abrirlo: la base vuelve a crearse vacía.
+- **Verlo con datos.** `npm run db:seed:demo` carga alumnos, ventas y clics ficticios ("Alumno de prueba 1", "Alumno de prueba 2"…) para que el resumen y los gráficos tengan números. Cerrá `npm run dev` antes de correrlo: la base local no admite dos programas a la vez. Se puede repetir las veces que quieras.
+- **Sacar los datos de ejemplo.** `npm run db:seed:demo -- --clear` borra los alumnos, las ventas y los clics de ejemplo y nada más: lo que cargaste a mano, el monotributo y los clics reales quedan como están. Si cargaste una venta tuya a un alumno de ejemplo, ese alumno no se borra y el comando te avisa cuál es.
+
+Estos dos comandos se niegan a correr si hay una `DATABASE_URL` definida: los datos de ejemplo nunca van a la base de Supabase.
+
+### El día a día
+
+| Pantalla | Qué ves |
+| --- | --- |
+| Resumen | Cuánto cobraste en el período que elijas contra el anterior, por mes, por servicio, por medio de pago y por país, lo que tenés pendiente (entregas, sesiones, ventas sin facturar) y cuánto del tope del monotributo llevás usado |
+| Ventas | Todas las ventas, con filtros y búsqueda por alumno; desde acá cargás y editás ventas y exportás el CSV |
+| Servicios | Cada servicio con sus ventas, ingresos, tendencia, clics en "Reservar" y conversión |
+| Alumnos | Cada alumno con lo que compró y su historial; desde acá los cargás y los editás |
+| Facturación | Lo cobrado que todavía no facturaste, lo cobrado y facturado mes a mes, el monotributo y el CSV para el contador |
+| Configuración | La categoría del monotributo y su tope |
+
+**Cargar una venta.** En "Ventas" tocá "Nueva venta" (o "Cargar una venta" en el Resumen). Elegí el alumno (uno que ya está o uno nuevo) y el servicio: el monto se completa con el precio de lista en dólares y lo podés cambiar. Completá la moneda (dólar, peso, real o USDT), el medio de pago, el estado y la fecha de cobro.
+
+- **Tipo de cambio.** Con "Automático (BCRA)" el panel usa la última cotización oficial del día de cobro o de antes (si fue fin de semana o feriado, la del último día hábil). Con "Manual" escribís vos los pesos por dólar (y por real, si cobraste en reales). Si el BCRA no contesta, el formulario te pide el valor a mano y la venta se guarda igual. El USDT cuenta como dólar. Confirmá con tu contador qué tipo de cambio corresponde.
+- **Estados.** "Pendiente" es una venta que todavía no cobraste; "Cobrada" y "Entregada" son ventas cobradas; "Cancelada" es una que no se concretó y "Reembolsada", una en la que devolviste la plata. Las ventas no se borran: si no se dio, pasala a cancelada o reembolsada y queda en el historial.
+- **Qué cuenta como ingreso.** Solo las ventas "Cobrada" y "Entregada", y en el día de su fecha de cobro (no el día que entregaste ni el que facturaste). Las pendientes, canceladas y reembolsadas no suman en ningún número del panel, y una venta con fecha de cobro futura recién suma ese día.
+
+**Marcar facturas.** El panel no emite facturas: vos las hacés en ARCA y acá anotás las que ya hiciste. En "Facturación", "Por facturar" lista lo cobrado que falta, agrupado por mes de cobro.
+
+1. Elegí una venta, varias o un mes entero con las casillas.
+2. Elegí el tipo de factura (C o E), escribí el número como figura en ARCA (por ejemplo `00003-00000045`) y la fecha de la factura (no puede ser de un día que todavía no llegó).
+3. Tocá "Marcar como facturadas". Una misma factura puede cubrir varias ventas.
+
+"No requiere factura" saca las ventas elegidas de la lista sin anotar ninguna factura (con más de 5 pide confirmar). Si te equivocaste, abrí la venta en "Ventas" y tocá "Volver a pendiente" (borra los datos de la factura y la podés marcar de nuevo; solo en ventas cobradas o entregadas). Una factura ya emitida en ARCA se anula allá, con una nota de crédito.
+
+**Monotributo.** En "Configuración" cargá la categoría (de la A a la K), el tope anual en pesos y desde cuándo rige, copiándolos de la [tabla vigente de ARCA](https://www.arca.gob.ar/monotributo/categorias.asp). El panel suma lo cobrado en pesos en los últimos 12 meses (por fecha de cobro) y lo compara con el tope que cargaste: te dice qué porcentaje llevás usado y cuánto te queda. No consulta ARCA ni verifica nada, y **no es asesoramiento impositivo: confirmalo con tu contador**.
+
+### CSV para el contador
+
+Hay dos descargas: "Exportar para el contador" en Facturación (lo cobrado, por defecto los 12 meses del monotributo, que se puede filtrar por estado de factura) y "Exportar CSV" en Ventas (lo que muestran los filtros de la lista, con ventas de todos los estados). Si el archivo no se puede armar, el panel te devuelve a la pantalla con un aviso.
+
+El archivo usa `;` como separador y coma decimal (`1234,56`), las fechas van como `dd/mm/aaaa` y viene en UTF-8 con BOM: se abre con doble clic en Excel en español, con los acentos bien. Tiene estas 19 columnas:
+
+| Columna | Qué es |
+| --- | --- |
+| Fecha de cobro | El día que cobraste |
+| Alumno | Su nombre |
+| País | Código de 2 letras (AR, BR, MX…) |
+| Servicio | Qué se vendió |
+| Descripción | El detalle, para las ventas "Otro" |
+| Moneda | En la que cobraste (USD, ARS, BRL, USDT) |
+| Monto | Lo que cobraste, en esa moneda |
+| Pesos | Lo cobrado, en pesos |
+| Dólares | Lo cobrado, en dólares |
+| Tipo de cambio | Pesos por unidad de la moneda cobrada (1 si cobraste en pesos): Monto × Tipo de cambio = Pesos |
+| Cotización del dólar | Pesos por dólar: Pesos ÷ Cotización del dólar = Dólares |
+| Fuente | De dónde salió el tipo de cambio: "BCRA (oficial)" o "cargado a mano" |
+| Fecha de cotización | El día de la cotización oficial que se usó (puede ser anterior al cobro: fin de semana o feriado); vacía si lo cargaste a mano |
+| Medio de pago | Mercado Pago, Pix, PayPal, cripto, transferencia, efectivo u otro |
+| Estado | El de la venta (Cobrada, Entregada…) |
+| Factura | "Sin facturar", "Facturada" o "No requiere" |
+| Tipo | Tipo de la factura (C o E) |
+| Número | Número de la factura |
+| Fecha de factura | El día de la factura |
+
+Un texto que empieza con `=`, `+`, `-` o `@` sale con un apóstrofo adelante: así Excel no lo toma por una fórmula.
+
+Si Excel te cambia el formato de la columna "Número" (por ejemplo le saca los ceros de adelante), no abras el archivo con doble clic: en Excel andá a Datos → Desde texto/CSV, elegí el archivo y, en la vista previa, poné esa columna como "Texto" antes de cargar.
+
+### Ponerlo en línea
+
+Para que el panel funcione en internet (en Vercel) la base no puede ser la local: usa Supabase. Una sola vez:
+
+1. **Crear la base.** En [supabase.com](https://supabase.com) creá un proyecto nuevo, con la región São Paulo (la más cercana a Argentina y Brasil).
+2. **Copiar la conexión.** En el proyecto, tocá "Connect", elegí "Transaction pooler" y copiá la cadena de conexión (completá `[YOUR-PASSWORD]` con la contraseña de la base). Es el valor de `DATABASE_URL`. Tiene que ser la del pooler de transacciones (puerto 6543): la web corre en Vercel y abre muchas conexiones cortas.
+3. **Crear las tablas.** En tu compu, en una terminal, definí esa variable solo para ese comando y corré `npm run db:migrate`: en PowerShell, `$env:DATABASE_URL="la cadena"; npm run db:migrate`; en Git Bash, `DATABASE_URL="la cadena" npm run db:migrate`. Si la contraseña tiene símbolos (`@`, `:`, `/`, `#`…) la cadena no funciona tal cual: cambiala por una sin símbolos. Hay que repetirlo después de cada migración nueva que se suba al repo (carpeta `drizzle/`); sin `DATABASE_URL` el comando avisa y no hace nada.
+4. **Usar el rol dueño de las tablas.** La cadena del paso 2 entra como el usuario `postgres` (en el pooler se escribe `postgres.` y el código de tu proyecto), que es el dueño de las tablas: dejala así. Todas las tablas tienen la seguridad por filas (RLS) activada y sin políticas, para que la API pública de Supabase no vea nada; el dueño es el único que pasa, así que con otro rol el panel no podría leer ni escribir.
+5. **Cargar las variables en Vercel.** En el proyecto, Settings → Environment Variables: las tres de "Dejarlo listo" (`ADMIN_PASSWORD_HASH`, `ADMIN_SESSION_SECRET` y `DATABASE_URL`). Volvé a desplegar y entrá a `/admin`.
+
+Dos protecciones más, que se hacen en los paneles de Vercel y Supabase:
+
+- **Límite de pedidos para los clics (Firewall de Vercel).** Es la defensa de verdad contra alguien que le pegue sin parar a `POST /api/interest`: la app tiene sus propios topes, pero cada pedido descartado igual le da trabajo a la base. En el proyecto de Vercel: Firewall → Configure → New Rule. Ponele un nombre; en "If" agregá "Request Path" igual a `/api/interest` y "Request Method" igual a `POST`; en "Then" elegí "Rate Limit" con "Fixed Window", un tiempo de 60 segundos y un límite de 30 pedidos (lo mismo que el tope propio de la app por visitante), contando por IP; dejá la acción por defecto (429). Guardá con "Save Rule" y publicá con "Review Changes" → "Publish". La primera vez Vercel muestra su cuadro de precios del límite de pedidos: leelo antes de seguir. El detalle está en la [guía oficial](https://vercel.com/docs/vercel-firewall/vercel-waf/rate-limiting).
+- **Alerta de uso de la base (Supabase).** El panel guarda poco (ventas, alumnos y clics, que se borran a los 400 días), pero conviene enterarse si algo crece de más: Supabase avisa por mail a la dirección de facturación cuando se pasa de la cuota del plan, y en su panel hay una página de uso ("Usage") con el tamaño de la base y la transferencia. Mirá ese uso de vez en cuando; la guía oficial se llama [Manage your usage](https://supabase.com/docs/guides/platform/manage-your-usage).
+
+**Respaldo.** Supabase hace una copia diaria de la base en los planes pagos (en el plan Pro, de los últimos 7 días; se ven en Database → Backups). En el plan gratis no hay copias automáticas: Supabase recomienda exportar los datos cada tanto (con `supabase db dump`, ver su [guía de backups](https://supabase.com/docs/guides/platform/backups)). Como ayuda extra, descargá el CSV de Ventas de vez en cuando y guardalo: tiene todas las ventas con sus montos y su factura (no es un respaldo completo: no trae los alumnos sin compras ni sus notas, ni los clics).
+
 ### Cómo se protege
 
 | Qué | Cómo |
@@ -107,7 +199,7 @@ Los botones de reserva del sitio público (`BookingLink`, `src/components/home/b
 | Cuerpo | JSON `{ item, locale }`: `item` de `INTEREST_ITEMS` (`src/admin/catalog.ts`, todo menos "Otro") y `locale` `es`, `pt` o `en`. Cualquier otro campo o valor es un 400; sin eco de lo recibido |
 | Respuestas | `204` guardado (y también aceptado y descartado), `400` inválido, `413` más de 1 KB, `415` si el `Content-Type` no es `application/json` (el aviso del sitio siempre lo manda; así no entra un POST entre sitios sin CORS), `429` con `Retry-After: 60`, `405` otros métodos; siempre `Cache-Control: no-store` |
 | Descartes (204 sin guardar) | Bots por `user-agent` (lista corta en `src/admin/interest/bots.ts`), tope global superado (por minuto o por hora; se cuenta por día y Servicios lo muestra), y sin `ADMIN_SESSION_SECRET` o sin base configurada: el sitio público nunca se rompe por esto |
-| Límites | 30 eventos por minuto por visitante, 200 por minuto y 2.000 por hora entre todos (pasado un tope global, descarte en silencio: acota lo que puede escribir quien rote IPs). Cada descarte global suma uno al día en `interest_drops` y la página Servicios dice "N clics descartados por exceso" si hubo en el período. El visitante es la IPv4 o el /64 de la IPv6 (una IPv4 escrita como `::ffff:a.b.c.d` cuenta como esa IPv4); ver `src/admin/interest/ip-key.ts` |
+| Límites | 30 eventos por minuto por visitante, 200 por minuto y 2.000 por hora entre todos (pasado un tope global, descarte en silencio: acota lo que puede escribir quien rote IPs). Cada descarte global suma uno al día en `interest_drops` y la página Servicios dice "N clics descartados por exceso" si hubo en el período. El visitante es la IPv4 o el /64 de la IPv6 (una IPv4 escrita como `::ffff:a.b.c.d` cuenta como esa IPv4); ver `src/admin/net/ip-key.ts`. Los topes son una red de seguridad: cada pedido descartado igual le da trabajo a la base, así que la defensa de verdad contra un abuso sostenido es la regla del Firewall de Vercel sobre `POST /api/interest` (ver "Ponerlo en línea") |
 | Privacidad | Se guarda un HMAC de la clave del visitante con la fecha de Argentina (nunca la IP): el mismo visitante tiene otro hash cada día, así que las filas no se pueden vincular entre días ni con `login_attempts`. A medianoche el cupo por minuto vuelve a empezar |
 | Retención | Los clics se borran a los 400 días (más que cualquier período que muestra el panel). La limpieza es oportunista: al guardar un clic, como mucho una vez por hora por proceso (`src/admin/interest/retention.ts`) |
 | País | Del encabezado `x-vercel-ip-country`, solo si son dos letras mayúsculas |
@@ -117,7 +209,11 @@ Los botones de reserva del sitio público (`BookingLink`, `src/components/home/b
 
 `npm run test:e2e` arranca el servidor con una contraseña y un secreto de prueba (`tests/helpers/admin-server.ts`), una base PGlite vacía en una carpeta temporal que se borra al iniciar, y `EXCHANGE_RATE_SOURCE=fixed` (cotizaciones fijas, sin llamar al BCRA; en producción de Vercel esa variable se ignora). Cada test navega con su propia IP, así los bloqueos de uno no afectan a los otros.
 
-Los tests que verifican totales (`tests/e2e/admin-overview.spec.ts` y `tests/e2e/admin-services-demo.spec.ts`) corren aparte, con `playwright.demo.config.ts`: un segundo servidor en el puerto 3101, con el mismo build y su propia base PGlite que se siembra con `buildDemoData(hoy en Argentina)` antes de arrancar (`src/admin/demo-data.ts`). Nadie escribe en esa base, así los números esperados salen de los mismos datos con las mismas funciones que usa la página. `npm run test:e2e:demo` arma el build y corre solo esa tanda; con `npm run test:e2e` el build lo arma la primera.
+Los tests que verifican totales o que necesitan tablas y gráficos con datos (`admin-overview`, `admin-services-demo`, `admin-billing-demo` y `admin-quality`, en `tests/e2e/`) corren aparte, con `playwright.demo.config.ts`: un segundo servidor en el puerto 3101, con el mismo build y su propia base PGlite que se siembra con `buildDemoData(hoy en Argentina)` antes de arrancar (`src/admin/demo-data.ts`). Nadie escribe en esa base, así los números esperados salen de los mismos datos con las mismas funciones que usa la página. `npm run test:e2e:demo` arma el build y corre solo esa tanda; con `npm run test:e2e` el build lo arma la primera.
+
+`tests/e2e/admin-quality.spec.ts` recorre todas las pantallas del panel (también el login y la página de "falta configurar") a 375, 768 y 1440 px: axe sin violaciones serias ni críticas, sin scroll horizontal de la página, el menú lateral y el del celular con el teclado, y un recorrido con Tab que mide que todo lo que se puede enfocar tenga un aro visible con contraste de al menos 3:1.
+
+Los tests unitarios (`npm run test`) crean cada base de prueba clonando una base ya migrada (`tests/helpers/db.ts`), y `vitest.config.ts` sube el tiempo máximo de cada test a 30 segundos: con la máquina cargada, abrir la base o lanzar un script tardaba más que los 5 segundos de Vitest aunque nada estuviera roto.
 
 ## Deploy (Vercel)
 
