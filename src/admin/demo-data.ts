@@ -86,11 +86,20 @@ const SALES_PER_PAST_MONTH = [3, 4, 4, 5, 6, 6, 7, 7, 8, 8, 9, 10, 10] as const;
 const SALES_IN_FULL_CURRENT_MONTH = 12;
 const MIN_SALES_IN_CURRENT_MONTH = 2;
 
+/**
+ * Los ids de ejemplo tienen un principio fijo que ningún id al azar (uuid v4) de
+ * un alumno o una venta reales puede tener: así se reconocen para reemplazarlos
+ * o para borrarlos (`scripts/seed-demo.ts`), sin importar de qué día se cargaron
+ * (cada día trae una cantidad distinta de ventas).
+ */
+export const DEMO_CUSTOMER_ID_PREFIX = "de000000-0000-4000-8000-";
+export const DEMO_SALE_ID_PREFIX = "de100000-0000-4000-8000-";
+
 function indexedId(prefix: string, index: number): string {
-  return `${prefix}-0000-4000-8000-${String(index).padStart(12, "0")}`;
+  return `${prefix}${String(index).padStart(12, "0")}`;
 }
-const customerId = (index: number) => indexedId("de000000", index);
-const saleId = (index: number) => indexedId("de100000", index);
+const customerId = (index: number) => indexedId(DEMO_CUSTOMER_ID_PREFIX, index);
+const saleId = (index: number) => indexedId(DEMO_SALE_ID_PREFIX, index);
 
 function buildCustomers(): DemoCustomer[] {
   return STUDENTS.map(({ country }, index) => ({
