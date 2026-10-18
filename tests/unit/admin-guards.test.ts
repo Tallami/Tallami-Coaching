@@ -15,6 +15,7 @@ import {
 // empiece con `await requireAdmin();`, o sea antes de cualquier acceso a la base.
 
 const IMPORT = 'import { requireAdmin } from "@/admin/auth/require-admin";\nimport { getDb } from "@/db/client";\n';
+const USE_SERVER = '"use server";\n';
 
 function readAdminFile(file: string): string {
   return readFileSync(path.join(ADMIN_APP_DIR, file), "utf8");
@@ -276,6 +277,111 @@ describe("analyzeGuards", () => {
         export const GET = (async () => Response.json(await getDb()));`, "route.ts")).toHaveLength(1);
       expect(analyze(`${IMPORT}
         export const GET = (async () => { await requireAdmin(); return Response.json(await getDb()); });`, "route.ts")).toEqual([]);
+    });
+  });
+
+  describe("what hides a function from the reader of exports", () => {
+    test.each([
+      ["a namespace exported in an actions file", "actions.ts", USE_SERVER, "export namespace Tools { export async function wipe() { await getDb(); } }"],
+      ["a namespace exported in a page", "page.tsx", "", "export namespace Tools { export const wipe = async () => getDb(); }"],
+      ["a namespace exported in a route", "route.ts", "", "export namespace Tools { export const GET = async () => getDb(); }"],
+      ["an exported import alias in an actions file", "actions.ts", USE_SERVER, "export import wipe = Other.wipe;"],
+      ["an exported import alias in a page", "page.tsx", "", "export import wipe = Other.wipe;"],
+    ])("flags %s", (_label, fileName, directive, extra) => {
+      const problems = analyze(`${directive}${IMPORT}
+        export default async function Page() { await requireAdmin(); }
+        export async function saved() { await requireAdmin(); }
+        ${extra}`, fileName);
+
+      expect(problems, extra).not.toEqual([]);
+    });
+
+    test("a namespace that is not exported, or a type-only one, is not an entry point", () => {
+      expect(
+        analyze(`${IMPORT}
+          namespace Local { export const x = 1; }
+          declare namespace Types { type A = string }
+          export default async function Page() { await requireAdmin(); return Local.x; }`),
+      ).toEqual([]);
+    });
+  });
+
+  describe("a function with its own use server inside a page is a public action too", () => {
+    test("flags an inline action in a page that does not check the session first", () => {
+      const problems = analyze(`${IMPORT}
+        export default async function Page() {
+          await requireAdmin();
+          async function wipe() {
+            "use server";
+            await getDb();
+          }
+          return wipe;
+        }`);
+
+      expect(problems).toHaveLength(1);
+      expect(problems[0]).toMatchObject({ entry: "wipe" });
+    });
+
+    test.each([
+      ["an arrow function", "const wipe = async () => { \"use server\"; await getDb(); }; return wipe;"],
+      ["a function expression", "const wipe = async function () { \"use server\"; await getDb(); }; return wipe;"],
+      ["a parenthesized arrow", "const wipe = (async () => { \"use server\"; await getDb(); }); return wipe;"],
+      ["an action inside another function", "function inner() { return async () => { \"use server\"; await getDb(); }; } return inner;"],
+      ["an action passed straight to a form", "return form({ action: async () => { \"use server\"; await getDb(); } });"],
+      ["a check that comes after the first statement", "async function wipe() { \"use server\"; await getDb(); await requireAdmin(); } return wipe;"],
+      ["a check that is not awaited", "async function wipe() { \"use server\"; requireAdmin(); await getDb(); } return wipe;"],
+    ])("flags %s", (_label, body) => {
+      const problems = analyze(`${IMPORT}
+        export default async function Page() {
+          await requireAdmin();
+          ${body}
+        }`);
+
+      expect(problems, body).toHaveLength(1);
+    });
+
+    test("accepts inline actions that start with the check, whatever the shape", () => {
+      expect(
+        analyze(`${IMPORT}
+          export default async function Page() {
+            await requireAdmin();
+            async function a() { "use server"; await requireAdmin(); await getDb(); }
+            const b = async () => { "use server"; await requireAdmin(); };
+            return [a, b];
+          }`),
+      ).toEqual([]);
+    });
+
+    test("ignores an ordinary function inside the page and one that only mentions the directive", () => {
+      expect(
+        analyze(`${IMPORT}
+          export default async function Page() {
+            await requireAdmin();
+            const helper = async () => { await getDb(); };
+            const label = "use server";
+            return [helper, label];
+          }`),
+      ).toEqual([]);
+    });
+
+    test("an inline action is also flagged in a route and in an actions file", () => {
+      expect(
+        analyze(`${IMPORT}
+          export async function GET() {
+            await requireAdmin();
+            const wipe = async () => { "use server"; await getDb(); };
+            return Response.json(wipe);
+          }`, "route.ts"),
+      ).toHaveLength(1);
+      expect(
+        analyze(`"use server";
+${IMPORT}
+          export async function saved() {
+            await requireAdmin();
+            const wipe = async () => { "use server"; await getDb(); };
+            return wipe;
+          }`, "actions.ts"),
+      ).toHaveLength(1);
     });
   });
 

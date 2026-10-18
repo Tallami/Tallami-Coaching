@@ -55,6 +55,36 @@ describe("assertDatabaseUrlForMigrate", () => {
     expect(() => assertDatabaseUrlForMigrate([...NODE, "migrate", "--name", "generate"], {})).toThrow(/DATABASE_URL/);
   });
 
+  test("sees the command after an option whose value is a separate argument", () => {
+    // `--config archivo.ts migrate`: el primer argumento sin guion es el archivo, no el comando.
+    for (const args of [
+      ["--config", "drizzle.config.ts", "migrate"],
+      ["--config", "otra/ruta/drizzle.ts", "--verbose", "migrate"],
+      ["--out", "drizzle", "migrate"],
+      ["--dialect", "postgresql", "--schema", "src/db/schema.ts", "migrate"],
+      ["--name", "algo", "migrate"],
+    ]) {
+      expect(() => assertDatabaseUrlForMigrate([...NODE, ...args], {}), args.join(" ")).toThrow(/DATABASE_URL/);
+      expect(() => assertDatabaseUrlForMigrate([...NODE, ...args], { DATABASE_URL: URL }), args.join(" ")).not.toThrow();
+    }
+  });
+
+  test("skips the value of an option, even when the value says migrate", () => {
+    for (const args of [
+      ["--config", "migrate", "generate"],
+      ["--out", "migrate", "check"],
+      ["--prefix", "migrate", "generate"],
+      ["generate", "--config", "migrate"],
+    ]) {
+      expect(() => assertDatabaseUrlForMigrate([...NODE, ...args], {}), args.join(" ")).not.toThrow();
+    }
+  });
+
+  test("an option with its value inside (--config=file.ts) does not swallow the next argument", () => {
+    expect(() => assertDatabaseUrlForMigrate([...NODE, "--config=drizzle.config.ts", "migrate"], {})).toThrow(/DATABASE_URL/);
+    expect(() => assertDatabaseUrlForMigrate([...NODE, "--out=drizzle", "generate"], {})).not.toThrow();
+  });
+
   test("does not get in the way of the commands that only read the schema", () => {
     for (const command of ["generate", "check", "up"]) {
       expect(() => assertDatabaseUrlForMigrate([...NODE, command], {}), command).not.toThrow();

@@ -23,6 +23,12 @@
 //   `"use server"`) todo export tiene que ser una de esas funciones; en una
 //   página o una ruta también se aceptan datos simples (literales, objetos y
 //   listas) y la configuración de Next (`metadata`, `dynamic`, `revalidate`, …).
+//   También se informan `export namespace` y `export import x = …`: esconden
+//   funciones detrás de un nombre y no se pueden seguir.
+// - Una función con su propia directiva `"use server"` adentro de una página, una
+//   ruta o una acción (una acción en línea, escrita donde sea) también es un punto
+//   de entrada público: tiene que empezar con `await requireAdmin();` igual que
+//   las exportadas.
 
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -161,6 +167,10 @@ function collectExports(source: ts.SourceFile, { isActions, isRoute }: { isActio
           unreadable(name, "export que no es un dato, ni la configuración de Next, ni una función escrita en el archivo: no se puede comprobar");
         }
       }
+    } else if (ts.isModuleDeclaration(statement) && isExported(statement) && !hasModifier(statement, ts.SyntaxKind.DeclareKeyword)) {
+      unreadable(statement.name.getText(source), "export de un namespace: no se puede comprobar");
+    } else if (ts.isImportEqualsDeclaration(statement) && isExported(statement) && !statement.isTypeOnly) {
+      unreadable(statement.name.text, "export de un alias de importación (`export import x = …`): no se puede comprobar");
     } else if ((ts.isClassDeclaration(statement) || ts.isEnumDeclaration(statement)) && isExported(statement)) {
       // Una clase exportada no es una función que se pueda comprobar; en una página o ruta, un enum es solo un dato.
       if (ts.isClassDeclaration(statement) || isActions) {
@@ -188,6 +198,41 @@ function collectExports(source: ts.SourceFile, { isActions, isRoute }: { isActio
     }
   }
   return { entries, problems };
+}
+
+/** ¿El cuerpo de la función empieza con la directiva `"use server"` (antes de cualquier otra sentencia)? */
+function hasInlineUseServer(fn: FunctionNode): boolean {
+  if (!fn.body || !ts.isBlock(fn.body)) return false;
+  for (const statement of fn.body.statements) {
+    if (!isDirective(statement)) return false;
+    if ((statement as ts.ExpressionStatement).expression.getText().slice(1, -1) === "use server") return true;
+  }
+  return false;
+}
+
+/** Cómo se llama una función escrita en línea: su nombre, el de la variable que la guarda o el de la propiedad. */
+function inlineName(fn: FunctionNode): string {
+  if ((ts.isFunctionDeclaration(fn) || ts.isFunctionExpression(fn)) && fn.name) return fn.name.text;
+  let parent: ts.Node | undefined = fn.parent;
+  while (parent && (ts.isParenthesizedExpression(parent) || ts.isAsExpression(parent) || ts.isSatisfiesExpression(parent))) {
+    parent = parent.parent;
+  }
+  if (parent && ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name)) return parent.name.text;
+  if (parent && ts.isPropertyAssignment(parent) && (ts.isIdentifier(parent.name) || ts.isStringLiteral(parent.name))) {
+    return parent.name.text;
+  }
+  return "(función en línea)";
+}
+
+/** Las funciones con su propia directiva `"use server"` escritas en cualquier parte del archivo. */
+function inlineServerActions(source: ts.SourceFile): { name: string; fn: FunctionNode }[] {
+  const found: { name: string; fn: FunctionNode }[] = [];
+  const visit = (node: ts.Node): void => {
+    if (isFunctionNode(node) && hasInlineUseServer(node)) found.push({ name: inlineName(node), fn: node });
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return found;
 }
 
 /** ¿Es exactamente `await requireAdmin();`? */
@@ -261,6 +306,13 @@ export function analyzeGuards(sourceText: string, fileName: string): GuardProble
   for (const [entry, fn] of entries) {
     const reason = guardProblem(fn);
     if (reason) found.push({ entry, reason });
+  }
+  // Las acciones en línea que no son un export ya revisado: también se piden por afuera.
+  const checked = new Set<FunctionNode>(entries.values());
+  for (const { name, fn } of inlineServerActions(source)) {
+    if (checked.has(fn)) continue;
+    const reason = guardProblem(fn);
+    if (reason) found.push({ entry: name, reason: `acción en línea con "use server": ${reason}` });
   }
   return found;
 }
