@@ -3,9 +3,11 @@
 import { needsOwnRate } from "@/admin/catalog";
 import type { SaleFormValues } from "@/admin/sales/form-values";
 import type { RateMode } from "@/admin/sales/schema";
+import { CHOSEN_CHOICE_CLASSES } from "@/admin/ui/choice-classes";
 import { Field } from "@/admin/ui/field";
 import { Notice } from "@/admin/ui/notice";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 interface RateFieldsProps {
   values: Pick<SaleFormValues, "currency" | "rateMode" | "arsPerUnit" | "arsPerUsd">;
@@ -42,7 +44,10 @@ export function RateFields({ values, errors, onChange }: RateFieldsProps) {
         {MODES.map(({ value, label, description }) => (
           <label
             key={value}
-            className="flex min-h-12 cursor-pointer items-start gap-3 border-2 border-ink bg-white px-4 py-2.5 transition-[color,background-color,border-color] duration-150 hover:bg-gold/15 has-[:checked]:bg-stage has-[:checked]:text-on-stage"
+            className={cn(
+              "flex min-h-12 cursor-pointer items-start gap-3 border-2 border-ink bg-white px-4 py-2.5 transition-[color,background-color,border-color] duration-150 hover:bg-gold/15",
+              CHOSEN_CHOICE_CLASSES,
+            )}
           >
             <input
               type="radio"

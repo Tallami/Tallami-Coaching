@@ -12,6 +12,7 @@ export default defineConfig({
     "**/admin-overview.spec.ts",
     "**/admin-services-demo.spec.ts",
     "**/admin-billing-demo.spec.ts",
+    "**/admin-quality.spec.ts",
   ],
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),

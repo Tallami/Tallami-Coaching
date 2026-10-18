@@ -32,7 +32,8 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
   return (
     <thead
       data-slot="table-header"
-      className={cn("bg-stage text-on-stage", className)}
+      // Fondo oscuro: lo que se enfoca adentro (una casilla) lleva el aro dorado, como en el escenario.
+      className={cn("bg-stage text-on-stage [&_:focus-visible]:outline-gold", className)}
       {...props}
     />
   )

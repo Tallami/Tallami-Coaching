@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import type { CustomerOption } from "@/admin/customers/repository";
 import { customerLabel, type SaleFormValues } from "@/admin/sales/form-values";
+import { CHOSEN_CHOICE_CLASSES } from "@/admin/ui/choice-classes";
 import { Field } from "@/admin/ui/field";
 import { searchCustomersAction } from "@/app/admin/ventas/actions";
 import { Badge } from "@/components/ui/badge";
@@ -48,7 +49,10 @@ export function CustomerPicker({ values, errors, onChange }: CustomerPickerProps
         {MODES.map(({ value, label }) => (
           <label
             key={value}
-            className="flex min-h-12 cursor-pointer items-center gap-3 border-2 border-ink bg-white px-4 font-bold transition-[color,background-color,border-color] duration-150 hover:bg-gold/15 has-[:checked]:bg-stage has-[:checked]:text-on-stage"
+            className={cn(
+              "flex min-h-12 cursor-pointer items-center gap-3 border-2 border-ink bg-white px-4 font-bold transition-[color,background-color,border-color] duration-150 hover:bg-gold/15",
+              CHOSEN_CHOICE_CLASSES,
+            )}
           >
             <input
               type="radio"
