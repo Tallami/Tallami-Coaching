@@ -30,11 +30,13 @@ const nextConfig: NextConfig = {
   // no se usa: allá la base es `DATABASE_URL`.
   serverExternalPackages: ["@electric-sql/pglite"],
   images: {
-    // Las fotos de los tweets (`pbs.twimg.com`). Solo https y solo este servidor.
-    // Los avatares de las tarjetas son las fotos locales de los jugadores
-    // (`src/assets/players`), así que ya no hace falta el avatar por defecto de
-    // X (`abs.twimg.com`).
-    remotePatterns: [{ protocol: "https", hostname: "pbs.twimg.com", pathname: "/**" }],
+    // Las fotos de los tweets (`pbs.twimg.com`). Solo https, solo este servidor y
+    // solo `/media/`: las tarjetas piden la primera foto de cada tweet (`photos`
+    // en `src/lib/tweets.ts`) y todas viven ahí; ninguna usa videos. Los avatares
+    // de las tarjetas son las fotos locales de los jugadores (`src/assets/players`),
+    // así que tampoco hacen falta `profile_images` ni el avatar por defecto de X
+    // (`abs.twimg.com`).
+    remotePatterns: [{ protocol: "https", hostname: "pbs.twimg.com", pathname: "/media/**" }],
   },
   experimental: {
     // Habilita `src/app/global-not-found.tsx`: el 404 localizado que se
