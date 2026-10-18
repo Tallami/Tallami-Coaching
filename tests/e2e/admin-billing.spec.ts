@@ -163,6 +163,37 @@ test.describe("billing", () => {
     await expect(rowOf(page, student)).toHaveCount(0);
   });
 
+  test("the notice of what was just marked goes away when the next mark fails", async ({ page }) => {
+    const first = uniqueName("Eva aviso uno");
+    const second = uniqueName("Fede aviso dos");
+    await createSale(page, { student: first });
+    await createSale(page, { student: second });
+    await openBilling(page);
+    await pickerOf(page, first).check();
+    await page.getByLabel("Tipo de factura").selectOption("C");
+    await page.getByLabel("Número de factura").fill(uniqueInvoiceNumber());
+    await mark(page, "Marcar como facturadas");
+    await expect(page).toHaveURL(/guardada=facturadas&cantidad=1$/);
+    const notice = page.getByRole("status").filter({ hasText: "1 venta marcada como facturada." });
+    await expect(notice).toBeVisible();
+    await expect(page.locator("form[data-hydrated='true']")).toBeVisible();
+
+    // La otra venta sin tipo ni número: no se marca y el aviso de recién ya no es cierto.
+    await pickerOf(page, second).check();
+    await mark(page, "Marcar como facturadas");
+
+    await expect(page.getByText("Escribí el número de la factura.")).toBeVisible();
+    await expect(notice).toHaveCount(0);
+    await expect(rowOf(page, second)).toHaveCount(1);
+  });
+
+  test("the notice stays when the last pending sale was marked and there is no list left", async ({ page }) => {
+    // El aviso lo trae la dirección: con todo facturado no hay formulario y el aviso se ve igual.
+    await page.goto(`${BILLING_PATH}?guardada=facturadas&cantidad=3`);
+
+    await expect(page.getByRole("status").filter({ hasText: "3 ventas marcadas como facturadas." })).toBeVisible();
+  });
+
   test("a batch with one sale that can no longer be marked changes nothing", async ({ context, page }) => {
     const stale = uniqueName("Eli ya marcada");
     const fresh = uniqueName("Fede sigue pendiente");
@@ -977,6 +1008,20 @@ test.describe("a download that could not be built", () => {
       page.getByRole("alert").filter({ hasText: "No pudimos preparar el archivo. Probá de nuevo en unos minutos." }),
     ).toBeVisible();
     await expect(page.getByRole("heading", { name: "Ventas", level: 1 })).toBeVisible();
+  });
+
+  test("the export form comes back with the dates and the invoice state that were asked for", async ({ page }) => {
+    await page.goto(`${BILLING_PATH}?desde=2026-02-01&hasta=2026-03-31&factura=issued&exportacion=demasiadas`);
+
+    const form = page.getByRole("form", { name: "Exportar para el contador" });
+    await expect(form.getByLabel("Desde")).toHaveValue("2026-02-01");
+    await expect(form.getByLabel("Hasta")).toHaveValue("2026-03-31");
+    await expect(form.getByLabel("Factura")).toHaveValue("issued");
+
+    // Sin nada pedido, los 12 meses del monotributo y todas las facturas, como siempre.
+    await page.goto(BILLING_PATH);
+    await expect(form.getByLabel("Factura")).toHaveValue("");
+    await expect(form.getByLabel("Desde")).not.toHaveValue("2026-02-01");
   });
 
   test("a value that is not one of the two says nothing", async ({ page }) => {

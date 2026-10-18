@@ -256,6 +256,42 @@ describe("the count at the top of the list", () => {
   });
 });
 
+describe("the export form after a download that did not happen", () => {
+  function exportForm(exportRequest?: { from?: string; to?: string; invoiceStatus?: "pending" | "issued" | "not_required" }) {
+    const data = buildBilling({
+      uninvoiced: { rows: [], truncated: false },
+      sales: [sale()],
+      settings: SETTINGS,
+      now: NOW,
+      ...(exportRequest ? { exportRequest } : {}),
+    });
+    return { data, markup: render(data) };
+  }
+
+  test("starts with the 12 months of the monotributo and every invoice state when nothing was asked for", () => {
+    const { data, markup } = exportForm();
+
+    expect(data.exportDefaults).toEqual({ from: "2025-10-14", to: "2026-10-13" });
+    expect(markup).toContain('value="2025-10-14"');
+    expect(markup).toMatch(/<option [^>]*value="" selected[^>]*>Todas<\/option>/);
+  });
+
+  test("comes back with the dates and the invoice state the person had asked for", () => {
+    const { data, markup } = exportForm({ from: "2026-01-01", to: "2026-03-31", invoiceStatus: "issued" });
+
+    expect(data.exportDefaults).toEqual({ from: "2026-01-01", to: "2026-03-31" });
+    expect(markup).toContain('value="2026-01-01"');
+    expect(markup).toContain('value="2026-03-31"');
+    expect(markup).toMatch(/<option [^>]*value="issued" selected[^>]*>Facturada<\/option>/);
+  });
+
+  test("a date that was not asked for keeps its default", () => {
+    const { data } = exportForm({ to: "2026-03-31" });
+
+    expect(data.exportDefaults).toEqual({ from: "2025-10-14", to: "2026-03-31" });
+  });
+});
+
 describe("the scope of the list against the 12-month table", () => {
   const NOTE = "Esta lista trae todo lo cobrado sin facturar, de cualquier fecha";
 
@@ -277,5 +313,35 @@ describe("the scope of the list against the 12-month table", () => {
     const markup = render(build({ rows: [saleRow({ paidOn: "2026-10-05" })], truncated: true }));
 
     expect(markup).toContain(NOTE);
+  });
+});
+
+describe("the notice of what was just marked", () => {
+  const NOTICE = "2 ventas marcadas como facturadas.";
+
+  function withNotice(data: BillingData, savedNotice?: string): string {
+    return renderToStaticMarkup(
+      createElement(BillingView, { data, invoiceAction: noop, ...(savedNotice === undefined ? {} : { savedNotice }) }),
+    );
+  }
+
+  test("lives inside the form of the list, as a status, so a later failed mark can take it away", () => {
+    const markup = withNotice(build({ rows: [saleRow()] }), NOTICE);
+    const form = markup.slice(markup.indexOf("<form"), markup.indexOf("</form>"));
+
+    expect(form).toMatch(/role="status"[^>]*>2 ventas marcadas como facturadas\./);
+    expect(markup.match(/2 ventas marcadas como facturadas\./g)).toHaveLength(1);
+  });
+
+  test("with everything invoiced there is no form, and the notice still shows", () => {
+    const markup = withNotice(build({ sales: [sale({ paidOn: "2026-10-02" })] }), NOTICE);
+
+    expect(markup).not.toContain('aria-label="Marcar ventas como facturadas"');
+    expect(markup).toMatch(/role="status"[^>]*>2 ventas marcadas como facturadas\./);
+    expect(markup).toContain("Todo lo cobrado está facturado");
+  });
+
+  test("says nothing without one", () => {
+    expect(withNotice(build({ rows: [saleRow()] }))).not.toContain("marcadas como facturadas");
   });
 });

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { INVOICE_STATUSES, INVOICE_STATUS_LABELS } from "@/admin/catalog";
+import { INVOICE_STATUSES, INVOICE_STATUS_LABELS, type InvoiceStatus } from "@/admin/catalog";
 import type { DateRange } from "@/admin/metrics/period";
 import { ADMIN_ROUTES } from "@/admin/routes";
 import { SALES_PARAMS } from "@/admin/sales/filters";
@@ -14,7 +14,14 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
  * en Excel. Es un formulario `GET` común: el archivo se baja sin JavaScript y
  * la dirección (`?desde=…&hasta=…&factura=…`) lleva los filtros.
  */
-export function ExportCard({ defaults }: { defaults: DateRange }) {
+export function ExportCard({
+  defaults,
+  invoiceStatus,
+}: {
+  defaults: DateRange;
+  /** El estado de factura que arranca elegido; sin él, "Todas". */
+  invoiceStatus?: InvoiceStatus;
+}) {
   return (
     <SectionCard
       id="exportar"
@@ -33,7 +40,7 @@ export function ExportCard({ defaults }: { defaults: DateRange }) {
         </div>
         <Field id="export-invoice" label="Factura">
           {(control) => (
-            <NativeSelect {...control} name={SALES_PARAMS.invoiceStatus} defaultValue="">
+            <NativeSelect {...control} name={SALES_PARAMS.invoiceStatus} defaultValue={invoiceStatus ?? ""}>
               <NativeSelectOption value="">Todas</NativeSelectOption>
               {INVOICE_STATUSES.map((status) => (
                 <NativeSelectOption key={status} value={status}>

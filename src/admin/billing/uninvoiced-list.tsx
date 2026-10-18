@@ -42,6 +42,12 @@ interface UninvoicedListProps {
   today: string;
   /** Marca las ventas elegidas; ante un problema devuelve el estado con los errores. */
   action: InvoicingAction;
+  /**
+   * Lo que avisa el último marcado que salió bien (lo trae la dirección después de
+   * marcar). Se ve mientras el formulario no recibe ninguna respuesta: si el
+   * siguiente marcado falla, deja de mostrarse, porque ya no es lo último que pasó.
+   */
+  savedNotice?: string;
 }
 
 /**
@@ -174,7 +180,7 @@ function selectionSummary(rows: readonly UninvoicedRowView[]): string {
  * lista. Al marcar, la acción redirige y la página trae la lista nueva (la
  * página pasa un `key` nuevo para que esta lista vuelva a armarse vacía).
  */
-export function UninvoicedList({ groups, today, action }: UninvoicedListProps) {
+export function UninvoicedList({ groups, today, action, savedNotice }: UninvoicedListProps) {
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [values, setValues] = useState({ type: "", number: "", issuedOn: today });
   const [state, dispatch, isSaving] = useActionState(action, INITIAL_INVOICING_FORM_STATE);
@@ -259,6 +265,11 @@ export function UninvoicedList({ groups, today, action }: UninvoicedListProps) {
       data-hydrated={hydrated ? "true" : "false"}
       className="mt-5"
     >
+      {savedNotice && state === INITIAL_INVOICING_FORM_STATE ? (
+        <Notice tone="ok" className="mb-4">
+          {savedNotice}
+        </Notice>
+      ) : null}
       <div ref={summaryRef} tabIndex={-1} className="outline-offset-0 empty:hidden">
         {state.formError ? (
           <Notice tone="error" className="mb-4 border-l-8">

@@ -10,6 +10,8 @@ import { formatMoney } from "@/lib/money";
 interface UninvoicedSectionProps {
   data: BillingData;
   action: InvoicingAction;
+  /** Lo que avisa el último marcado que salió bien, si lo hubo (viene de la dirección). */
+  savedNotice?: string;
 }
 
 /**
@@ -17,7 +19,7 @@ interface UninvoicedSectionProps {
  * en dólares y el formulario para marcarlo. Una venta con fecha de cobro futura
  * todavía no se cobró y no figura (igual que en el resumen).
  */
-export function UninvoicedSection({ data, action }: UninvoicedSectionProps) {
+export function UninvoicedSection({ data, action, savedNotice }: UninvoicedSectionProps) {
   const { uninvoiced } = data;
   const groups = toGroupViews(uninvoiced.groups);
   // Cuando se marcan ventas la lista cambia: con otra clave arranca sin nada elegido ni escrito.
@@ -34,6 +36,12 @@ export function UninvoicedSection({ data, action }: UninvoicedSectionProps) {
     >
       {uninvoiced.count === 0 ? (
         <>
+          {/* Sin lista no hay formulario que lo muestre: el aviso va acá. */}
+          {savedNotice ? (
+            <Notice tone="ok" className="mb-4">
+              {savedNotice}
+            </Notice>
+          ) : null}
           <p className="flex items-center gap-2 text-[1.0625rem] font-bold">
             <CircleCheckIcon className="size-5 shrink-0 text-ok-ink" aria-hidden="true" />
             Todo lo cobrado está facturado.
@@ -65,7 +73,13 @@ export function UninvoicedSection({ data, action }: UninvoicedSectionProps) {
               que quedan.
             </Notice>
           ) : null}
-          <UninvoicedList key={listKey} groups={groups} today={data.today} action={action} />
+          <UninvoicedList
+            key={listKey}
+            groups={groups}
+            today={data.today}
+            action={action}
+            savedNotice={savedNotice}
+          />
         </>
       )}
     </SectionCard>

@@ -13,6 +13,11 @@ interface BillingViewProps {
   data: BillingData;
   /** Marca las ventas elegidas como facturadas o como "no requiere factura". */
   invoiceAction: InvoicingAction;
+  /**
+   * El aviso del último marcado que salió bien (viene de la dirección). Lo muestra
+   * el formulario de la lista y se va si el siguiente marcado falla.
+   */
+  savedNotice?: string;
 }
 
 /**
@@ -22,7 +27,7 @@ interface BillingViewProps {
  * el resumen de 12 meses y, lado a lado, el monotributo y la exportación para
  * el contador. En pantallas angostas todo se apila en ese orden.
  */
-export function BillingView({ data, invoiceAction }: BillingViewProps) {
+export function BillingView({ data, invoiceAction, savedNotice }: BillingViewProps) {
   if (!data.hasIncome) {
     return (
       <EmptyState
@@ -39,11 +44,11 @@ export function BillingView({ data, invoiceAction }: BillingViewProps) {
 
   return (
     <>
-      <UninvoicedSection data={data} action={invoiceAction} />
+      <UninvoicedSection data={data} action={invoiceAction} savedNotice={savedNotice} />
       <MonthlyBilling months={data.months} total={data.total} className="mb-6" />
       <div className="grid items-start gap-6 grid-cols-2 narrow:grid-cols-1">
         <MonotributoCard data={data} />
-        <ExportCard defaults={data.exportDefaults} />
+        <ExportCard defaults={data.exportDefaults} invoiceStatus={data.exportInvoiceStatus ?? undefined} />
       </div>
     </>
   );

@@ -16,6 +16,7 @@ import {
   type MonthBilling,
   type UninvoicedGroup,
 } from "@/admin/billing/summary";
+import type { InvoiceStatus } from "@/admin/catalog";
 import { sumMinor } from "@/admin/metrics/math";
 import { isIncome, type MetricSale } from "@/admin/metrics/metric-sale";
 import {
@@ -56,8 +57,13 @@ export interface BillingData {
   /** La suma de los 12 meses. */
   total: BillingTotals;
   monotributo: OverviewData["monotributo"];
-  /** Las fechas con que arranca el formulario de exportación: los 12 meses del monotributo. */
+  /**
+   * Las fechas con que arranca el formulario de exportación: los 12 meses del
+   * monotributo, o las que se habían pedido (ver `BillingInput.exportRequest`).
+   */
   exportDefaults: DateRange;
+  /** El estado de factura con que arranca el formulario de exportación, si se había pedido uno. */
+  exportInvoiceStatus: InvoiceStatus | null;
 }
 
 export interface BillingInput {
@@ -72,9 +78,15 @@ export interface BillingInput {
   sales: readonly MetricSale[];
   settings: MonotributoSettings | null;
   now: Date;
+  /**
+   * Lo que se había pedido en el formulario de exportación y no salió (ver
+   * `src/admin/export/notices.ts`), ya validado: la pantalla vuelve con el
+   * formulario cargado con eso y no con los valores de siempre.
+   */
+  exportRequest?: { from?: string; to?: string; invoiceStatus?: InvoiceStatus };
 }
 
-export function buildBilling({ uninvoiced, sales, settings, now }: BillingInput): BillingData {
+export function buildBilling({ uninvoiced, sales, settings, now, exportRequest }: BillingInput): BillingData {
   const today = todayInArgentina(now);
   const groups = groupUninvoicedByMonth(uninvoiced.rows);
   const months = monthlyBilling(sales, BILLING_MONTHS, now);
@@ -106,6 +118,7 @@ export function buildBilling({ uninvoiced, sales, settings, now }: BillingInput)
       settings,
       window,
     },
-    exportDefaults: window,
+    exportDefaults: { from: exportRequest?.from ?? window.from, to: exportRequest?.to ?? window.to },
+    exportInvoiceStatus: exportRequest?.invoiceStatus ?? null,
   };
 }

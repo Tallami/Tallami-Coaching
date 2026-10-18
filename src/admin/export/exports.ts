@@ -103,6 +103,11 @@ export function billingExportResponse(
   const { filter: parsed } = parseSalesQuery(searchParamsRecord(params));
   const filter: SaleFilter = { ...parsed, status: undefined };
   const today = todayInArgentina(now);
-  const back = { path: ADMIN_ROUTES.billing, query: "" };
+  // Vuelve con lo que se pidió en el formulario del contador (las fechas y el estado de la factura),
+  // ya validado: solo esos tres filtros y solo los valores que `parseSalesQuery` aceptó.
+  const back = {
+    path: ADMIN_ROUTES.billing,
+    query: salesQueryString({ from: parsed.from, to: parsed.to, invoiceStatus: parsed.invoiceStatus }),
+  };
   return runExport(db, { name: "facturacion", filter, collectedBy: today, back }, today, options.limit ?? MAX_EXPORT_ROWS);
 }

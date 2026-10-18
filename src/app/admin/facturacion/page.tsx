@@ -6,6 +6,7 @@ import { BillingView } from "@/admin/billing/billing-view";
 import { countUninvoicedSales, listUninvoicedSales } from "@/admin/billing/invoicing";
 import { invoicingNotice } from "@/admin/billing/saved-notice";
 import { loadMetricSales } from "@/admin/metrics/load";
+import { parseSalesQuery } from "@/admin/sales/filters";
 import { getMonotributoSettings } from "@/admin/settings/read";
 import { Notice } from "@/admin/ui/notice";
 import { PageHeader } from "@/admin/ui/page-header";
@@ -32,7 +33,15 @@ export default async function BillingPage(props: PageProps<"/admin/facturacion">
     loadMetricSales(db, now),
     getMonotributoSettings(db),
   ]);
-  const data = buildBilling({ uninvoiced: { ...uninvoiced, totals }, sales, settings, now });
+  // Una descarga que falló vuelve con lo que se había pedido (ya validado) para cargar el formulario con eso.
+  const { from, to, invoiceStatus } = parseSalesQuery(params).filter;
+  const data = buildBilling({
+    uninvoiced: { ...uninvoiced, totals },
+    sales,
+    settings,
+    now,
+    exportRequest: { from, to, invoiceStatus },
+  });
 
   return (
     <PanelShell active="billing">
@@ -40,17 +49,12 @@ export default async function BillingPage(props: PageProps<"/admin/facturacion">
         title="Facturación"
         description="Qué cobraste y todavía no facturaste, cuánto llevás en el año y lo que le pasás al contador."
       />
-      {notice ? (
-        <Notice tone="ok" className="mb-5">
-          {notice}
-        </Notice>
-      ) : null}
       {exportError ? (
         <Notice tone="error" className="mb-5">
           {exportError}
         </Notice>
       ) : null}
-      <BillingView data={data} invoiceAction={invoicingAction} />
+      <BillingView data={data} invoiceAction={invoicingAction} savedNotice={notice ?? undefined} />
     </PanelShell>
   );
 }

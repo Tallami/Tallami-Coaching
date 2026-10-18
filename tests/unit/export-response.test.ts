@@ -273,7 +273,8 @@ describe("billingExportResponse", () => {
     const tooMany = await billingExportResponse(db, new URLSearchParams("desde=2026-01-01"), NOW, { limit: 1 });
 
     expect(tooMany.status).toBe(303);
-    expect(tooMany.headers.get("Location")).toBe("/admin/facturacion?exportacion=demasiadas");
+    // Vuelve con lo que se había pedido (acá, el desde) para que la persona lo acote sin volver a escribirlo.
+    expect(tooMany.headers.get("Location")).toBe("/admin/facturacion?desde=2026-01-01&exportacion=demasiadas");
     expect(tooMany.headers.get("Content-Disposition")).toBeNull();
     expect(tooMany.headers.get("Cache-Control")).toBe("no-store");
 
@@ -288,6 +289,39 @@ describe("billingExportResponse", () => {
 
     expect(failed.status).toBe(303);
     expect(failed.headers.get("Location")).toBe("/admin/facturacion?exportacion=error");
+  });
+
+  test("the way back keeps the dates and the invoice state that were asked for, so the form comes back filled", async () => {
+    const response = await billingExportResponse(
+      db,
+      new URLSearchParams("desde=2026-08-01&hasta=2026-10-13&factura=pending"),
+      NOW,
+      { limit: 1 },
+    );
+
+    const location = new URL(response.headers.get("Location") ?? "", "http://panel.test");
+    expect(location.pathname).toBe("/admin/facturacion");
+    expect(Object.fromEntries(location.searchParams)).toEqual({
+      desde: "2026-08-01",
+      hasta: "2026-10-13",
+      factura: "pending",
+      exportacion: "demasiadas",
+    });
+  });
+
+  test("only the validated values go back: garbage and the filters this file does not use are dropped", async () => {
+    const response = await billingExportResponse(
+      db,
+      new URLSearchParams(
+        "desde=2026-02-30&hasta=2026-10-13&factura=__proto__&q=a&estado=cancelled&servicio=lesson&medio=transfer&pagina=3&x=%3Cscript%3E",
+      ),
+      NOW,
+      { limit: 1 },
+    );
+
+    const location = new URL(response.headers.get("Location") ?? "", "http://panel.test");
+    expect(Object.fromEntries(location.searchParams)).toEqual({ hasta: "2026-10-13", exportacion: "demasiadas" });
+    expect(response.headers.get("Location")).not.toContain("script");
   });
 });
 
