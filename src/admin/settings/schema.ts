@@ -9,11 +9,9 @@
 
 import { z } from "zod";
 import { isPlausibleDay } from "@/admin/dates";
+import { MONOTRIBUTO_CATEGORIES, type MonotributoCategory } from "@/admin/settings/categories";
 import { cleanText } from "@/admin/zod-text";
 import { InvalidAmountError, parseAmountToMinor } from "@/lib/money";
-
-export const MONOTRIBUTO_CATEGORIES = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K"] as const;
-export type MonotributoCategory = (typeof MONOTRIBUTO_CATEGORIES)[number];
 
 /** Tope anual máximo: un billón de pesos (en centavos). Más que eso es un error de tipeo. */
 export const MAX_ANNUAL_CAP_ARS_MINOR = 100_000_000_000_000;

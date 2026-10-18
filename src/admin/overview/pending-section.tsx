@@ -172,7 +172,6 @@ function Sessions({ sessions }: { sessions: readonly UpcomingSession[] }) {
 function ToMarkRow({ session }: { session: SessionToMark }) {
   return (
     <PendingRow
-      key={session.id}
       sale={session}
       when={`fue el ${formatSessionWhen(session.dueAt)}`}
       badge={session.unpaid ? UNPAID_BADGE : null}

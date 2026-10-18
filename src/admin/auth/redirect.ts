@@ -2,7 +2,9 @@
 // visitante: solo se aceptan rutas del propio panel, para que el login no sea
 // una redirección abierta (`?next=//sitio-malo.com`).
 
-export const PANEL_PATH = "/admin";
+import { ADMIN_ROUTES } from "../routes";
+
+export const PANEL_PATH = ADMIN_ROUTES.overview;
 export const LOGIN_PATH = "/admin/login";
 export const SETUP_PATH = "/admin/setup";
 

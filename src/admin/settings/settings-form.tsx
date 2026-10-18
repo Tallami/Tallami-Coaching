@@ -14,7 +14,7 @@ import {
   type SettingsFormState,
   type SettingsFormValues,
 } from "@/admin/settings/form-state";
-import { MONOTRIBUTO_CATEGORIES } from "@/admin/settings/schema";
+import { MONOTRIBUTO_CATEGORIES } from "@/admin/settings/categories";
 import { Field } from "@/admin/ui/field";
 import { NoScriptNote } from "@/admin/ui/no-script-note";
 import { Notice } from "@/admin/ui/notice";

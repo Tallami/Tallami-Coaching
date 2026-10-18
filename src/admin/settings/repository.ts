@@ -11,7 +11,7 @@ import { monotributoInputSchema } from "@/admin/settings/schema";
 import type { Db } from "@/db/client";
 import { settings } from "@/db/schema";
 
-export { MONOTRIBUTO_CATEGORIES, type MonotributoCategory } from "@/admin/settings/schema";
+export { MONOTRIBUTO_CATEGORIES, type MonotributoCategory } from "@/admin/settings/categories";
 
 /** Lo que carga Tallami en el formulario del monotributo: todo texto, como lo escribe. */
 export interface MonotributoInput {
