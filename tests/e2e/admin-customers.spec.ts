@@ -98,6 +98,41 @@ test.describe("students", () => {
     await expect(page.getByRole("heading", { name: "Editar venta" })).toBeVisible();
   });
 
+  test("a sale collected on a future date does not add up yet: not in the list, not in the summary, but in the history", async ({
+    page,
+  }) => {
+    const student = uniqueName("Fabi futura");
+    await createSale(page, { student, item: "lesson", status: "paid", paidOn: "2026-08-10" });
+    // Cobrada, pero con día de cobro dentro de muchos años: todavía no es ingreso.
+    await createSaleForExisting(page, {
+      student,
+      item: "gamePlan",
+      status: "paid",
+      paidOn: "2099-01-01",
+    });
+
+    await openListFor(page, student);
+    const row = rowOf(page, student);
+    await expect(row.getByRole("cell").nth(2)).toHaveText("1");
+    await expect(row).toContainText("USD 40,00");
+    await expect(row).not.toContainText("USD 160,00");
+    await expect(row).not.toContainText("01/01/2099");
+    await expect(row).not.toContainText("Plan de juego personalizado");
+
+    await row.getByRole("link", { name: student }).click();
+    const summary = page.getByRole("region", { name: "Lo que compró" });
+    await expect(summary).toContainText("USD 40,00");
+    await expect(summary).not.toContainText("01/01/2099");
+    // El historial sí la lista, y dice que todavía no suma.
+    const history = page.getByRole("region", { name: "Ventas del alumno" });
+    const future = history.getByRole("row").filter({ hasText: "Plan de juego personalizado" });
+    await expect(future).toContainText("01/01/2099");
+    await expect(future).toContainText("Todavía no suma");
+    await expect(history.getByRole("row").filter({ hasText: "Clase 1 a 1" })).not.toContainText(
+      "Todavía no suma",
+    );
+  });
+
   test("edits a student's discord and country", async ({ page }) => {
     const student = uniqueName("Beto editable");
     await createStudent(page, { name: student, discord: "viejo.e2e", country: "br" });

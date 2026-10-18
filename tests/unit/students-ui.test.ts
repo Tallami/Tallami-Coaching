@@ -143,8 +143,10 @@ describe("StudentSummary", () => {
 });
 
 describe("StudentHistory", () => {
-  function history(sales: SaleRow[]): string {
-    return renderToStaticMarkup(createElement(StudentHistory, { sales }));
+  const TODAY = "2026-10-15";
+
+  function history(sales: SaleRow[], today = TODAY): string {
+    return renderToStaticMarkup(createElement(StudentHistory, { sales, today }));
   }
 
   test("with no sales it says so and offers to add one", () => {
@@ -173,6 +175,27 @@ describe("StudentHistory", () => {
 
   test("explains that only collected or delivered sales add up", () => {
     expect(history([SALE])).toContain("Solo cuentan las ventas cobradas o entregadas");
+  });
+
+  test("a collected sale with a payment day after today is listed but says it does not add up yet", () => {
+    const future = { ...SALE, id: "44444444-7c5c-4a43-9d4c-3f6a3a2f1b10", paidOn: "2026-10-20" };
+
+    const markup = history([future, SALE]);
+
+    expect(markup).toContain("Todavía no suma");
+    // Solo la que es de después de hoy lo dice: la de hoy o anterior cuenta normal.
+    expect(markup.match(/Todavía no suma/g)).toHaveLength(1);
+    expect(history([SALE])).not.toContain("Todavía no suma");
+    expect(history([{ ...SALE, paidOn: TODAY }])).not.toContain("Todavía no suma");
+  });
+
+  test("a sale that never adds up (cancelled, pending) does not get the \"not yet\" label", () => {
+    const markup = history([
+      { ...SALE, status: "cancelled", paidOn: "2026-10-20" },
+      { ...SALE, id: "55555555-7c5c-4a43-9d4c-3f6a3a2f1b10", status: "pending", paidOn: null },
+    ]);
+
+    expect(markup).not.toContain("Todavía no suma");
   });
 
   test("keeps the charged currency's own symbol and shows the 'Otro' description", () => {

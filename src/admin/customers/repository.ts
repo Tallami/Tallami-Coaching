@@ -3,12 +3,14 @@
 // se crea uno nuevo.
 //
 // Lo que compró un alumno cuenta solo las ventas de ingreso (cobradas o
-// entregadas, `INCOME_STATUSES`): una cancelada, una reembolsada o una pendiente
-// no suman en compras, total gastado, fechas ni servicios. Su ficha, en cambio,
-// muestra todas sus ventas con su estado.
+// entregadas, `INCOME_STATUSES`) con día de cobro de hoy o anterior, en Argentina:
+// una cancelada, una reembolsada, una pendiente o una con fecha de cobro futura
+// no suman en compras, total gastado, fechas ni servicios, igual que en el resto
+// del panel. Su ficha, en cambio, muestra todas sus ventas con su estado.
 
-import { and, asc, count, eq, ilike, inArray, max, min, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, eq, ilike, inArray, lte, max, min, or, sql, type SQL } from "drizzle-orm";
 import { INCOME_STATUSES, SALE_ITEMS, type SaleItem } from "@/admin/catalog";
+import { todayInArgentina } from "@/admin/dates";
 import { newestSalesFirst, saleRowColumns, toSaleRow, type SaleRow } from "@/admin/sales/sale-row";
 import type { Db } from "@/db/client";
 import { containsPattern } from "@/db/like";
@@ -32,9 +34,9 @@ export interface CustomerOption {
   country: string | null;
 }
 
-/** Un alumno con lo que compró (solo ventas de ingreso). */
+/** Un alumno con lo que compró (solo ventas de ingreso, cobradas hasta hoy). */
 export interface CustomerStats extends CustomerOption {
-  /** Cantidad de ventas cobradas o entregadas. */
+  /** Cantidad de ventas cobradas o entregadas, con día de cobro de hoy o anterior. */
   purchases: number;
   /** Suma de esas ventas en dólares, en centavos. */
   totalUsdMinor: number;
@@ -154,12 +156,13 @@ function itemsFromAggregate(aggregate: string | null): SaleItem[] {
  * Los alumnos que cumplen `where`, cada uno con lo que compró. Es un solo
  * `group by` en la base: las ventas de ingreso se unen al alumno con un
  * `left join` (así los que no compraron siguen en la lista, con ceros) y se
- * resumen ahí mismo. La suma de un `bigint` llega como texto numérico y se
+ * resumen ahí mismo; solo se unen las de día de cobro de hoy (en Argentina, según
+ * `now`) o anterior: una venta con fecha futura todavía no se cobró. La suma de un `bigint` llega como texto numérico y se
  * pasa a `number` (los montos de este negocio entran de sobra en 2^53).
  * Orden por la última compra, la más nueva primero; los que no compraron al
  * final, y a igual día, por nombre.
  */
-async function selectWithStats(db: Db, where: SQL | undefined): Promise<CustomerStats[]> {
+async function selectWithStats(db: Db, where: SQL | undefined, now: Date): Promise<CustomerStats[]> {
   const rows = await db
     .select({
       id: customers.id,
@@ -178,7 +181,11 @@ async function selectWithStats(db: Db, where: SQL | undefined): Promise<Customer
     .from(customers)
     .leftJoin(
       sales,
-      and(eq(sales.customerId, customers.id), inArray(sales.status, [...INCOME_STATUSES])),
+      and(
+        eq(sales.customerId, customers.id),
+        inArray(sales.status, [...INCOME_STATUSES]),
+        lte(sales.paidOn, todayInArgentina(now)),
+      ),
     )
     .where(where)
     .groupBy(customers.id)
@@ -192,23 +199,33 @@ async function selectWithStats(db: Db, where: SQL | undefined): Promise<Customer
 }
 
 /**
- * Los alumnos con lo que compró cada uno (solo ventas de ingreso), el que
- * compró hace menos primero. Con texto, solo los que lo tienen en el nombre o
- * en el Discord (igual que `searchCustomers`, pero sin tope de cantidad).
+ * Los alumnos con lo que compró cada uno (solo ventas de ingreso con día de
+ * cobro hasta hoy), el que compró hace menos primero. Con texto, solo los que lo
+ * tienen en el nombre o en el Discord (igual que `searchCustomers`, pero sin tope
+ * de cantidad). `now` fija el "hoy" de Argentina: lo usan los tests.
  */
-export async function listCustomersWithStats(db: Db, q?: string): Promise<CustomerStats[]> {
-  return selectWithStats(db, q === undefined ? undefined : matchesText(q));
+export async function listCustomersWithStats(
+  db: Db,
+  q?: string,
+  now: Date = new Date(),
+): Promise<CustomerStats[]> {
+  return selectWithStats(db, q === undefined ? undefined : matchesText(q), now);
 }
 
 /**
  * La ficha de un alumno, o `null` si no existe (o el id no es un id): sus
- * datos, lo que compró y todas sus ventas, también las canceladas, reembolsadas
- * y pendientes, con su estado.
+ * datos, lo que compró (con la misma regla que la lista: solo lo cobrado hasta
+ * hoy) y todas sus ventas, también las canceladas, reembolsadas, pendientes y
+ * las de fecha de cobro futura, con su estado.
  */
-export async function getCustomer(db: Db, id: string): Promise<CustomerDetail | null> {
+export async function getCustomer(
+  db: Db,
+  id: string,
+  now: Date = new Date(),
+): Promise<CustomerDetail | null> {
   if (!isUuid(id)) return null;
   const [[stats], [profile], history] = await Promise.all([
-    selectWithStats(db, eq(customers.id, id)),
+    selectWithStats(db, eq(customers.id, id), now),
     db.select({ notes: customers.notes }).from(customers).where(eq(customers.id, id)).limit(1),
     db
       .select(saleRowColumns)

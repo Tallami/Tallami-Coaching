@@ -186,6 +186,56 @@ describe("listCustomersWithStats", () => {
     expect(names).toEqual(["Maru", "Zoe", "Abel", "Nadie", "Pablo pendiente"]);
   });
 
+  test("a sale collected after today (Argentina) does not count yet: not in purchases, total, dates or services", async () => {
+    // El 12 de octubre a las 12:00 en Argentina.
+    const now = new Date("2026-10-12T15:00:00Z");
+    const { id } = await createCustomer(db, { name: "Ana Futuro" });
+    await sell(db, id, { item: "lesson", paidOn: "2026-10-10", amount: "40" });
+    // Hoy sí cuenta; mañana no, aunque ya esté cobrada o entregada.
+    await sell(db, id, { item: "vodRecorded", paidOn: "2026-10-12", amount: "30" });
+    await sell(db, id, { item: "gamePlan", status: "paid", paidOn: "2026-10-13", amount: "120" });
+    await sell(db, id, { item: "proSeason", status: "delivered", paidOn: "2026-12-01", amount: "2500" });
+
+    const found = (await listCustomersWithStats(db, undefined, now)).find((customer) => customer.id === id);
+
+    expect(found).toMatchObject({
+      purchases: 2,
+      totalUsdMinor: 7000,
+      firstPaidOn: "2026-10-10",
+      lastPaidOn: "2026-10-12",
+      items: ["vodRecorded", "lesson"],
+    });
+  });
+
+  test("the sale starts to count on its own day, by the Argentine calendar and not the UTC one", async () => {
+    const { id } = await createCustomer(db, { name: "Borde del día" });
+    await sell(db, id, { paidOn: "2026-10-13", amount: "40" });
+    const totalAt = async (now: Date) =>
+      (await listCustomersWithStats(db, undefined, now)).find((customer) => customer.id === id)?.totalUsdMinor;
+
+    // 23:00 del 12 en Argentina ya es el 13 en UTC: para el negocio todavía es el 12.
+    expect(await totalAt(new Date("2026-10-13T02:00:00Z"))).toBe(0);
+    // 00:30 del 13 en Argentina.
+    expect(await totalAt(new Date("2026-10-13T03:30:00Z"))).toBe(4000);
+  });
+
+  test("a student whose only collected sale is in the future sorts with the ones who have not bought", async () => {
+    const fresh = await createTestDb();
+    const now = new Date("2026-10-12T15:00:00Z");
+    const make = async (name: string) => (await createCustomer(fresh, { name })).id;
+    const abel = await make("Abel");
+    const zoe = await make("Zoe");
+    const futuro = await make("Futuro");
+    await sell(fresh, abel, { paidOn: "2026-10-03" });
+    await sell(fresh, zoe, { paidOn: "2026-10-10" });
+    // Con su fecha de cobro dentro de un mes, antes quedaba primero de la lista.
+    await sell(fresh, futuro, { paidOn: "2026-11-12" });
+
+    const names = (await listCustomersWithStats(fresh, undefined, now)).map((customer) => customer.name);
+
+    expect(names).toEqual(["Zoe", "Abel", "Futuro"]);
+  });
+
   test("a student without income sales is listed with zeros and no dates", async () => {
     const { id } = await createCustomer(db, { name: "Pablo sin compras" });
     await sell(db, id, { status: "pending", paidOn: undefined });
@@ -292,6 +342,25 @@ describe("getCustomer", () => {
       ["lesson", "paid", 4000],
     ]);
     expect(customer?.sales.every((sale) => sale.customerId === id)).toBe(true);
+  });
+
+  test("the stats leave out a sale collected after today but the history still lists it", async () => {
+    const now = new Date("2026-10-12T15:00:00Z");
+    const { id: future } = await createCustomer(db, { name: "Fran Futuro" });
+    await sell(db, future, { item: "lesson", paidOn: "2026-10-10", amount: "40" });
+    await sell(db, future, { item: "gamePlan", status: "paid", paidOn: "2026-10-20", amount: "120" });
+
+    const customer = await getCustomer(db, future, now);
+
+    expect(customer).toMatchObject({
+      purchases: 1,
+      totalUsdMinor: 4000,
+      firstPaidOn: "2026-10-10",
+      lastPaidOn: "2026-10-10",
+      items: ["lesson"],
+    });
+    // La ficha muestra todas las ventas, también la que todavía no cuenta.
+    expect(customer?.sales.map((sale) => sale.item)).toEqual(["gamePlan", "lesson"]);
   });
 
   test("a student with no sales has an empty history", async () => {

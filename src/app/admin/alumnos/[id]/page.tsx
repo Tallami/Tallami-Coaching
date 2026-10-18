@@ -6,6 +6,7 @@ import { getCustomer, type CustomerDetail } from "@/admin/customers/repository";
 import { StudentForm } from "@/admin/customers/student-form";
 import { StudentHistory } from "@/admin/customers/student-history";
 import { StudentSummary } from "@/admin/customers/student-summary";
+import { todayInArgentina } from "@/admin/dates";
 import { ADMIN_ROUTES } from "@/admin/routes";
 import { EmptyState } from "@/admin/ui/empty-state";
 import { PageHeader } from "@/admin/ui/page-header";
@@ -35,7 +36,9 @@ function toFormValues(student: CustomerDetail): StudentFormValues {
 export default async function StudentPage(props: PageProps<"/admin/alumnos/[id]">) {
   await requireAdmin();
   const { id } = await props.params;
-  const student = await getCustomer(await getDb(), id);
+  // Un solo "ahora" para los totales y para marcar en el historial lo que todavía no suma.
+  const now = new Date();
+  const student = await getCustomer(await getDb(), id, now);
 
   if (!student) {
     return (
@@ -70,7 +73,7 @@ export default async function StudentPage(props: PageProps<"/admin/alumnos/[id]"
       />
       <StudentSummary student={student} />
       <div className="grid grid-cols-1 items-start gap-x-8 gap-y-8 xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <StudentHistory sales={student.sales} />
+        <StudentHistory sales={student.sales} today={todayInArgentina(now)} />
         {/* Con otros datos guardados (el país pasa a mayúsculas) el formulario se arma de nuevo. */}
         <StudentForm
           key={JSON.stringify(formValues)}

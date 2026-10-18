@@ -22,16 +22,19 @@ const INCOME: readonly SaleStatus[] = INCOME_STATUSES;
 interface StudentHistoryProps {
   /** Todas las ventas del alumno, con su estado. */
   sales: readonly SaleRow[];
+  /** Hoy en Argentina, "AAAA-MM-DD": una venta con día de cobro posterior todavía no suma. */
+  today: string;
 }
 
 const numberCell = "text-right whitespace-nowrap tabular-nums";
 
 /**
  * Todas las ventas del alumno, también las canceladas, reembolsadas y
- * pendientes. Las que no suman al total gastado se ven en gris. Cada una abre
- * su edición en Ventas.
+ * pendientes. Las que no suman al total gastado se ven en gris; una cobrada
+ * con día de cobro de después de hoy lo dice, porque todavía no suma (igual
+ * que en el resto del panel). Cada una abre su edición en Ventas.
  */
-export function StudentHistory({ sales }: StudentHistoryProps) {
+export function StudentHistory({ sales, today }: StudentHistoryProps) {
   if (sales.length === 0) {
     return (
       <EmptyState
@@ -75,7 +78,9 @@ export function StudentHistory({ sales }: StudentHistoryProps) {
           </TableHeader>
           <TableBody>
             {sales.map((sale) => {
-              const counts = INCOME.includes(sale.status);
+              const isIncome = INCOME.includes(sale.status);
+              const notYet = isIncome && sale.paidOn !== null && sale.paidOn > today;
+              const counts = isIncome && !notYet;
               return (
                 <TableRow key={sale.id}>
                   <TableCell className="whitespace-nowrap">
@@ -84,6 +89,9 @@ export function StudentHistory({ sales }: StudentHistoryProps) {
                     ) : (
                       <span className="text-ink-2">Sin fecha</span>
                     )}
+                    {notYet ? (
+                      <div className="mt-0.5 text-[0.8125rem] text-ink-2">Todavía no suma</div>
+                    ) : null}
                   </TableCell>
                   <TableCell>
                     <Link
