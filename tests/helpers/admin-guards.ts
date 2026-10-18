@@ -12,10 +12,17 @@
 //   página, los `GET`/`POST` de una ruta, cada acción) debe tener como primera
 //   sentencia `await requireAdmin();`. Después de las directivas (`"use server"`)
 //   y antes de cualquier otra cosa: así nada la antecede, tampoco el acceso a la base.
+//   Los paréntesis y las aserciones de tipo (`(async () => {…}) as Tipo`) no cambian
+//   qué función es.
 // - `requireAdmin` tiene que venir de `@/admin/auth/require-admin`, sin alias:
 //   una función local con ese nombre no cuenta.
-// - Lo que no se puede leer (un manejador envuelto en otra función, un
-//   `export … from`) se informa como problema en vez de dejarlo pasar.
+// - Lo que no se puede leer se informa como problema en vez de dejarlo pasar:
+//   un `export … from`, un export de algo que no es una función escrita en el
+//   archivo (un import reexportado, `export const f = otra`, una llamada que
+//   envuelve el manejador, una clase). En un archivo de acciones (`actions` o con
+//   `"use server"`) todo export tiene que ser una de esas funciones; en una
+//   página o una ruta también se aceptan datos simples (literales, objetos y
+//   listas) y la configuración de Next (`metadata`, `dynamic`, `revalidate`, …).
 
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -28,8 +35,11 @@ export const EXEMPT_ADMIN_DIRS: readonly string[] = ["login", "setup"];
 const REQUIRE_ADMIN_MODULE = "@/admin/auth/require-admin";
 const REQUIRE_ADMIN = "requireAdmin";
 const ENTRY_FILE = /^(page|route)\.(tsx?|jsx?)$|^actions\.tsx?$/;
+const ACTIONS_FILE = /^actions\.(tsx?|jsx?)$/;
 const ROUTE_FILE = /^route\.(tsx?|jsx?)$/;
 const HTTP_METHODS = new Set(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]);
+/** Los exports de configuración que Next lee de una página o una ruta: son datos, no puntos de entrada. */
+const NEXT_CONFIG_EXPORTS = /^(metadata|viewport|dynamic|revalidate|runtime|preferredRegion|maxDuration|fetchCache|dynamicParams)$/;
 
 export interface GuardProblem {
   /** Nombre del export (`default`, `GET`, `saveSaleAction`, …) o `(archivo)` si el problema es del archivo. */
@@ -43,13 +53,50 @@ function isFunctionNode(node: ts.Node | undefined): node is FunctionNode {
   return node !== undefined && (ts.isFunctionDeclaration(node) || ts.isArrowFunction(node) || ts.isFunctionExpression(node));
 }
 
-function isExported(node: ts.Node): boolean {
-  return ts.canHaveModifiers(node) && (ts.getModifiers(node) ?? []).some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
+/** La expresión sin los paréntesis ni las aserciones de tipo que la envuelven (`(f)`, `f as T`, `f satisfies T`, `f!`, `<T>f`). */
+function unwrap(expression: ts.Expression | undefined): ts.Expression | undefined {
+  let current = expression;
+  while (
+    current !== undefined &&
+    (ts.isParenthesizedExpression(current) ||
+      ts.isAsExpression(current) ||
+      ts.isSatisfiesExpression(current) ||
+      ts.isNonNullExpression(current) ||
+      ts.isTypeAssertionExpression(current))
+  ) {
+    current = current.expression;
+  }
+  return current;
 }
 
-function isDefault(node: ts.Node): boolean {
-  return ts.canHaveModifiers(node) && (ts.getModifiers(node) ?? []).some((m) => m.kind === ts.SyntaxKind.DefaultKeyword);
+/** La función que escribe `expression`, sin contar lo que la envuelve, o `undefined` si no es una función. */
+function functionOf(expression: ts.Expression | undefined): FunctionNode | undefined {
+  const inner = unwrap(expression);
+  return isFunctionNode(inner) ? inner : undefined;
 }
+
+/** ¿Es un dato simple: un literal, un objeto, una lista o un número con signo? */
+function isPlainData(expression: ts.Expression | undefined): boolean {
+  const inner = unwrap(expression);
+  if (inner === undefined) return false;
+  return (
+    ts.isStringLiteralLike(inner) ||
+    ts.isNumericLiteral(inner) ||
+    ts.isObjectLiteralExpression(inner) ||
+    ts.isArrayLiteralExpression(inner) ||
+    inner.kind === ts.SyntaxKind.TrueKeyword ||
+    inner.kind === ts.SyntaxKind.FalseKeyword ||
+    inner.kind === ts.SyntaxKind.NullKeyword ||
+    (ts.isPrefixUnaryExpression(inner) && ts.isNumericLiteral(inner.operand))
+  );
+}
+
+function hasModifier(node: ts.Node, kind: ts.SyntaxKind): boolean {
+  return ts.canHaveModifiers(node) && (ts.getModifiers(node) ?? []).some((modifier) => modifier.kind === kind);
+}
+
+const isExported = (node: ts.Node) => hasModifier(node, ts.SyntaxKind.ExportKeyword);
+const isDefault = (node: ts.Node) => hasModifier(node, ts.SyntaxKind.DefaultKeyword);
 
 /** Las funciones declaradas en la raíz del archivo, por nombre (para seguir `export default Page` y `export { a }`). */
 function topLevelFunctions(source: ts.SourceFile): Map<string, FunctionNode> {
@@ -59,13 +106,25 @@ function topLevelFunctions(source: ts.SourceFile): Map<string, FunctionNode> {
       functions.set(statement.name.text, statement);
     } else if (ts.isVariableStatement(statement)) {
       for (const declaration of statement.declarationList.declarations) {
-        if (ts.isIdentifier(declaration.name) && isFunctionNode(declaration.initializer)) {
-          functions.set(declaration.name.text, declaration.initializer);
-        }
+        const fn = functionOf(declaration.initializer);
+        if (ts.isIdentifier(declaration.name) && fn) functions.set(declaration.name.text, fn);
       }
     }
   }
   return functions;
+}
+
+/** ¿Es una directiva de prólogo, como `"use server"`? */
+function isDirective(statement: ts.Statement): boolean {
+  return ts.isExpressionStatement(statement) && ts.isStringLiteral(statement.expression);
+}
+
+/** ¿El archivo empieza con la directiva `"use server"`? */
+function hasUseServerDirective(source: ts.SourceFile): boolean {
+  return source.statements.some(
+    (statement) =>
+      isDirective(statement) && (statement as ts.ExpressionStatement).expression.getText(source).slice(1, -1) === "use server",
+  );
 }
 
 interface Collected {
@@ -73,8 +132,13 @@ interface Collected {
   problems: GuardProblem[];
 }
 
-/** Las funciones que el archivo exporta, y lo que exporta que no se puede analizar. */
-function collectExports(source: ts.SourceFile, isRoute: boolean): Collected {
+/**
+ * Las funciones que el archivo exporta, y lo que exporta que no se puede
+ * analizar. `isActions` es un archivo de acciones (`actions` o `"use server"`):
+ * ahí todo export tiene que ser una función; `isRoute`, un `route`: sus
+ * `GET`/`POST`/… tienen que ser funciones escritas en el archivo.
+ */
+function collectExports(source: ts.SourceFile, { isActions, isRoute }: { isActions: boolean; isRoute: boolean }): Collected {
   const locals = topLevelFunctions(source);
   const entries = new Map<string, FunctionNode>();
   const problems: GuardProblem[] = [];
@@ -86,38 +150,44 @@ function collectExports(source: ts.SourceFile, isRoute: boolean): Collected {
     } else if (ts.isVariableStatement(statement) && isExported(statement)) {
       for (const declaration of statement.declarationList.declarations) {
         const name = ts.isIdentifier(declaration.name) ? declaration.name.text : declaration.name.getText(source);
-        if (isFunctionNode(declaration.initializer)) {
-          entries.set(name, declaration.initializer);
+        const fn = functionOf(declaration.initializer);
+        if (fn) {
+          entries.set(name, fn);
         } else if (isRoute && HTTP_METHODS.has(name)) {
           unreadable(name, "el manejador no es una función escrita en el archivo: no se puede comprobar");
-        } else if (declaration.initializer && ts.isCallExpression(declaration.initializer)) {
-          // `export const metadata = …` es un dato; una llamada podría ser una acción envuelta.
-          if (!/^(metadata|viewport|dynamic|revalidate|runtime|preferredRegion|maxDuration|fetchCache|dynamicParams)$/.test(name)) {
-            unreadable(name, "export resuelto con una llamada: no se puede comprobar si verifica la sesión");
-          }
+        } else if (isActions) {
+          unreadable(name, "en un archivo de acciones todo export tiene que ser una función escrita en el archivo: no se puede comprobar");
+        } else if (!NEXT_CONFIG_EXPORTS.test(name) && !isPlainData(declaration.initializer)) {
+          unreadable(name, "export que no es un dato, ni la configuración de Next, ni una función escrita en el archivo: no se puede comprobar");
         }
       }
+    } else if ((ts.isClassDeclaration(statement) || ts.isEnumDeclaration(statement)) && isExported(statement)) {
+      // Una clase exportada no es una función que se pueda comprobar; en una página o ruta, un enum es solo un dato.
+      if (ts.isClassDeclaration(statement) || isActions) {
+        unreadable(isDefault(statement) ? "default" : (statement.name?.text ?? "default"), "export de una clase o un enum: no se puede comprobar");
+      }
     } else if (ts.isExportAssignment(statement)) {
-      const target = ts.isIdentifier(statement.expression) ? locals.get(statement.expression.text) : statement.expression;
-      if (isFunctionNode(target)) entries.set("default", target);
+      const expression = unwrap(statement.expression);
+      const target = expression !== undefined && ts.isIdentifier(expression) ? locals.get(expression.text) : functionOf(expression);
+      if (target) entries.set("default", target);
       else unreadable("default", "`export default` no es una función escrita en el archivo: no se puede comprobar");
     } else if (ts.isExportDeclaration(statement) && !statement.isTypeOnly) {
       if (statement.moduleSpecifier) {
         unreadable("(archivo)", "reexporta desde otro archivo: no se puede comprobar");
       } else if (statement.exportClause && ts.isNamedExports(statement.exportClause)) {
         for (const element of statement.exportClause.elements) {
+          if (element.isTypeOnly) continue;
+          const exported = element.name.text;
           const local = locals.get((element.propertyName ?? element.name).text);
-          if (isFunctionNode(local)) entries.set(element.name.text, local);
+          if (local) entries.set(exported, local);
+          else if (isActions || !NEXT_CONFIG_EXPORTS.test(exported)) {
+            unreadable(exported, "export de algo que no es una función escrita en el archivo (un import, un dato): no se puede comprobar");
+          }
         }
       }
     }
   }
   return { entries, problems };
-}
-
-/** ¿La sentencia es una directiva de prólogo, como `"use server"`? */
-function isDirective(statement: ts.Statement): boolean {
-  return ts.isExpressionStatement(statement) && ts.isStringLiteral(statement.expression);
 }
 
 /** ¿Es exactamente `await requireAdmin();`? */
@@ -153,14 +223,33 @@ function importsRealGuard(source: ts.SourceFile): boolean {
   );
 }
 
+/** `.ts`/`.js` se leen como tal: en TSX, `<Tipo>valor` sería una etiqueta y el árbol saldría mal. */
+function scriptKindOf(fileName: string): ts.ScriptKind {
+  switch (path.extname(fileName)) {
+    case ".tsx":
+      return ts.ScriptKind.TSX;
+    case ".jsx":
+      return ts.ScriptKind.JSX;
+    case ".js":
+      return ts.ScriptKind.JS;
+    default:
+      return ts.ScriptKind.TS;
+  }
+}
+
 /**
  * Los problemas de un archivo del panel (vacío si cada función que expone
  * verifica la sesión primero). `fileName` decide el tipo de archivo
- * (`route.ts` exige que sus manejadores se puedan leer).
+ * (`route.ts` exige que sus manejadores se puedan leer; `actions.ts` y los
+ * archivos con `"use server"` solo pueden exportar funciones).
  */
 export function analyzeGuards(sourceText: string, fileName: string): GuardProblem[] {
-  const source = ts.createSourceFile(fileName, sourceText, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-  const { entries, problems } = collectExports(source, ROUTE_FILE.test(path.basename(fileName)));
+  const source = ts.createSourceFile(fileName, sourceText, ts.ScriptTarget.Latest, true, scriptKindOf(fileName));
+  const base = path.basename(fileName);
+  const { entries, problems } = collectExports(source, {
+    isActions: ACTIONS_FILE.test(base) || hasUseServerDirective(source),
+    isRoute: ROUTE_FILE.test(base),
+  });
   const found = [...problems];
 
   if (!importsRealGuard(source)) {
@@ -174,14 +263,6 @@ export function analyzeGuards(sourceText: string, fileName: string): GuardProble
     if (reason) found.push({ entry, reason });
   }
   return found;
-}
-
-/** ¿Empieza con la directiva `"use server"`? */
-function hasUseServerDirective(sourceText: string): boolean {
-  const source = ts.createSourceFile("archivo.ts", sourceText, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-  return source.statements.some(
-    (statement) => isDirective(statement) && (statement as ts.ExpressionStatement).expression.getText(source).slice(1, -1) === "use server",
-  );
 }
 
 function walk(dir: string, relative: string): string[] {
@@ -201,7 +282,9 @@ export function listAdminEntryFiles(): string[] {
     .filter((file) => /\.(tsx?|jsx?)$/.test(file))
     .filter((file) => {
       const name = path.posix.basename(file);
-      return ENTRY_FILE.test(name) || hasUseServerDirective(readFileSync(path.join(ADMIN_APP_DIR, file), "utf8"));
+      if (ENTRY_FILE.test(name)) return true;
+      const text = readFileSync(path.join(ADMIN_APP_DIR, file), "utf8");
+      return hasUseServerDirective(ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, scriptKindOf(file)));
     })
     .sort();
 }

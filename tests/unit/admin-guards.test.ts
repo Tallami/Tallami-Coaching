@@ -155,6 +155,130 @@ describe("analyzeGuards", () => {
       export const handler = async () => getDb();`, "actions.ts")).toHaveLength(1);
   });
 
+  describe("in an actions file that also has a guarded action, nothing unreadable gets through", () => {
+    /** Un archivo de acciones con una acción en regla y, además, lo que se prueba. */
+    function actions(extra: string, fileName = "actions.ts") {
+      return analyze(`"use server";
+        ${IMPORT}
+        import { wipeAll } from "@/admin/x";
+        export async function saved() { await requireAdmin(); }
+        ${extra}`, fileName);
+    }
+
+    test.each([
+      ["a function imported and exported by name", "export { wipeAll };"],
+      ["a function imported and exported under another name", "export { wipeAll as wipe };"],
+      ["an imported function as the default export", "export default wipeAll;"],
+      ["an imported function exported as the default by name", "export { wipeAll as default };"],
+      ["an identifier as the initializer", "export const wipe = wipeAll;"],
+      ["a destructured export", "export const { wipe } = { wipe: wipeAll };"],
+      ["a call", "export const wipe = guarded(wipeAll);"],
+      ["data", "export const limit = 10;"],
+      ["a let without a value", "export let wipe;"],
+      ["a class", "export class Wiper {}"],
+      ["a default class", "export default class {}"],
+      ["a re-export of everything", 'export * from "@/admin/x";'],
+      ["a namespace re-export", 'export * as x from "@/admin/x";'],
+      ["a name that is not defined in the file", "export { nowhere };"],
+    ])("flags %s", (_label, extra) => {
+      expect(actions(extra), extra).not.toEqual([]);
+    });
+
+    test("names the export it could not read, and leaves the guarded action alone", () => {
+      const problems = actions("export const wipe = wipeAll;");
+
+      expect(problems.map((problem) => problem.entry)).toEqual(["wipe"]);
+    });
+
+    test("sees through parentheses and type assertions around a function", () => {
+      const unguarded = [
+        "export const a = (async () => { await getDb(); });",
+        "export const b = ((async () => { await getDb(); }));",
+        "export const c = (async () => { await getDb(); }) as () => Promise<void>;",
+        "export const d = (async () => { await getDb(); }) satisfies () => Promise<void>;",
+        "export const e = (async () => { await getDb(); })!;",
+        "export const f = <() => Promise<void>>(async () => { await getDb(); });",
+      ];
+      for (const extra of unguarded) {
+        expect(actions(extra).map((problem) => problem.entry), extra).toHaveLength(1);
+      }
+
+      const guarded = [
+        "export const a = (async () => { await requireAdmin(); });",
+        "export const c = (async () => { await requireAdmin(); }) as () => Promise<void>;",
+        "export const d = (async () => { await requireAdmin(); }) satisfies () => Promise<void>;",
+        "const g = (async () => { await requireAdmin(); }); export { g };",
+        "const h = (async () => { await requireAdmin(); }); export default h;",
+        "export default (async () => { await requireAdmin(); });",
+      ];
+      for (const extra of guarded) {
+        expect(actions(extra), extra).toEqual([]);
+      }
+    });
+
+    test("an unguarded local function exported in a list or as the default is still flagged by name", () => {
+      expect(actions("async function a() { await getDb(); } export { a };").map((p) => p.entry)).toEqual(["a"]);
+      expect(actions("async function a() { await getDb(); } export default a;").map((p) => p.entry)).toEqual(["default"]);
+      expect(actions("export default (async () => { await getDb(); });").map((p) => p.entry)).toEqual(["default"]);
+    });
+
+    test("a type-only export is not code and does not count", () => {
+      expect(actions("type Result = { ok: boolean }; export type { Result }; export type Other = string; export interface Shape { a: 1 }")).toEqual([]);
+      expect(actions("type Result = { ok: boolean }; export { type Result };")).toEqual([]);
+    });
+
+    test("the same rules hold in any file that starts with use server, whatever it is called", () => {
+      expect(actions("export const wipe = wipeAll;", "guardadas.ts")).not.toEqual([]);
+      expect(actions("export { wipeAll };", "ventas-actions.ts")).not.toEqual([]);
+    });
+  });
+
+  describe("in pages and routes only data and the config exports are allowed besides the functions", () => {
+    test("a page can export plain data and the config of Next", () => {
+      expect(
+        analyze(`${IMPORT}
+          export const metadata = { title: "Ventas" };
+          export const revalidate = 60;
+          export const dynamic = "force-dynamic";
+          export const maxDuration = 30;
+          export const LABEL = "texto";
+          export const LIMITS = [1, 2, 3];
+          export const NEGATIVE = -1;
+          export const FLAG = true;
+          export const NOTHING = null;
+          export default async function Page() { await requireAdmin(); }`),
+      ).toEqual([]);
+      expect(
+        analyze(`${IMPORT}
+          const metadata = { title: "Ventas" };
+          export { metadata };
+          export default async function Page() { await requireAdmin(); }`),
+      ).toEqual([]);
+    });
+
+    test.each([
+      ["an identifier", "export const wipe = wipeAll;"],
+      ["a named export of something that is not a function of the file", 'import { wipeAll } from "@/admin/x"; export { wipeAll };'],
+      ["a class", "export class Wiper {}"],
+      ["a default class", "export default class {}"],
+      ["a call that is not a Next config", "export const wipe = guarded(wipeAll);"],
+    ])("flags %s", (_label, extra) => {
+      const problems = analyze(`${IMPORT}
+        import { wipeAll } from "@/admin/x";
+        export default async function Page() { await requireAdmin(); }
+        ${extra}`);
+
+      expect(problems, extra).not.toEqual([]);
+    });
+
+    test("a route handler written as a parenthesized arrow is read, and flagged when it does not guard", () => {
+      expect(analyze(`${IMPORT}
+        export const GET = (async () => Response.json(await getDb()));`, "route.ts")).toHaveLength(1);
+      expect(analyze(`${IMPORT}
+        export const GET = (async () => { await requireAdmin(); return Response.json(await getDb()); });`, "route.ts")).toEqual([]);
+    });
+  });
+
   test("flags a page that exposes nothing at all", () => {
     expect(analyze(`${IMPORT}
       export const metadata = {};`)).toHaveLength(1);
