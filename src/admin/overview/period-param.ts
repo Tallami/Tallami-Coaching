@@ -3,6 +3,7 @@
 // si no está (o falta), se usa el período por defecto. Nunca es un error.
 
 import { PERIODS, type Period } from "@/admin/metrics/period";
+import { ADMIN_ROUTES } from "@/admin/routes";
 import { firstValue } from "@/admin/ui/search-params";
 
 export const DEFAULT_PERIOD: Period = "thisMonth";
@@ -35,5 +36,5 @@ export function periodHref(basePath: string, period: Period): string {
 
 /** A dónde lleva el selector del Resumen para ese período. */
 export function overviewHref(period: Period): string {
-  return periodHref("/admin", period);
+  return periodHref(ADMIN_ROUTES.overview, period);
 }

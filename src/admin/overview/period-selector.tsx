@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PERIODS, PERIOD_LABELS, type Period } from "@/admin/metrics/period";
 import { periodHref } from "@/admin/overview/period-param";
+import { ADMIN_ROUTES } from "@/admin/routes";
 import { cn } from "@/lib/utils";
 
 interface PeriodSelectorProps {
@@ -18,7 +19,7 @@ interface PeriodSelectorProps {
  */
 export function PeriodSelector({
   current,
-  basePath = "/admin",
+  basePath = ADMIN_ROUTES.overview,
   label = "Período del resumen",
 }: PeriodSelectorProps) {
   return (

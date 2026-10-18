@@ -3,6 +3,7 @@
 import { MenuIcon, XIcon } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
+import { ADMIN_ROUTES } from "@/admin/routes";
 import { Monogram } from "@/admin/ui/monogram";
 import { cn } from "@/lib/utils";
 
@@ -39,7 +40,7 @@ export function SidebarFrame({ children }: SidebarFrameProps) {
       onKeyDown={closeWithEscape}
     >
       <div className="flex items-center justify-between gap-3 px-5 pt-6 pb-5 narrow:px-gutter narrow:py-3">
-        <Link href="/admin" className="flex items-center gap-3 rounded-[4px]" aria-label="Tallami, panel de administración">
+        <Link href={ADMIN_ROUTES.overview} className="flex items-center gap-3 rounded-[4px]" aria-label="Tallami, panel de administración">
           <Monogram size={40} />
           <span className="flex flex-col leading-none">
             <span className="text-[1.5rem] font-extrabold [font-stretch:75%]">Tallami</span>
