@@ -17,7 +17,14 @@ import * as schema from "@/db/schema";
 let migratedTemplate: Promise<PGlite> | undefined;
 
 function template(): Promise<PGlite> {
-  migratedTemplate ??= openPglite().then((db) => (db as unknown as { $client: PGlite }).$client);
+  if (!migratedTemplate) {
+    const opening = openPglite().then((db) => (db as unknown as { $client: PGlite }).$client);
+    migratedTemplate = opening;
+    // Si falla no se guarda el fallo: el próximo test vuelve a intentar en vez de repetir el mismo error.
+    opening.catch(() => {
+      if (migratedTemplate === opening) migratedTemplate = undefined;
+    });
+  }
   return migratedTemplate;
 }
 
