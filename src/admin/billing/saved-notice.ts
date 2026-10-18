@@ -38,7 +38,7 @@ export function invoicingNotice(params: SearchParams): string | null {
 }
 
 /** Qué pasó al volver una venta a pendiente: lo que lleva la dirección de la ficha de la venta. */
-export type InvoiceUndoOutcome = "done" | "refused";
+export type InvoiceUndoOutcome = "done" | "refused" | "not-collected";
 
 export interface InvoiceUndoNotice {
   tone: "ok" | "error";
@@ -65,11 +65,19 @@ const UNDO_NOTICES: ReadonlyMap<string, InvoiceUndoNotice> = new Map([
       text: "La venta no tenía factura para quitar: ya estaba pendiente o no existe.",
     },
   ],
+  [
+    "no-cobrada",
+    {
+      tone: "error",
+      text: "La factura se queda como está: para volverla a pendiente la venta tiene que estar cobrada o entregada. Si ya la emitiste en ARCA, anularla es con una nota de crédito, que se hace en ARCA.",
+    },
+  ],
 ]);
 
 const UNDO_PARAM_BY_OUTCOME: Record<InvoiceUndoOutcome, string> = {
   done: "pendiente",
   refused: "no-se-pudo",
+  "not-collected": "no-cobrada",
 };
 
 /** La dirección de la venta `id` a la que vuelve la acción de volver a pendiente. */

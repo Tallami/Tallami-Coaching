@@ -172,6 +172,20 @@ describe("the undo of an invoice with a session", () => {
     expect((await getSale(db, id))?.invoiceStatus).toBe("pending");
   });
 
+  test.each(["cancelled", "refunded"] as const)(
+    "a replayed undo of a %s sale changes nothing and goes back with the notice about the credit note",
+    async (status) => {
+      const db = await openDb();
+      const id = await seedSale(db);
+      await db.update(sales).set({ ...INVOICED, status }).where(eq(sales.id, id));
+      const { markInvoicePendingAction } = await import("@/app/admin/ventas/actions");
+
+      await expect(markInvoicePendingAction(id)).rejects.toThrow(`NEXT_REDIRECT /admin/ventas/${id}?factura=no-cobrada`);
+
+      expect(await getSale(db, id)).toMatchObject({ invoiceStatus: "issued", invoiceNumber: "00003-00000045", invoiceType: "C" });
+    },
+  );
+
   test("an id that is not a uuid never reaches the database", async () => {
     vi.mocked(requireAdmin).mockResolvedValue(undefined);
     const { markInvoicePendingAction } = await import("@/app/admin/ventas/actions");

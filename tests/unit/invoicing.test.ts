@@ -3,6 +3,7 @@ import { describe, expect, test } from "vitest";
 import {
   InvalidInvoiceError,
   InvoiceNotAllowedError,
+  InvoiceNotCollectedError,
   MAX_INVOICE_BATCH,
   listUninvoicedSales,
   markInvoiceNotRequired,
@@ -476,16 +477,85 @@ describe("markInvoicePending", () => {
     });
   });
 
-  test("a cancelled sale that had an invoice can also be returned to pending", async () => {
-    const db = await createTestDb();
-    const id = await seedSale(db);
-    await markInvoiced(db, [id], INVOICE, NOW);
-    await updateSaleStatus(db, id, "cancelled");
+  describe("a sale that is not collected or delivered keeps its invoice", () => {
+    // El botón no aparece en la ficha (cancelada, reembolsada, pendiente), pero una acción
+    // repetida a mano llega igual: el dominio también la rechaza y no toca nada.
+    test.each(["cancelled", "refunded", "pending"] as const)(
+      "a %s sale with an issued invoice is refused, and the invoice stays",
+      async (status) => {
+        const db = await createTestDb();
+        const id = await seedSale(db);
+        await markInvoiced(db, [id], INVOICE, NOW);
+        await updateSaleStatus(db, id, status);
 
-    await markInvoicePending(db, id);
+        const refusal = await markInvoicePending(db, id).then(
+          () => null,
+          (error: unknown) => error,
+        );
 
-    expect((await invoiceOf(db, id)).status).toBe("pending");
-    // Sigue sin aparecer para facturar: una venta cancelada no es ingreso.
-    expect((await listUninvoicedSales(db, NOW)).rows).toEqual([]);
+        expect(refusal).toBeInstanceOf(InvoiceNotAllowedError);
+        expect(refusal).toBeInstanceOf(InvoiceNotCollectedError);
+        expect((refusal as Error).message).toContain("nota de crédito");
+        expect((refusal as Error).message).toContain("ARCA");
+        expect(await invoiceOf(db, id)).toEqual({
+          status: "issued",
+          type: "C",
+          number: "00003-00000045",
+          on: "2026-10-13",
+        });
+      },
+    );
+
+    test("a cancelled sale marked as not requiring an invoice is refused too", async () => {
+      const db = await createTestDb();
+      const id = await seedSale(db);
+      await markInvoiceNotRequired(db, [id], NOW);
+      await updateSaleStatus(db, id, "cancelled");
+
+      await expect(markInvoicePending(db, id)).rejects.toBeInstanceOf(InvoiceNotCollectedError);
+
+      expect((await invoiceOf(db, id)).status).toBe("not_required");
+    });
+
+    test("a sale that is already pending, or does not exist, is still the plain refusal", async () => {
+      const db = await createTestDb();
+      const id = await seedSale(db);
+      await updateSaleStatus(db, id, "cancelled");
+
+      for (const target of [id, UNKNOWN_ID]) {
+        const refusal = await markInvoicePending(db, target).then(
+          () => null,
+          (error: unknown) => error,
+        );
+        expect(refusal, target).toBeInstanceOf(InvoiceNotAllowedError);
+        expect(refusal, target).not.toBeInstanceOf(InvoiceNotCollectedError);
+      }
+    });
+
+    test("a paid or delivered sale can still be undone", async () => {
+      const db = await createTestDb();
+      const paid = await seedSale(db, { status: "paid" });
+      const delivered = await seedSale(db, { status: "delivered" });
+      await markInvoiced(db, [paid, delivered], INVOICE, NOW);
+
+      await markInvoicePending(db, paid);
+      await markInvoicePending(db, delivered);
+
+      expect((await invoiceOf(db, paid)).status).toBe("pending");
+      expect((await invoiceOf(db, delivered)).status).toBe("pending");
+    });
+
+    test("once the sale is collected again, the invoice can be undone", async () => {
+      const db = await createTestDb();
+      const id = await seedSale(db);
+      await markInvoiced(db, [id], INVOICE, NOW);
+      await updateSaleStatus(db, id, "cancelled");
+      await expect(markInvoicePending(db, id)).rejects.toBeInstanceOf(InvoiceNotCollectedError);
+
+      await updateSaleStatus(db, id, "paid");
+
+      await expect(markInvoicePending(db, id)).resolves.toEqual({ updated: 1 });
+      expect((await invoiceOf(db, id)).status).toBe("pending");
+    });
   });
 });

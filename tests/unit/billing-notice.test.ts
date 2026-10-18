@@ -68,6 +68,15 @@ describe("invoiceUndoNotice", () => {
     });
   });
 
+  test("says that a sale that is not collected keeps its invoice, and points to the credit note in ARCA", () => {
+    const notice = invoiceUndoNotice({ factura: "no-cobrada" });
+
+    expect(notice?.tone).toBe("error");
+    expect(notice?.text).toContain("cobrada o entregada");
+    expect(notice?.text).toContain("nota de crédito");
+    expect(notice?.text).toContain("ARCA");
+  });
+
   test.each([
     [{}],
     [{ factura: "otra-cosa" }],
@@ -93,10 +102,11 @@ describe("invoiceUndoPath", () => {
   test("goes back to the sale with what happened", () => {
     expect(invoiceUndoPath(ID, "done")).toBe(`/admin/ventas/${ID}?factura=pendiente`);
     expect(invoiceUndoPath(ID, "refused")).toBe(`/admin/ventas/${ID}?factura=no-se-pudo`);
+    expect(invoiceUndoPath(ID, "not-collected")).toBe(`/admin/ventas/${ID}?factura=no-cobrada`);
   });
 
   test("what it writes is what the notice reads", () => {
-    for (const outcome of ["done", "refused"] as const) {
+    for (const outcome of ["done", "refused", "not-collected"] as const) {
       const query = new URLSearchParams(invoiceUndoPath(ID, outcome).split("?")[1]);
 
       expect(invoiceUndoNotice(Object.fromEntries(query))).not.toBeNull();

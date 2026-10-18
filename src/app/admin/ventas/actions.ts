@@ -3,7 +3,11 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireAdmin } from "@/admin/auth/require-admin";
-import { InvoiceNotAllowedError, markInvoicePending } from "@/admin/billing/invoicing";
+import {
+  InvoiceNotAllowedError,
+  InvoiceNotCollectedError,
+  markInvoicePending,
+} from "@/admin/billing/invoicing";
 import { invoiceUndoPath, type InvoiceUndoOutcome } from "@/admin/billing/saved-notice";
 import { searchCustomers, type CustomerOption } from "@/admin/customers/repository";
 import type { SaleFormState } from "@/admin/sales/form-state";
@@ -66,7 +70,8 @@ export async function markInvoicePendingAction(saleId: string): Promise<void> {
     await markInvoicePending(await getDb(), saleId);
   } catch (error) {
     if (!(error instanceof InvoiceNotAllowedError)) throw error;
-    outcome = "refused";
+    // La venta tiene factura pero no está cobrada ni entregada: el aviso dice por qué.
+    outcome = error instanceof InvoiceNotCollectedError ? "not-collected" : "refused";
   }
   // `redirect` interrumpe tirando un error: va fuera del `try`.
   redirect(invoiceUndoPath(saleId, outcome));

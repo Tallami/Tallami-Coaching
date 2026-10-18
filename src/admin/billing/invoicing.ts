@@ -57,6 +57,22 @@ export class InvoiceNotAllowedError extends Error {
   }
 }
 
+/**
+ * La venta tiene factura (o "No requiere") pero no está cobrada ni entregada
+ * (cancelada, reembolsada o pendiente): su factura no se vuelve a pendiente desde
+ * el panel. Si ya salió en ARCA, anularla es con una nota de crédito, que se hace
+ * allá. Es un `InvoiceNotAllowedError`: quien ya maneja ese rechazo lo sigue manejando.
+ */
+export class InvoiceNotCollectedError extends InvoiceNotAllowedError {
+  constructor() {
+    super(
+      1,
+      "La venta no está cobrada ni entregada, así que su factura no se vuelve a pendiente desde acá. Si ya la emitiste en ARCA, anularla es con una nota de crédito, que se hace en ARCA.",
+    );
+    this.name = "InvoiceNotCollectedError";
+  }
+}
+
 /** Qué queda escrito en las ventas marcadas. */
 type InvoiceValues =
   | { invoiceStatus: "issued"; invoiceType: InvoiceType; invoiceNumber: string; invoicedOn: string }
@@ -133,8 +149,13 @@ export async function markInvoiceNotRequired(
  * borra los datos de su factura: tipo, número y fecha. Es el deshacer de
  * `markInvoiced` y de `markInvoiceNotRequired`; para corregir un número mal
  * escrito se deshace y se vuelve a marcar. No toca el cobro ni los montos.
- * Tira `InvoiceNotAllowedError` si la venta ya está pendiente o no existe, e
- * `InvalidInvoiceError` si el id no es un uuid (nunca llega a la base).
+ *
+ * Solo de una venta cobrada o entregada (la misma regla que `markInvoiced`): la ficha
+ * no muestra el botón en una cancelada o reembolsada, y una acción repetida a mano
+ * tampoco puede deshacer su factura. Tira `InvoiceNotCollectedError` si la venta tiene
+ * factura pero no está cobrada ni entregada, `InvoiceNotAllowedError` si ya está
+ * pendiente o no existe, e `InvalidInvoiceError` si el id no es un uuid (nunca llega
+ * a la base).
  */
 export async function markInvoicePending(db: Db, id: string): Promise<{ updated: number }> {
   if (!isUuid(id)) {
@@ -143,9 +164,22 @@ export async function markInvoicePending(db: Db, id: string): Promise<{ updated:
   const updated = await db
     .update(sales)
     .set({ invoiceStatus: "pending", invoiceType: null, invoiceNumber: null, invoicedOn: null })
-    .where(and(eq(sales.id, id.toLowerCase()), inArray(sales.invoiceStatus, ["issued", "not_required"])))
+    .where(
+      and(
+        eq(sales.id, id.toLowerCase()),
+        inArray(sales.invoiceStatus, ["issued", "not_required"]),
+        inArray(sales.status, [...INCOME_STATUSES]),
+      ),
+    )
     .returning({ id: sales.id });
   if (updated.length === 0) {
+    // Para decir el motivo: ¿tenía factura y fue el estado lo que la frenó?
+    const [held] = await db
+      .select({ id: sales.id })
+      .from(sales)
+      .where(and(eq(sales.id, id.toLowerCase()), inArray(sales.invoiceStatus, ["issued", "not_required"])))
+      .limit(1);
+    if (held) throw new InvoiceNotCollectedError();
     throw new InvoiceNotAllowedError(1, "Esa venta no tenía factura para quitar: ya estaba pendiente o no existe.");
   }
   return { updated: updated.length };
