@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { count } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { DbNotConfiguredError, getDb, type Db } from "@/db/client";
+import { REMOTE_DB_OPTIONS, DbNotConfiguredError, getDb, type Db } from "@/db/client";
 import { customers } from "@/db/schema";
 
 // `getDb()` decide el driver con las variables de entorno y guarda la base en
@@ -27,6 +27,20 @@ async function closeOpenDb(): Promise<void> {
   await client?.close?.(); // PGlite
   await client?.end?.(); // postgres.js
 }
+
+describe("REMOTE_DB_OPTIONS", () => {
+  // Los números salen de la guía de Supabase para funciones serverless con el
+  // pooler de transacciones (un solo cliente por instancia, SSL `require`, sin
+  // sentencias preparadas) y del ejemplo de postgres.js para `idle_timeout`.
+  test("encrypts the connection, keeps prepared statements off and sizes the pool for serverless", () => {
+    expect(REMOTE_DB_OPTIONS).toEqual({
+      ssl: "require",
+      prepare: false,
+      max: 1,
+      idle_timeout: 20,
+    });
+  });
+});
 
 describe("getDb", () => {
   let dataDir: string;
@@ -73,6 +87,33 @@ describe("getDb", () => {
       .$client;
     expect(client.options.prepare).toBe(false);
     expect(existsSync(pgliteDir)).toBe(false);
+  });
+
+  test("with DATABASE_URL the connection is encrypted and sized for serverless", async () => {
+    vi.stubEnv("DATABASE_URL", "postgres://user:pass@localhost:6543/postgres");
+
+    const db = await getDb();
+
+    const { options } = (
+      db as unknown as {
+        $client: { options: { ssl: unknown; max: number; idle_timeout: number } };
+      }
+    ).$client;
+    expect(options.ssl).toBe("require");
+    expect(options.max).toBe(1);
+    expect(options.idle_timeout).toBe(20);
+  });
+
+  test("the encryption does not depend on what the URL says: sslmode=disable does not turn it off", async () => {
+    vi.stubEnv(
+      "DATABASE_URL",
+      "postgres://user:pass@localhost:6543/postgres?sslmode=disable",
+    );
+
+    const db = await getDb();
+
+    const client = (db as unknown as { $client: { options: { ssl: unknown } } }).$client;
+    expect(client.options.ssl).toBe("require");
   });
 
   test("locally it opens a migrated PGlite on disk and reuses it", async () => {
