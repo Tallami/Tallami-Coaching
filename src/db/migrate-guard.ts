@@ -13,14 +13,16 @@ export const MIGRATE_WITHOUT_DATABASE_URL_MESSAGE =
 
 /**
  * Tira un error en español si el comando que corre drizzle-kit es `migrate` y
- * `DATABASE_URL` falta o está vacía. `argv` es `process.argv`; el comando va
- * después del ejecutable y del script.
+ * `DATABASE_URL` falta o está vacía. `argv` es `process.argv`; el comando es el
+ * primer argumento que no es una opción (después del ejecutable y del script),
+ * así `generate --name migrate` no se confunde con `migrate`.
  */
 export function assertDatabaseUrlForMigrate(
   argv: readonly string[],
   env: Readonly<Record<string, string | undefined>>,
 ): void {
-  const isMigrate = argv.slice(2).includes(MIGRATE_COMMAND);
+  const command = argv.slice(2).find((argument) => !argument.startsWith("-"));
+  const isMigrate = command === MIGRATE_COMMAND;
   if (isMigrate && !env.DATABASE_URL?.trim()) {
     throw new Error(MIGRATE_WITHOUT_DATABASE_URL_MESSAGE);
   }

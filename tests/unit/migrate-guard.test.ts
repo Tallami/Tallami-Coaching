@@ -38,6 +38,23 @@ describe("assertDatabaseUrlForMigrate", () => {
     ).toThrow(/DATABASE_URL/);
   });
 
+  test("looks only at the command, not at the value of an option that happens to say migrate", () => {
+    for (const args of [
+      ["generate", "--name", "migrate"],
+      ["generate", "--name=migrate"],
+      ["generate", "--custom", "--name", "migrate"],
+      ["check", "migrate"],
+    ]) {
+      expect(() => assertDatabaseUrlForMigrate([...NODE, ...args], {}), args.join(" ")).not.toThrow();
+    }
+  });
+
+  test("the command is the first argument that is not an option, and options before it do not hide it", () => {
+    expect(() => assertDatabaseUrlForMigrate([...NODE, "--verbose", "migrate"], {})).toThrow(/DATABASE_URL/);
+    expect(() => assertDatabaseUrlForMigrate([...NODE, "--config=drizzle.config.ts", "migrate"], {})).toThrow(/DATABASE_URL/);
+    expect(() => assertDatabaseUrlForMigrate([...NODE, "migrate", "--name", "generate"], {})).toThrow(/DATABASE_URL/);
+  });
+
   test("does not get in the way of the commands that only read the schema", () => {
     for (const command of ["generate", "check", "up"]) {
       expect(() => assertDatabaseUrlForMigrate([...NODE, command], {}), command).not.toThrow();
