@@ -29,6 +29,13 @@
       "when": 1792186309902,
       "tag": "0003_interest_drops",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792607885430,
+      "tag": "0004_admin_login_security",
+      "breakpoints": true
     }
   ]
 }

@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { createRequire } from "node:module";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -203,8 +204,9 @@ describe("isAdminPath", () => {
 });
 
 describe("guardAdmin", () => {
+  /** Una cookie firmada con un id de sesión bien formado: el `proxy` no mira la base. */
   async function validCookie(): Promise<string> {
-    return `${ADMIN_COOKIE}=${await createSessionToken()}`;
+    return `${ADMIN_COOKIE}=${await createSessionToken(randomBytes(32).toString("base64url"))}`;
   }
 
   function get(path: string, headers: Record<string, string> = {}, method = "GET") {

@@ -15,6 +15,14 @@ import { createTestDb } from "../helpers/db";
 
 const MIGRATIONS_DIR = path.join(process.cwd(), "drizzle");
 
+/** Las tablas de la seguridad del ingreso al panel: llaves, sesiones, ingresos a medio camino y códigos. */
+const LOGIN_SECURITY_TABLES = [
+  "admin_passkeys",
+  "admin_sessions",
+  "admin_pending_logins",
+  "admin_enrollment_codes",
+];
+
 /** Las tablas que exporta el schema de Drizzle. */
 function schemaTables(): PgTable[] {
   const tables: PgTable[] = [];
@@ -51,6 +59,14 @@ describe("row level security", () => {
         "login_attempts",
         "interest_events",
       ]),
+    );
+  });
+
+  test("the four tables of the login security are in the schema", () => {
+    const names = schemaTables().map(getTableName);
+
+    expect(names).toEqual(
+      expect.arrayContaining(LOGIN_SECURITY_TABLES),
     );
   });
 
@@ -96,6 +112,22 @@ describe("row level security at work", () => {
     await db.execute(
       sql`insert into customers (name) values ('Alumno de la RLS'), ('Otro alumno de la RLS')`,
     );
+    // Una fila en cada tabla de la seguridad del ingreso: así, que el rol de la API no lea nada
+    // de ellas (más abajo) prueba que la RLS las esconde y no que están vacías.
+    await db.execute(
+      sql`insert into admin_passkeys (credential_id, public_key, name) values ('credencial-rls', 'clave', 'Celular')`,
+    );
+    await db.execute(
+      sql`insert into admin_sessions (id, device, expires_at) values ('sesion-rls', 'Chrome en Windows', now() + interval '8 hours')`,
+    );
+    await db.execute(
+      sql`insert into admin_pending_logins (id, mode, next_path, ip_hash, device, expires_at)
+          values ('ingreso-rls', 'passkey', '/admin', 'hash', 'Chrome en Windows', now() + interval '5 minutes')`,
+    );
+    await db.execute(
+      sql`insert into admin_enrollment_codes (code_hash, created_by_session, expires_at)
+          values ('codigo-rls', 'sesion-rls', now() + interval '10 minutes')`,
+    );
   });
 
   async function asApiRole<T>(run: () => Promise<T>): Promise<T> {
@@ -135,6 +167,14 @@ describe("row level security at work", () => {
       await other.execute(sql`insert into customers (name) values ('Escrito por el dueño')`);
     } finally {
       await other.execute(sql`reset role`);
+    }
+  });
+
+  test("the owner sees the rows of the login security tables that the Data API role will not", async () => {
+    for (const name of LOGIN_SECURITY_TABLES) {
+      const result = await db.execute(sql`select count(*)::int as total from ${sql.identifier(name)}`);
+
+      expect(Number(rowsOf(result)[0].total), name).toBeGreaterThanOrEqual(1);
     }
   });
 

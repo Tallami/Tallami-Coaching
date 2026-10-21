@@ -2,9 +2,10 @@ import { cookies, headers } from "next/headers";
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { loginIpHash } from "@/admin/auth/login-ip";
 import { LOGIN_MAX_FAILURES } from "@/admin/auth/rate-limit";
-import { hashIp } from "@/admin/auth/session";
+import { ADMIN_COOKIE, hashIp, readSessionClaims } from "@/admin/auth/session";
+import { createSession, validateSession } from "@/admin/auth/sessions";
 import { getDb, type Db } from "@/db/client";
-import { loginAttempts } from "@/db/schema";
+import { adminSessions, loginAttempts } from "@/db/schema";
 import { interestIpHash } from "@/admin/interest/ip-key";
 import { loginAction } from "@/app/admin/login/actions";
 import {
@@ -28,9 +29,11 @@ vi.mock("@/db/client", async (importOriginal) => ({
 
 const cookieJar = { set: vi.fn() };
 
-/** Un intento de ingreso desde la IP `ip` (como la manda Vercel en `x-forwarded-for`). */
-async function login(ip: string, password: string): Promise<string> {
-  vi.mocked(headers).mockResolvedValue(new Headers({ "x-forwarded-for": ip }) as never);
+/** Un intento de ingreso desde la IP `ip` (como la manda Vercel en `x-forwarded-for`), con el navegador `userAgent` si se indica. */
+async function login(ip: string, password: string, userAgent?: string): Promise<string> {
+  const requestHeaders = new Headers({ "x-forwarded-for": ip });
+  if (userAgent) requestHeaders.set("user-agent", userAgent);
+  vi.mocked(headers).mockResolvedValue(requestHeaders as never);
   const form = new FormData();
   form.set("password", password);
   const error = await loginAction(form).then(
@@ -102,10 +105,73 @@ describe("loginAction", () => {
     vi.mocked(cookies).mockResolvedValue(cookieJar as never);
     cookieJar.set.mockClear();
     await db.delete(loginAttempts);
+    await db.delete(adminSessions);
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
+  });
+
+  describe("the session a right password opens", () => {
+    const CHROME_WINDOWS =
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
+
+    test("is saved in the database and its id travels in the cookie", async () => {
+      expect(await login("203.0.113.20", ADMIN_TEST_PASSWORD, CHROME_WINDOWS)).toBe(IN);
+
+      const rows = await db.select().from(adminSessions);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ passkeyId: null, device: "Chrome en Windows", reauthAt: null, revokedAt: null });
+      expect(cookieJar.set).toHaveBeenCalledOnce();
+      const [name, token, options] = cookieJar.set.mock.calls[0];
+      expect(name).toBe(ADMIN_COOKIE);
+      expect(await readSessionClaims(token)).toEqual({ sessionId: rows[0].id });
+      expect(options).toMatchObject({ httpOnly: true, sameSite: "strict", path: "/admin", maxAge: 8 * 60 * 60 });
+      expect(await validateSession(db, rows[0].id)).not.toBeNull();
+    });
+
+    test("ends eight hours after it starts", async () => {
+      await login("203.0.113.21", ADMIN_TEST_PASSWORD, CHROME_WINDOWS);
+
+      const [row] = await db.select().from(adminSessions);
+      expect(row.expiresAt.getTime() - row.createdAt.getTime()).toBe(8 * 60 * 60 * 1000);
+    });
+
+    test("describes the device as unknown when the browser says nothing", async () => {
+      await login("203.0.113.22", ADMIN_TEST_PASSWORD);
+
+      const [row] = await db.select().from(adminSessions);
+      expect(row.device).toBe("Navegador desconocido");
+    });
+
+    test("is a new one for every login", async () => {
+      await login("203.0.113.23", ADMIN_TEST_PASSWORD, CHROME_WINDOWS);
+      await login("203.0.113.24", ADMIN_TEST_PASSWORD, CHROME_WINDOWS);
+
+      const ids = (await db.select({ id: adminSessions.id }).from(adminSessions)).map((row) => row.id);
+      expect(new Set(ids).size).toBe(2);
+    });
+
+    test("is never opened by a wrong password or a blocked address", async () => {
+      for (let attempt = 0; attempt < LOGIN_MAX_FAILURES; attempt += 1) {
+        await login("203.0.113.25", "incorrecta", CHROME_WINDOWS);
+      }
+      await login("203.0.113.25", ADMIN_TEST_PASSWORD, CHROME_WINDOWS);
+
+      expect(await db.select().from(adminSessions)).toEqual([]);
+      expect(cookieJar.set).not.toHaveBeenCalled();
+    });
+
+    test("comes with a cleanup of the records that nobody needs any more", async () => {
+      const longAgo = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000);
+      const oldId = await createSession(db, { passkeyId: null, device: "Chrome en Windows", reauthed: false }, longAgo);
+
+      await login("203.0.113.26", ADMIN_TEST_PASSWORD, CHROME_WINDOWS);
+
+      const ids = (await db.select({ id: adminSessions.id }).from(adminSessions)).map((row) => row.id);
+      expect(ids).toHaveLength(1);
+      expect(ids).not.toContain(oldId);
+    });
   });
 
   test("an ipv6 visitor cannot dodge the limit by changing address inside their /64", async () => {

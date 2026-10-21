@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import type { BrowserContext, Page } from "@playwright/test";
+import type { Browser, BrowserContext, Page } from "@playwright/test";
 import {
   ADMIN_COOKIE,
   ADMIN_TEST_PASSWORD,
@@ -7,12 +7,14 @@ import {
   loginAsAdmin,
   signTestToken,
   test,
+  uniqueTestIp,
 } from "../helpers/admin";
 import { fillSale, openNewSale, uniqueName, whenInteractive } from "../helpers/admin-ui";
 
-// Las sesiones del panel duran 12 horas y no se renuevan: con la pestaña abierta
-// de un día para otro, la sesión ya no existe cuando se envía lo que se cargó. El
-// `proxy` no deja pasar ese Server Action; el navegador tiene que terminar en el
+// Las sesiones del panel se cierran solas a los 30 minutos sin uso y a las 8 horas
+// como máximo: con la pestaña abierta un rato largo, la sesión ya no existe cuando
+// se envía lo que se cargó. El `proxy` no deja pasar ese Server Action (cuando lo
+// que falta es la cookie o ya venció su firma); el navegador tiene que terminar en el
 // ingreso o, si algo más falla, en la pantalla de error en español, nunca en la
 // página "Application error" de Next.
 
@@ -31,6 +33,27 @@ async function expireSession(context: BrowserContext): Promise<void> {
       path: "/admin",
     },
   ]);
+}
+
+/**
+ * Cierra la sesión desde otro navegador que tiene la misma cookie: la sesión queda cerrada en la
+ * base y la cookie de `context` sigue ahí, con la firma y la hora buenas.
+ */
+async function closeFromAnotherBrowser(context: BrowserContext, browser: Browser): Promise<void> {
+  const cookie = (await context.cookies()).find(({ name }) => name === ADMIN_COOKIE);
+  if (!cookie) throw new Error("Falta la cookie de sesión.");
+  const elsewhere = await browser.newContext({ extraHTTPHeaders: { "x-forwarded-for": uniqueTestIp() } });
+  try {
+    await elsewhere.addCookies([{ name: ADMIN_COOKIE, value: cookie.value, domain: "localhost", path: "/admin" }]);
+    const other = await elsewhere.newPage();
+    await other.goto("/admin");
+    const logout = other.getByRole("button", { name: "Salir" });
+    await whenInteractive(logout);
+    await logout.click();
+    await expect(other).toHaveURL(/\/admin\/login/);
+  } finally {
+    await elsewhere.close();
+  }
 }
 
 async function expectNoEnglishError(page: Page): Promise<void> {
@@ -83,6 +106,30 @@ test.describe("a session that ends while the panel is open", () => {
       await expect(page.getByRole("row").filter({ hasText: student })).toHaveCount(0);
     });
   }
+
+  test("a sale submitted when the session was closed from another browser ends at the login and is not saved", async ({
+    browser,
+    context,
+    page,
+  }) => {
+    const student = uniqueName("Sesión cerrada");
+    await openNewSale(page);
+    await fillSale(page, { student, item: "lesson", paymentMethod: "transfer", status: "paid" });
+
+    // La cookie sigue firmada y sin vencer: no la frena el `proxy` sino `requireAdmin()`, que mira la base.
+    await closeFromAnotherBrowser(context, browser);
+    await page.getByRole("button", SAVE_BUTTON).click();
+
+    await expect(page).toHaveURL(/\/admin\/login$/);
+    await expect(page.getByRole("heading", { name: "Panel de Tallami", level: 1 })).toBeVisible();
+    await expectNoEnglishError(page);
+
+    await page.getByLabel("Contraseña").fill(ADMIN_TEST_PASSWORD);
+    await page.getByRole("button", { name: "Ingresar" }).click();
+    await expect(page).toHaveURL(/\/admin$/);
+    await page.goto(`/admin/ventas?q=${encodeURIComponent(student)}`);
+    await expect(page.getByRole("row").filter({ hasText: student })).toHaveCount(0);
+  });
 
   test("any other action ends at the login too: the Salir button of a tab that already lost its session", async ({
     context,

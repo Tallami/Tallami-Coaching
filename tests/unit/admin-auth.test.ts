@@ -15,6 +15,8 @@ import {
   SESSION_AUDIENCE,
   createSessionToken,
   hashIp,
+  readSessionClaims,
+  sessionCookieOptions,
   verifySessionToken,
 } from "@/admin/auth/session";
 import type { Db } from "@/db/client";
@@ -35,6 +37,8 @@ const SECRET = "secreto-de-prueba-de-mas-de-32-caracteres";
 const OTHER_SECRET = "otro-secreto-de-prueba-de-mas-de-32-caracteres";
 const MINUTE_MS = 60_000;
 const HOUR_SECONDS = 3600;
+/** El id de una sesión: 32 bytes al azar en base64url (43 caracteres). */
+const SID = randomBytes(32).toString("base64url");
 
 const encoder = new TextEncoder();
 
@@ -46,6 +50,7 @@ async function signToken({
   alg = "HS256",
   withExpiration = true,
   claim = passwordClaim(encoder.encode(secret), ADMIN_TEST_PASSWORD_HASH),
+  sid = SID,
 }: {
   secret?: string;
   audience?: string;
@@ -54,9 +59,14 @@ async function signToken({
   withExpiration?: boolean;
   /** El claim de la contraseña; `null` firma una sesión de antes de que existiera. */
   claim?: string | null;
+  /** El id de la sesión (`sid`); `null` firma una sesión de antes de que se guardaran en la base. */
+  sid?: string | null;
 } = {}): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
-  const jwt = new SignJWT(claim === null ? {} : { [PASSWORD_CLAIM]: claim })
+  const jwt = new SignJWT({
+    ...(claim === null ? {} : { [PASSWORD_CLAIM]: claim }),
+    ...(sid === null ? {} : { sid }),
+  })
     .setProtectedHeader({ alg })
     .setAudience(audience)
     .setIssuedAt(now - 2 * HOUR_SECONDS);
@@ -148,7 +158,7 @@ describe("session tokens", () => {
 
   describe("the password claim", () => {
     test("is a short keyed value derived from the password hash, never the hash itself", async () => {
-      const payload = decodePart((await createSessionToken()).split(".")[1]);
+      const payload = decodePart((await createSessionToken(SID)).split(".")[1]);
 
       expect(payload[PASSWORD_CLAIM]).toMatch(/^[0-9a-f]{16}$/);
       expect(payload[PASSWORD_CLAIM]).toBe(passwordClaim(encoder.encode(SECRET), ADMIN_TEST_PASSWORD_HASH));
@@ -164,13 +174,14 @@ describe("session tokens", () => {
     });
 
     test("a new password hash closes the sessions of the old one, and new sessions work", async () => {
-      const token = await createSessionToken();
+      const token = await createSessionToken(SID);
       expect(await verifySessionToken(token)).toBe(true);
 
       vi.stubEnv("ADMIN_PASSWORD_HASH", ADMIN_TEST_OLD_PASSWORD_HASH);
 
       expect(await verifySessionToken(token)).toBe(false);
-      const fresh = await createSessionToken();
+      expect(await readSessionClaims(token)).toBeNull();
+      const fresh = await createSessionToken(SID);
       expect(await verifySessionToken(fresh)).toBe(true);
       expect(fresh).not.toBe(token);
     });
@@ -190,7 +201,7 @@ describe("session tokens", () => {
 
     test("rejects a claim that is not text", async () => {
       const now = Math.floor(Date.now() / 1000);
-      const token = await new SignJWT({ [PASSWORD_CLAIM]: 1234567890123456 })
+      const token = await new SignJWT({ [PASSWORD_CLAIM]: 1234567890123456, sid: SID })
         .setProtectedHeader({ alg: "HS256" })
         .setAudience(SESSION_AUDIENCE)
         .setIssuedAt(now)
@@ -201,26 +212,124 @@ describe("session tokens", () => {
     });
 
     test("no session is valid, or can be created, without a usable password hash", async () => {
-      const token = await createSessionToken();
+      const token = await createSessionToken(SID);
 
       for (const hash of ["", "no-es-un-hash"]) {
         vi.stubEnv("ADMIN_PASSWORD_HASH", hash);
         expect(await verifySessionToken(token)).toBe(false);
-        await expect(createSessionToken()).rejects.toThrow(/ADMIN_PASSWORD_HASH/);
+        await expect(createSessionToken(SID)).rejects.toThrow(/ADMIN_PASSWORD_HASH/);
       }
     });
   });
 
-  test("creates a token that verifies, for twelve hours and for the panel only", async () => {
-    const token = await createSessionToken();
+  describe("the session id", () => {
+    test("travels in the sid claim, and readSessionClaims gives it back", async () => {
+      const token = await createSessionToken(SID);
+
+      expect(decodePart(token.split(".")[1]).sid).toBe(SID);
+      expect(await readSessionClaims(token)).toEqual({ sessionId: SID });
+    });
+
+    test("a signed token with a well-formed id is valid for the proxy even if the database never heard of it", async () => {
+      // El `proxy` solo hace la verificación criptográfica: quien dice si la sesión existe es `requireAdmin()`.
+      const token = await signToken({ sid: randomBytes(32).toString("base64url") });
+
+      expect(await verifySessionToken(token)).toBe(true);
+    });
+
+    test("a session from before ids existed no longer opens anything", async () => {
+      const token = await signToken({ sid: null });
+
+      expect(await readSessionClaims(token)).toBeNull();
+      expect(await verifySessionToken(token)).toBe(false);
+    });
+
+    test.each([
+      ["an empty id", ""],
+      ["an id that is too short", SID.slice(0, 42)],
+      ["an id that is too long", `${SID}A`],
+      ["an id with a plus sign", `${SID.slice(0, 42)}+`],
+      ["an id with a slash", `${SID.slice(0, 42)}/`],
+      ["an id with padding", `${SID.slice(0, 42)}=`],
+      ["an id with a space", `${SID.slice(0, 42)} `],
+      ["an id with a line break", `${SID.slice(0, 42)}\n`],
+    ])("rejects %s", async (_label, sid) => {
+      const token = await signToken({ sid });
+
+      expect(await readSessionClaims(token)).toBeNull();
+      expect(await verifySessionToken(token)).toBe(false);
+    });
+
+    test.each([
+      ["a number", 12345],
+      ["a list", [SID]],
+      ["an object", { id: SID }],
+      ["null", null],
+    ])("rejects an id that is %s", async (_label, sid) => {
+      const now = Math.floor(Date.now() / 1000);
+      const token = await new SignJWT({
+        [PASSWORD_CLAIM]: passwordClaim(encoder.encode(SECRET), ADMIN_TEST_PASSWORD_HASH),
+        sid,
+      })
+        .setProtectedHeader({ alg: "HS256" })
+        .setAudience(SESSION_AUDIENCE)
+        .setIssuedAt(now)
+        .setExpirationTime(now + HOUR_SECONDS)
+        .sign(encoder.encode(SECRET));
+
+      expect(await readSessionClaims(token)).toBeNull();
+    });
+
+    test.each([
+      ["expired", () => signToken({ expiresInSeconds: -10 })],
+      ["for another audience", () => signToken({ audience: "otro-sitio" })],
+      ["signed with another secret", () => signToken({ secret: OTHER_SECRET })],
+      ["signed with another algorithm", () => signToken({ alg: "HS512" })],
+      ["without an expiry", () => signToken({ withExpiration: false })],
+      ["from another password", () => signToken({ claim: passwordClaim(encoder.encode(SECRET), ADMIN_TEST_OLD_PASSWORD_HASH) })],
+    ])("gives nothing back for a token %s, even with a good id", async (_label, makeToken) => {
+      expect(await readSessionClaims(await makeToken())).toBeNull();
+    });
+
+    test.each([undefined, "", "abc", "a.b.c", "....", " "])("gives nothing back for the garbage value %j", async (token) => {
+      expect(await readSessionClaims(token)).toBeNull();
+    });
+
+    test("gives nothing back, and does not throw, when the secret is missing", async () => {
+      const token = await signToken();
+      vi.stubEnv("ADMIN_SESSION_SECRET", "");
+
+      expect(await readSessionClaims(token)).toBeNull();
+    });
+
+    test("the cookie lasts as long as the longest session: eight hours", () => {
+      expect(sessionCookieOptions(true)).toEqual({
+        httpOnly: true,
+        secure: true,
+        sameSite: "strict",
+        path: "/admin",
+        maxAge: 8 * HOUR_SECONDS,
+      });
+      expect(sessionCookieOptions(false).secure).toBe(false);
+    });
+  });
+
+  test("creates a token that verifies, for eight hours and for the panel only", async () => {
+    const token = await createSessionToken(SID);
 
     expect(await verifySessionToken(token)).toBe(true);
     const [rawHeader, rawPayload] = token.split(".");
     const payload = decodePart(rawPayload);
     expect(decodePart(rawHeader)).toMatchObject({ alg: "HS256" });
     expect(payload.aud).toBe("tallami-admin");
-    expect(Number(payload.exp) - Number(payload.iat)).toBe(12 * HOUR_SECONDS);
+    expect(Number(payload.exp) - Number(payload.iat)).toBe(8 * HOUR_SECONDS);
     expect(ADMIN_COOKIE).toBe("tallami_admin");
+  });
+
+  test("refuses to sign a token for something that is not a session id", async () => {
+    for (const sid of ["", "corto", `${SID}A`, "a".repeat(42) + "+"]) {
+      await expect(createSessionToken(sid)).rejects.toThrow(/id de sesión/);
+    }
   });
 
   test("rejects tampered, expired or foreign-audience tokens", async () => {
@@ -247,7 +356,7 @@ describe("session tokens", () => {
   });
 
   test("rejects tokens that skip the signature, the algorithm or the expiry", async () => {
-    const payload = { aud: "tallami-admin", exp: Math.floor(Date.now() / 1000) + HOUR_SECONDS };
+    const payload = { aud: "tallami-admin", sid: SID, exp: Math.floor(Date.now() / 1000) + HOUR_SECONDS };
     const unsigned = `${encodePart({ alg: "none", typ: "JWT" })}.${encodePart(payload)}.`;
 
     expect(await verifySessionToken(unsigned)).toBe(false);
@@ -267,12 +376,12 @@ describe("session tokens", () => {
 
     vi.stubEnv("ADMIN_SESSION_SECRET", "");
     expect(await verifySessionToken(token)).toBe(false);
-    await expect(createSessionToken()).rejects.toThrow();
+    await expect(createSessionToken(SID)).rejects.toThrow();
 
     const short = "x".repeat(31);
     vi.stubEnv("ADMIN_SESSION_SECRET", short);
     expect(await verifySessionToken(await signToken({ secret: short }))).toBe(false);
-    await expect(createSessionToken()).rejects.toThrow();
+    await expect(createSessionToken(SID)).rejects.toThrow();
   });
 });
 

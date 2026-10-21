@@ -4,12 +4,14 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getMissingConfig } from "@/admin/auth/config";
+import { describeDevice } from "@/admin/auth/device";
 import { attemptLogin } from "@/admin/auth/login";
 import { loginIpHash } from "@/admin/auth/login-ip";
 import type { LoginErrorCode } from "@/admin/auth/login-errors";
 import { loginPath, safeNextPath } from "@/admin/auth/redirect";
 import { getClientIp, shouldUseSecureCookie } from "@/admin/auth/request";
 import { ADMIN_COOKIE, createSessionToken, sessionCookieOptions } from "@/admin/auth/session";
+import { createSession, purgeExpiredAuthRecords } from "@/admin/auth/sessions";
 import { getDb } from "@/db/client";
 
 /** Tope del largo de la contraseña: scrypt cuesta lo mismo, pero no hay por qué procesar un texto enorme. */
@@ -22,8 +24,33 @@ function backToLogin(error: LoginErrorCode, next: string): never {
 }
 
 /**
- * Inicia sesión: verifica la contraseña (con límite de intentos por IP) y, si es
- * correcta, guarda la cookie de sesión y va a `next` (una ruta del panel; ver
+ * Verifica la contraseña (con límite de intentos por IP) y, si es correcta, abre
+ * una sesión en la base y devuelve su id; si no, el motivo del rechazo. De paso
+ * borra los registros viejos de sesiones, ingresos y códigos.
+ *
+ * Con solo la contraseña la sesión se abre ya, sin llave: es provisorio, el
+ * ingreso con llave de acceso la reemplaza por un paso más.
+ */
+async function openSessionWithPassword(
+  requestHeaders: Headers,
+  password: string,
+): Promise<{ sessionId: string } | { error: LoginErrorCode }> {
+  const db = await getDb();
+  const result = await attemptLogin(db, loginIpHash(getClientIp(requestHeaders)), password);
+  if (result !== "ok") return { error: result };
+
+  await purgeExpiredAuthRecords(db);
+  const sessionId = await createSession(db, {
+    passkeyId: null,
+    device: describeDevice(requestHeaders.get("user-agent")),
+    reauthed: false,
+  });
+  return { sessionId };
+}
+
+/**
+ * Inicia sesión: verifica la contraseña, abre la sesión en la base y guarda la
+ * cookie que lleva su id; después va a `next` (una ruta del panel; ver
  * `safeNextPath`).
  *
  * Ante cualquier falla de contraseña el aviso es el mismo, también cuando el
@@ -39,20 +66,19 @@ export async function loginAction(formData: FormData): Promise<void> {
   }
 
   const requestHeaders = await headers();
-  let result: Awaited<ReturnType<typeof attemptLogin>>;
+  let outcome: Awaited<ReturnType<typeof openSessionWithPassword>>;
   try {
-    const db = await getDb();
-    result = await attemptLogin(db, loginIpHash(getClientIp(requestHeaders)), password.data);
+    outcome = await openSessionWithPassword(requestHeaders, password.data);
   } catch (error) {
-    // Base caída o mal configurada: no se deja entrar sin poder anotar el intento.
+    // Base caída o mal configurada: no se deja entrar sin poder anotar el intento ni abrir la sesión.
     console.error("Panel: no se pudo verificar el ingreso.", error);
     return backToLogin("unavailable", next);
   }
-  if (result !== "ok") return backToLogin(result, next);
+  if ("error" in outcome) return backToLogin(outcome.error, next);
 
   (await cookies()).set(
     ADMIN_COOKIE,
-    await createSessionToken(),
+    await createSessionToken(outcome.sessionId),
     sessionCookieOptions(shouldUseSecureCookie(requestHeaders)),
   );
   redirect(next);

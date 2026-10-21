@@ -36,6 +36,7 @@ import {
   uuid,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
+import { PASSKEY_NAME_MAX_LENGTH } from "@/admin/auth/policy";
 import {
   CURRENCIES,
   INTEREST_ITEMS,
@@ -226,6 +227,110 @@ export const interestDrops = pgTable(
   },
   (t) => [check("interest_drops_dropped_positive", sql`${t.dropped} > 0`)],
 ).enableRLS();
+
+// Seguridad del ingreso al panel (`src/admin/auth/`): llaves de acceso (WebAuthn),
+// sesiones, ingresos a medio camino y códigos para sumar otro dispositivo. Los
+// tiempos que los gobiernan viven en `src/admin/auth/policy.ts`.
+
+/**
+ * Una llave de acceso registrada (passkey). `credentialId` y `publicKey` son lo
+ * que entrega el navegador al registrarla (la clave pública en COSE, base64url);
+ * `counter` es el contador de firmas, que solo puede subir.
+ */
+export const adminPasskeys = pgTable(
+  "admin_passkeys",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    credentialId: text("credential_id").notNull().unique(),
+    publicKey: text("public_key").notNull(),
+    counter: bigint("counter", { mode: "number" }).notNull().default(0),
+    transports: text("transports")
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    name: text("name").notNull(),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+    lastUsedAt: timestamptz("last_used_at"),
+  },
+  (t) => [
+    check(
+      "admin_passkeys_name_length",
+      sql`char_length(${t.name}) between 1 and ${sql.raw(String(PASSKEY_NAME_MAX_LENGTH))}`,
+    ),
+  ],
+).enableRLS();
+
+/**
+ * Una sesión del panel. La cookie lleva solo su `id` (32 bytes al azar, base64url):
+ * que la sesión valga, o no, lo decide esta fila (no cerrada, no vencida, con uso
+ * reciente). El desafío (`challenge…`) es el de una confirmación con la llave o
+ * del registro de otra, de un solo uso y de vida corta.
+ */
+export const adminSessions = pgTable(
+  "admin_sessions",
+  {
+    id: text("id").primaryKey(),
+    /** La llave con la que se ingresó, o `null` si fue solo con la contraseña. */
+    passkeyId: uuid("passkey_id").references(() => adminPasskeys.id, { onDelete: "set null" }),
+    /** Descripción corta del navegador y el sistema ("Chrome en Windows"). */
+    device: text("device").notNull(),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+    lastSeenAt: timestamptz("last_seen_at").notNull().defaultNow(),
+    expiresAt: timestamptz("expires_at").notNull(),
+    /** Última confirmación con la llave, para las acciones delicadas. */
+    reauthAt: timestamptz("reauth_at"),
+    revokedAt: timestamptz("revoked_at"),
+    challenge: text("challenge"),
+    challengePurpose: text("challenge_purpose"),
+    challengeExpiresAt: timestamptz("challenge_expires_at"),
+  },
+  (t) => [
+    check(
+      "admin_sessions_challenge_purpose_valid",
+      sql`${t.challengePurpose} is null or ${oneOf(t.challengePurpose, ["reauth", "register"])}`,
+    ),
+  ],
+).enableRLS();
+
+/**
+ * Un ingreso a medio camino: la contraseña ya estaba bien y falta el segundo
+ * paso. `mode` dice cómo termina: con una llave (`passkey`), registrando la
+ * primera (`first-key`) o con un código para otro dispositivo (`code`). La IP
+ * se guarda solo como hash, igual que en los intentos de ingreso.
+ */
+export const adminPendingLogins = pgTable(
+  "admin_pending_logins",
+  {
+    id: text("id").primaryKey(),
+    mode: text("mode").notNull(),
+    /** A dónde ir al terminar (una ruta del panel, ya validada). */
+    nextPath: text("next_path").notNull(),
+    ipHash: text("ip_hash").notNull(),
+    device: text("device").notNull(),
+    challenge: text("challenge"),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+    expiresAt: timestamptz("expires_at").notNull(),
+    consumedAt: timestamptz("consumed_at"),
+  },
+  (t) => [
+    check("admin_pending_logins_mode_valid", oneOf(t.mode, ["passkey", "first-key", "code"])),
+  ],
+).enableRLS();
+
+/**
+ * Un código de un solo uso para registrar una llave en otro dispositivo. Se
+ * guarda solo su hash; nace en una sesión abierta y se borra con ella.
+ */
+export const adminEnrollmentCodes = pgTable("admin_enrollment_codes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  codeHash: text("code_hash").notNull().unique(),
+  createdBySession: text("created_by_session")
+    .notNull()
+    .references(() => adminSessions.id, { onDelete: "cascade" }),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+  expiresAt: timestamptz("expires_at").notNull(),
+  usedAt: timestamptz("used_at"),
+}).enableRLS();
 
 export type Customer = typeof customers.$inferSelect;
 export type NewCustomer = typeof customers.$inferInsert;

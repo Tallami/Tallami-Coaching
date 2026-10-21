@@ -1,6 +1,8 @@
 // Ayudas de los e2e del panel: un `test` donde cada test navega con su propia
-// IP, tokens de sesión (válidos o falsos) y el inicio de sesión.
+// IP, tokens de sesión (firmados a mano o de un ingreso de verdad) y el inicio
+// de sesión.
 
+import { randomBytes } from "node:crypto";
 import { expect, test as base, type Page } from "@playwright/test";
 import { SignJWT } from "jose";
 import { PASSWORD_CLAIM, passwordClaim } from "../../src/admin/auth/password-claim";
@@ -23,7 +25,7 @@ export const ADMIN_COOKIE = "tallami_admin";
 export const ADMIN_AUDIENCE = "tallami-admin";
 
 const SECONDS_PER_HOUR = 3600;
-const SESSION_HOURS = 12;
+const SESSION_HOURS = 8;
 
 /** IP privada al azar: cada test tiene la suya, así el límite de intentos no se pisa entre tests en paralelo. */
 export function uniqueTestIp(): string {
@@ -57,6 +59,13 @@ interface TokenOptions {
    * claim es el de una contraseña anterior; `null` firma una sesión sin claim.
    */
   passwordHash?: string | null;
+  /**
+   * El id de la sesión (claim `sid`). Por defecto uno al azar, bien formado pero
+   * que no existe en la base: la firma pasa el `proxy` y `requireAdmin()` lo
+   * manda al ingreso. Una sesión que sí vale es la de un ingreso de verdad
+   * (`loginAndReadSessionCookie`).
+   */
+  sessionId?: string;
 }
 
 /** Firma una sesión como lo hace el panel; con opciones, una falsa, vencida o de una contraseña anterior. */
@@ -66,10 +75,14 @@ export async function signTestToken({
   expiresInSeconds = SESSION_HOURS * SECONDS_PER_HOUR,
   alg = "HS256",
   passwordHash = ADMIN_TEST_PASSWORD_HASH,
+  sessionId = randomBytes(32).toString("base64url"),
 }: TokenOptions = {}): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const key = new TextEncoder().encode(secret);
-  const claims = passwordHash === null ? {} : { [PASSWORD_CLAIM]: passwordClaim(key, passwordHash) };
+  const claims = {
+    ...(passwordHash === null ? {} : { [PASSWORD_CLAIM]: passwordClaim(key, passwordHash) }),
+    sid: sessionId,
+  };
   return new SignJWT(claims)
     .setProtectedHeader({ alg })
     .setAudience(audience)
@@ -84,4 +97,17 @@ export async function loginAsAdmin(page: Page): Promise<void> {
   await page.getByLabel("Contraseña").fill(ADMIN_TEST_PASSWORD);
   await page.getByRole("button", { name: "Ingresar" }).click();
   await expect(page).toHaveURL(/\/admin$/);
+}
+
+/**
+ * Entra al panel de verdad y devuelve el valor de la cookie de sesión que
+ * quedó en el navegador: la de una sesión que existe en la base. Sirve para
+ * mandar pedidos sueltos con una sesión válida (`request.get(…, { headers })`) o
+ * para volver a poner una cookie vieja después de cerrar la sesión.
+ */
+export async function loginAndReadSessionCookie(page: Page): Promise<string> {
+  await loginAsAdmin(page);
+  const cookie = (await page.context().cookies()).find(({ name }) => name === ADMIN_COOKIE);
+  if (!cookie) throw new Error("El ingreso no dejó la cookie de sesión.");
+  return cookie.value;
 }

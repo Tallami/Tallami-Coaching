@@ -1,24 +1,39 @@
-// Sesión del panel: un JWT firmado (HS256) con `ADMIN_SESSION_SECRET`, guardado
-// en una cookie. No hay usuarios ni sesiones en la base: la cookie es válida si
-// la firma, la audiencia, el vencimiento y el claim de la contraseña son
-// correctos. El claim (`password-claim.ts`) cambia cuando cambia
-// `ADMIN_PASSWORD_HASH`, así cambiar la contraseña cierra todas las sesiones.
+// Cookie de sesión del panel: un JWT firmado (HS256) con `ADMIN_SESSION_SECRET`
+// que lleva el id de una sesión guardada en la base (`sessions.ts`). El token es
+// válido si la firma, la audiencia, el vencimiento (el máximo de la sesión) y el
+// claim de la contraseña son correctos y trae un id bien formado: es la
+// verificación criptográfica que hace el `proxy` sin tocar la base. Que la
+// sesión exista, no esté cerrada ni lleve mucho sin uso lo mira `requireAdmin()`
+// en la base. El claim de la contraseña (`password-claim.ts`) cambia cuando
+// cambia `ADMIN_PASSWORD_HASH`, así cambiar la contraseña cierra todas las
+// sesiones.
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
 import { getPasswordHash, getSessionSecret } from "./config";
 import { PASSWORD_CLAIM, passwordClaim } from "./password-claim";
+import { SESSION_MAX_MS } from "./policy";
 
 export const ADMIN_COOKIE = "tallami_admin";
 /** Para qué sirve el token: un token firmado con el mismo secreto pero otra audiencia no entra. */
 export const SESSION_AUDIENCE = "tallami-admin";
-export const SESSION_HOURS = 12;
-export const SESSION_MAX_AGE_SECONDS = SESSION_HOURS * 60 * 60;
+/** La cookie y el token duran lo que la sesión más larga: 8 horas. */
+export const SESSION_MAX_AGE_SECONDS = SESSION_MAX_MS / 1000;
 /** La cookie solo viaja a `/admin`: el sitio público y `/api` nunca la reciben. */
 export const SESSION_COOKIE_PATH = "/admin";
+/** El claim del token con el id de la sesión de la base. */
+const SESSION_ID_CLAIM = "sid";
+/** Un id de sesión son 32 bytes al azar, en base64url: 43 caracteres. */
+export const SESSION_ID_BYTES = 32;
+const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
 const ALGORITHM = "HS256";
 const IP_HASH_CONTEXT = "tallami-admin:ip-hash:v1";
+
+/** ¿Tiene `value` la forma de un id de sesión? (No dice si la sesión existe.) */
+export function isSessionId(value: unknown): value is string {
+  return typeof value === "string" && SESSION_ID_PATTERN.test(value);
+}
 
 function requireSecret(): Uint8Array {
   const secret = getSessionSecret();
@@ -42,34 +57,44 @@ function sameText(a: string, b: string): boolean {
 }
 
 /**
- * Firma una sesión nueva: audiencia del panel, vencimiento a las 12 horas y el
- * claim de la contraseña vigente. Tira si falta el secreto o el hash.
+ * Firma el token de la sesión `sessionId`: audiencia del panel, vencimiento a las
+ * 8 horas (lo máximo que dura una sesión), el claim de la contraseña vigente y el
+ * id de la sesión (`sid`). Tira si falta el secreto o el hash, o si `sessionId` no
+ * tiene la forma de un id de sesión.
  */
-export async function createSessionToken(): Promise<string> {
+export async function createSessionToken(sessionId: string): Promise<string> {
+  if (!isSessionId(sessionId)) {
+    throw new Error("El id de sesión no tiene el formato esperado.");
+  }
   const secret = requireSecret();
   const claim = currentPasswordClaim(secret);
   if (claim === null) {
     throw new Error("ADMIN_PASSWORD_HASH falta o no tiene el formato esperado.");
   }
-  return new SignJWT({ [PASSWORD_CLAIM]: claim })
+  const issuedAt = Math.floor(Date.now() / 1000);
+  return new SignJWT({ [PASSWORD_CLAIM]: claim, [SESSION_ID_CLAIM]: sessionId })
     .setProtectedHeader({ alg: ALGORITHM })
     .setAudience(SESSION_AUDIENCE)
-    .setIssuedAt()
-    .setExpirationTime(`${SESSION_HOURS}h`)
+    .setIssuedAt(issuedAt)
+    .setExpirationTime(issuedAt + SESSION_MAX_AGE_SECONDS)
     .sign(secret);
 }
 
 /**
- * ¿Es `token` una sesión válida? Exige firma HS256 con el secreto, la audiencia
- * del panel, un vencimiento que no pasó y el claim de la contraseña vigente:
- * una sesión de antes de cambiar `ADMIN_PASSWORD_HASH` (o de antes de que
- * existiera el claim) no vale. Cualquier otra cosa (sin cookie, texto
- * cualquiera, `alg: none`, otro algoritmo, token sin vencimiento) es `false`;
- * nunca tira.
+ * El id de sesión de `token`, si el token es válido. Exige firma HS256 con el
+ * secreto, la audiencia del panel, un vencimiento que no pasó, el claim de la
+ * contraseña vigente (una sesión de antes de cambiar `ADMIN_PASSWORD_HASH` no
+ * vale) y un `sid` con la forma de un id de sesión: un token de antes de que las
+ * sesiones se guardaran en la base no vale. Cualquier otra cosa (sin cookie,
+ * texto cualquiera, `alg: none`, otro algoritmo, token sin vencimiento) es
+ * `null`; nunca tira. No consulta la base: que la sesión exista y siga abierta
+ * lo decide `validateSession`.
  */
-export async function verifySessionToken(token: string | undefined): Promise<boolean> {
+export async function readSessionClaims(
+  token: string | undefined,
+): Promise<{ sessionId: string } | null> {
   const secret = getSessionSecret();
-  if (!token || !secret) return false;
+  if (!token || !secret) return null;
   try {
     const { payload } = await jwtVerify(token, secret, {
       algorithms: [ALGORITHM],
@@ -78,10 +103,20 @@ export async function verifySessionToken(token: string | undefined): Promise<boo
     });
     const expected = currentPasswordClaim(secret);
     const claim = payload[PASSWORD_CLAIM];
-    return expected !== null && typeof claim === "string" && sameText(claim, expected);
+    if (expected === null || typeof claim !== "string" || !sameText(claim, expected)) return null;
+    const sessionId = payload[SESSION_ID_CLAIM];
+    return isSessionId(sessionId) ? { sessionId } : null;
   } catch {
-    return false;
+    return null;
   }
+}
+
+/**
+ * ¿Es `token` una sesión válida para el `proxy`? La verificación criptográfica
+ * de `readSessionClaims`, sin la base. Nunca tira.
+ */
+export async function verifySessionToken(token: string | undefined): Promise<boolean> {
+  return (await readSessionClaims(token)) !== null;
 }
 
 /**

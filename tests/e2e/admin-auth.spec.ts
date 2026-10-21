@@ -6,6 +6,7 @@ import {
   ADMIN_TEST_OLD_PASSWORD_HASH,
   ADMIN_TEST_PASSWORD,
   expect,
+  loginAndReadSessionCookie,
   loginAsAdmin,
   signTestToken,
   test,
@@ -14,7 +15,10 @@ import {
 
 const LOGIN_URL = /\/admin\/login(\?|$)/;
 const LOCKED_AFTER = 5;
-const SESSION_SECONDS = 12 * 60 * 60;
+/** Lo máximo que dura una sesión (y su cookie): 8 horas. */
+const SESSION_SECONDS = 8 * 60 * 60;
+/** Un endpoint del panel (no una página): el CSV de ventas. */
+const EXPORT_PATH = "/admin/ventas/exportar";
 /** La línea bajo el título del resumen: solo aparece con la sesión iniciada. */
 const PANEL_MARKER = "Cuánto ganás, qué se vende y qué tenés pendiente.";
 
@@ -138,23 +142,43 @@ test.describe("without a session", () => {
     }
   });
 
-  test("a valid token opens the panel, so the forged ones above fail for the right reason", async ({
+  test("the cookie of a real login opens the panel, so the forged ones above fail for the right reason", async ({
     context,
     page,
   }) => {
-    await context.addCookies([
-      {
-        name: ADMIN_COOKIE,
-        value: await signTestToken(),
-        domain: "localhost",
-        path: "/admin",
-      },
-    ]);
+    const value = await loginAndReadSessionCookie(page);
+    // Solo con esa cookie, puesta a mano en un navegador sin nada más.
+    await context.clearCookies();
+    await context.addCookies([{ name: ADMIN_COOKIE, value, domain: "localhost", path: "/admin" }]);
 
     await page.goto("/admin");
 
     await expect(page).toHaveURL(/\/admin$/);
     await expect(page.getByText(PANEL_MARKER)).toBeVisible();
+  });
+
+  test("a well-signed token whose session is not in the database ends at the login", async ({
+    context,
+    page,
+    request,
+  }) => {
+    // La firma, la audiencia, el vencimiento y la contraseña son buenos: el `proxy` la deja pasar.
+    // Lo que la frena es `requireAdmin()`, que no encuentra esa sesión en la base.
+    const value = await signTestToken();
+    await context.addCookies([{ name: ADMIN_COOKIE, value, domain: "localhost", path: "/admin" }]);
+
+    await page.goto("/admin");
+    await expect(page).toHaveURL(LOGIN_URL);
+    await expect(page.getByText(PANEL_MARKER)).toHaveCount(0);
+
+    // Lo mismo en una ruta que no es una página.
+    const exported = await request.get(EXPORT_PATH, {
+      maxRedirects: 0,
+      headers: { cookie: `${ADMIN_COOKIE}=${value}` },
+    });
+    expect(exported.status()).toBe(307);
+    expect(exported.headers().location).toContain("/admin/login");
+    expect(await exported.text()).not.toContain("Fecha de cobro");
   });
 
   for (const path of ["/%61dmin", "/%61dmin/ventas", "/admin%2Fventas", "//admin", "/admin/", "/ADMIN"]) {
@@ -319,6 +343,28 @@ test.describe("login", () => {
 
     await page.goto("/admin");
     await expect(page).toHaveURL(LOGIN_URL);
+  });
+
+  test("after Salir the old cookie stops working, even though its signature and expiry are still good", async ({
+    context,
+    page,
+    request,
+  }) => {
+    const oldCookie = await loginAndReadSessionCookie(page);
+    await page.getByRole("button", { name: "Salir" }).click();
+    await expect(page).toHaveURL(LOGIN_URL);
+
+    await context.addCookies([{ name: ADMIN_COOKIE, value: oldCookie, domain: "localhost", path: "/admin" }]);
+    await page.goto("/admin");
+    await expect(page).toHaveURL(LOGIN_URL);
+    await expect(page.getByText(PANEL_MARKER)).toHaveCount(0);
+
+    const exported = await request.get(EXPORT_PATH, {
+      maxRedirects: 0,
+      headers: { cookie: `${ADMIN_COOKIE}=${oldCookie}` },
+    });
+    expect(exported.status()).toBe(307);
+    expect(exported.headers().location).toContain("/admin/login");
   });
 
   test("cookie is httpOnly, SameSite=Strict and scoped to /admin", async ({ context, page }) => {

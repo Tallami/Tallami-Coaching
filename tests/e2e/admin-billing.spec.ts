@@ -10,6 +10,7 @@ import type { Download, Page } from "@playwright/test";
 import {
   ADMIN_COOKIE,
   expect,
+  loginAndReadSessionCookie,
   loginAsAdmin,
   signTestToken,
   test,
@@ -527,7 +528,7 @@ test.describe("exports", () => {
 
 test.describe("exports without a session", () => {
   for (const path of EXPORT_PATHS) {
-    test(`export endpoints require a session: ${path}`, async ({ request }) => {
+    test(`export endpoints require a session: ${path}`, async ({ page, request }) => {
       const anonymous = await request.get(path, { maxRedirects: 0 });
 
       expect(anonymous.status()).toBe(307);
@@ -552,10 +553,10 @@ test.describe("exports without a session", () => {
         expect(await response.text(), label).not.toContain("Fecha de cobro");
       }
 
-      // Con una sesión de verdad, las mismas direcciones sí entregan el archivo.
+      // Con la cookie de un ingreso de verdad, las mismas direcciones sí entregan el archivo.
       const valid = await request.get(path, {
         maxRedirects: 0,
-        headers: { cookie: `${ADMIN_COOKIE}=${await signTestToken()}` },
+        headers: { cookie: `${ADMIN_COOKIE}=${await loginAndReadSessionCookie(page)}` },
       });
       expect(valid.status()).toBe(200);
       expect(valid.headers()["content-type"]).toBe("text/csv; charset=utf-8");
