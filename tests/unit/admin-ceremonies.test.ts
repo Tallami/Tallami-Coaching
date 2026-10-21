@@ -85,6 +85,19 @@ describe("registrationOptions", () => {
     expect(options.rp.id).toBe(RP_ID);
   });
 
+  test("always offers the same classic algorithms (EdDSA, ES256, RS256), whatever the Node version supports", async () => {
+    // SimpleWebAuthn 14 suma ML-DSA-44 a su lista por defecto solo si el Node en
+    // uso lo soporta (hoy con avisos de "experimental"): una llave así dejaría de
+    // verificarse si el servidor cambiara de versión de Node.
+    const options = await registrationOptions([]);
+
+    expect(options.pubKeyCredParams).toEqual([
+      { alg: -8, type: "public-key" },
+      { alg: -7, type: "public-key" },
+      { alg: -257, type: "public-key" },
+    ]);
+  });
+
   test("always registers for the same fixed user", async () => {
     const first = await registrationOptions([]);
     const second = await registrationOptions([]);
@@ -176,11 +189,42 @@ describe("verifyRegistration", () => {
     expect(await verifyRegistration(phished, options.challenge)).toBeNull();
   });
 
+  test("rejects a registration made for a different rpID (the rpId hash does not match)", async () => {
+    const device = createVirtualAuthenticator({ rpID: RP_ID, origin: ORIGIN });
+    const options = await registrationOptions([]);
+    const forOtherSite = device.register(options, { rpID: "otro-sitio.example.com" });
+
+    expect(await verifyRegistration(forOtherSite, options.challenge)).toBeNull();
+    expect(await verifyRegistration(device.register(options), options.challenge)).not.toBeNull();
+  });
+
   test("rejects a registration where the device did not verify the user", async () => {
     const device = createVirtualAuthenticator({ rpID: RP_ID, origin: ORIGIN });
     const options = await registrationOptions([]);
 
     expect(await verifyRegistration(device.register(options, { userVerified: false }), options.challenge)).toBeNull();
+  });
+
+  test("keeps only the transports it knows, so junk from the browser never reaches the database", async () => {
+    const device = createVirtualAuthenticator({ rpID: RP_ID, origin: ORIGIN });
+    const options = await registrationOptions([]);
+    const response = device.register(options, {
+      transports: ["usb", "javascript:alert(1)", "hybrid", "x".repeat(200), "", "internal"],
+    });
+
+    const data = await verifyRegistration(response, options.challenge);
+
+    expect(data?.transports).toEqual(["usb", "hybrid", "internal"]);
+  });
+
+  test("stores an empty list when none of the transports the browser sent is known", async () => {
+    const device = createVirtualAuthenticator({ rpID: RP_ID, origin: ORIGIN });
+    const options = await registrationOptions([]);
+
+    const data = await verifyRegistration(device.register(options, { transports: ["inventado"] }), options.challenge);
+
+    expect(data).not.toBeNull();
+    expect(data?.transports).toEqual([]);
   });
 
   test.each([
@@ -220,6 +264,7 @@ describe("verifyRegistration", () => {
         expectedRPID: RP_ID,
         requireUserPresence: true,
         requireUserVerification: true,
+        supportedAlgorithmIDs: [-8, -7, -257],
       }),
     );
   });
@@ -353,6 +398,17 @@ describe("verifyAuthentication", () => {
     const phished = device.authenticate(options, { counter: 1, origin: "https://sitio-trucho.example.com" });
 
     expect(await verifyAuthentication(phished, options.challenge, passkey)).toBeNull();
+  });
+
+  test("rejects an assertion signed for a different rpID (the rpId hash does not match)", async () => {
+    const { device, passkey } = await registeredDevice();
+    const options = await authenticationOptions([passkey]);
+    const forOtherSite = device.authenticate(options, { counter: 1, rpID: "otro-sitio.example.com" });
+
+    expect(await verifyAuthentication(forOtherSite, options.challenge, passkey)).toBeNull();
+    expect(await verifyAuthentication(device.authenticate(options, { counter: 1 }), options.challenge, passkey)).toEqual({
+      newCounter: 1,
+    });
   });
 
   test("rejects a signature from a different device, even one that claims the same credential id", async () => {

@@ -16,7 +16,6 @@
 //   probable de que "no ande" y sin él no habría por dónde empezar.
 
 import {
-  type AuthenticatorTransportFuture,
   type AuthenticationResponseJSON,
   type PublicKeyCredentialCreationOptionsJSON,
   type PublicKeyCredentialRequestOptionsJSON,
@@ -26,7 +25,7 @@ import {
   verifyAuthenticationResponse,
   verifyRegistrationResponse,
 } from "@simplewebauthn/server";
-import { isoBase64URL } from "@simplewebauthn/server/helpers";
+import { COSEALG, isoBase64URL } from "@simplewebauthn/server/helpers";
 import type { Passkey } from "./passkeys";
 import { getWebAuthnConfig } from "./webauthn-config";
 
@@ -44,8 +43,23 @@ export type NewPasskeyData = {
 const USER_ID = new TextEncoder().encode("tallami-admin");
 const USER_NAME = "Tallami";
 
-/** Los transportes que entiende el navegador (incluido `hybrid`: el celular por QR y Bluetooth). */
-const KNOWN_TRANSPORTS: ReadonlySet<string> = new Set<AuthenticatorTransportFuture>([
+/**
+ * Los algoritmos de firma que se aceptan, los mismos al pedir y al verificar el
+ * registro. Se fijan acá y no se deja la lista por defecto de la librería: desde
+ * la versión 14 esa lista suma ML-DSA-44 (poscuántico) si el Node en uso lo
+ * soporta, o sea que cambia con la versión de Node, y una llave registrada así
+ * dejaría de verificarse si el servidor cambiara de versión. Estos tres cubren
+ * los celulares, Windows Hello y las llaves USB.
+ */
+const SUPPORTED_ALGORITHM_IDS = [COSEALG.EdDSA, COSEALG.ES256, COSEALG.RS256];
+
+/**
+ * Los transportes que entiende el navegador (incluido `hybrid`: el celular por QR
+ * y Bluetooth). Desde la versión 14 la librería los tipa como `string[]`, así que
+ * esta lista es la que decide qué entra: se filtra al registrar (lo que manda el
+ * navegador no llega a la columna `text[]` tal cual) y al armar las opciones.
+ */
+const KNOWN_TRANSPORTS: ReadonlySet<string> = new Set([
   "ble",
   "cable",
   "hybrid",
@@ -55,10 +69,8 @@ const KNOWN_TRANSPORTS: ReadonlySet<string> = new Set<AuthenticatorTransportFutu
   "usb",
 ]);
 
-function knownTransports(transports: string[]): AuthenticatorTransportFuture[] {
-  return transports.filter((transport): transport is AuthenticatorTransportFuture =>
-    KNOWN_TRANSPORTS.has(transport),
-  );
+function knownTransports(transports: string[]): string[] {
+  return transports.filter((transport) => KNOWN_TRANSPORTS.has(transport));
 }
 
 function describeCredentials(passkeys: Passkey[]) {
@@ -105,6 +117,7 @@ export async function registrationOptions(existing: Passkey[]): Promise<PublicKe
     attestationType: "none",
     excludeCredentials: describeCredentials(existing),
     authenticatorSelection: { residentKey: "preferred", userVerification: "required" },
+    supportedAlgorithmIDs: SUPPORTED_ALGORITHM_IDS,
   });
 }
 
@@ -123,6 +136,7 @@ export async function verifyRegistration(
       expectedRPID: rpID,
       requireUserPresence: true,
       requireUserVerification: true,
+      supportedAlgorithmIDs: SUPPORTED_ALGORITHM_IDS,
     });
     if (!verification.verified) return null;
     const { credential } = verification.registrationInfo;
@@ -130,7 +144,7 @@ export async function verifyRegistration(
       credentialId: credential.id,
       publicKey: isoBase64URL.fromBuffer(credential.publicKey),
       counter: credential.counter,
-      transports: credential.transports ?? [],
+      transports: knownTransports(credential.transports ?? []),
     };
   } catch (error) {
     logRejection("registro", error);

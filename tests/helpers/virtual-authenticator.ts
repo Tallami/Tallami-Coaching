@@ -80,12 +80,20 @@ type CeremonyOptions = {
   origin?: string;
   /** Si el dispositivo verificó al usuario (huella, PIN); por defecto sí. */
   userVerified?: boolean;
+  /** El sitio (`rpID`) para el que firma el dispositivo; por defecto el esperado. Otro es una llave de otro sitio. */
+  rpID?: string;
 };
 
 export type VirtualAuthenticator = {
   /** El id de la credencial, en base64url. */
   credentialId: string;
-  register(options: PublicKeyCredentialCreationOptionsJSON, ceremony?: CeremonyOptions): RegistrationResponseJSON;
+  register(
+    options: PublicKeyCredentialCreationOptionsJSON,
+    ceremony?: CeremonyOptions & {
+      /** Lo que el navegador dice del transporte de la llave; por defecto `["internal"]`. */
+      transports?: string[];
+    },
+  ): RegistrationResponseJSON;
   authenticate(
     options: PublicKeyCredentialRequestOptionsJSON,
     ceremony: CeremonyOptions & { counter: number },
@@ -97,7 +105,7 @@ export function createVirtualAuthenticator(site: { rpID: string; origin: string 
   const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
   const { x, y } = publicKey.export({ format: "jwk" });
   const credentialId = randomBytes(16);
-  const rpIdHash = sha256(site.rpID);
+  const rpIdHashFor = (rpID: string) => sha256(rpID);
 
   const flags = (userVerified: boolean, extra = 0) =>
     FLAG_USER_PRESENT | (userVerified ? FLAG_USER_VERIFIED : 0) | extra;
@@ -108,9 +116,9 @@ export function createVirtualAuthenticator(site: { rpID: string; origin: string 
   return {
     credentialId: credentialId.toString("base64url"),
 
-    register(options, { origin = site.origin, userVerified = true } = {}) {
+    register(options, { origin = site.origin, userVerified = true, rpID = site.rpID, transports = ["internal"] } = {}) {
       const authData = Buffer.concat([
-        rpIdHash,
+        rpIdHashFor(rpID),
         Buffer.from([flags(userVerified, FLAG_ATTESTED_CREDENTIAL_DATA)]),
         counterBytes(0),
         Buffer.alloc(16), // aaguid
@@ -126,13 +134,13 @@ export function createVirtualAuthenticator(site: { rpID: string; origin: string 
         response: {
           clientDataJSON: clientDataJSON("webauthn.create", options.challenge, origin).toString("base64url"),
           attestationObject: attestationObject(authData).toString("base64url"),
-          transports: ["internal"],
+          transports,
         },
       };
     },
 
-    authenticate(options, { counter, origin = site.origin, userVerified = true }) {
-      const authData = Buffer.concat([rpIdHash, Buffer.from([flags(userVerified)]), counterBytes(counter)]);
+    authenticate(options, { counter, origin = site.origin, userVerified = true, rpID = site.rpID }) {
+      const authData = Buffer.concat([rpIdHashFor(rpID), Buffer.from([flags(userVerified)]), counterBytes(counter)]);
       const clientData = clientDataJSON("webauthn.get", options.challenge, origin);
       const signature = sign("sha256", Buffer.concat([authData, sha256(clientData)]), privateKey);
       return {
