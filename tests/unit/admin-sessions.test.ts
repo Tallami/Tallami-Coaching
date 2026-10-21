@@ -2,18 +2,25 @@ import { eq } from "drizzle-orm";
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   AUTH_RECORD_RETENTION_MS,
+  CHALLENGE_MS,
+  REAUTH_WINDOW_MS,
   SESSION_IDLE_MS,
   SESSION_MAX_MS,
   SESSION_RETENTION_MS,
   SESSION_TOUCH_INTERVAL_MS,
 } from "@/admin/auth/policy";
 import {
+  type AdminSession,
   createSession,
+  hasRecentReauth,
   listActiveSessions,
+  markReauthed,
   purgeExpiredAuthRecords,
   revokeAllSessions,
   revokeSession,
   revokeSessionsForPasskey,
+  setSessionChallenge,
+  takeSessionChallenge,
   validateSession,
 } from "@/admin/auth/sessions";
 import type { Db } from "@/db/client";
@@ -367,5 +374,161 @@ describe("purgeExpiredAuthRecords", () => {
 
   test("does nothing, and does not fail, when there is nothing to delete", async () => {
     await expect(purgeExpiredAuthRecords(db, START)).resolves.toBeUndefined();
+  });
+});
+
+describe("session challenges", () => {
+  async function storedChallenge(id: string) {
+    const [row] = await db.select().from(adminSessions).where(eq(adminSessions.id, id));
+    return { challenge: row.challenge, purpose: row.challengePurpose, expiresAt: row.challengeExpiresAt };
+  }
+
+  test("setSessionChallenge keeps the challenge, its purpose, and five minutes of life", async () => {
+    const id = await open();
+
+    await setSessionChallenge(db, id, "reauth", "un-desafio", START);
+
+    expect(await storedChallenge(id)).toEqual({
+      challenge: "un-desafio",
+      purpose: "reauth",
+      expiresAt: after(CHALLENGE_MS),
+    });
+    expect(CHALLENGE_MS).toBe(5 * MINUTE_MS);
+  });
+
+  test("a new challenge replaces the old one, whatever its purpose", async () => {
+    const id = await open();
+    await setSessionChallenge(db, id, "reauth", "viejo", START);
+
+    await setSessionChallenge(db, id, "register", "nuevo", after(MINUTE_MS));
+
+    expect(await storedChallenge(id)).toEqual({
+      challenge: "nuevo",
+      purpose: "register",
+      expiresAt: after(MINUTE_MS + CHALLENGE_MS),
+    });
+  });
+
+  test("setSessionChallenge on a session that does not exist does nothing", async () => {
+    const id = await open();
+
+    await setSessionChallenge(db, "z".repeat(43), "reauth", "de-nadie", START);
+
+    expect(await storedChallenge(id)).toEqual({ challenge: null, purpose: null, expiresAt: null });
+  });
+
+  test("takeSessionChallenge hands the challenge back once and uses it up", async () => {
+    const id = await open();
+    await setSessionChallenge(db, id, "register", "desafio-de-registro", START);
+
+    expect(await takeSessionChallenge(db, id, "register", after(MINUTE_MS))).toBe("desafio-de-registro");
+    expect(await takeSessionChallenge(db, id, "register", after(MINUTE_MS))).toBeNull();
+    expect(await storedChallenge(id)).toEqual({ challenge: null, purpose: null, expiresAt: null });
+  });
+
+  test("takeSessionChallenge for another purpose is null, and the challenge is used up anyway", async () => {
+    const id = await open();
+    await setSessionChallenge(db, id, "reauth", "desafio-de-confirmacion", START);
+
+    expect(await takeSessionChallenge(db, id, "register", after(MINUTE_MS))).toBeNull();
+
+    expect(await takeSessionChallenge(db, id, "reauth", after(MINUTE_MS))).toBeNull();
+  });
+
+  test("takeSessionChallenge is valid at 4:59 and null at 5:00, and an expired one is used up too", async () => {
+    const justInTime = await open();
+    const late = await open();
+    await setSessionChallenge(db, justInTime, "reauth", "a-tiempo", START);
+    await setSessionChallenge(db, late, "reauth", "tarde", START);
+
+    expect(await takeSessionChallenge(db, justInTime, "reauth", after(CHALLENGE_MS - SECOND_MS))).toBe("a-tiempo");
+    expect(await takeSessionChallenge(db, late, "reauth", after(CHALLENGE_MS))).toBeNull();
+    expect(await storedChallenge(late)).toEqual({ challenge: null, purpose: null, expiresAt: null });
+  });
+
+  test("takeSessionChallenge is null when there is no challenge, or no such session", async () => {
+    const id = await open();
+
+    expect(await takeSessionChallenge(db, id, "reauth", START)).toBeNull();
+    expect(await takeSessionChallenge(db, "z".repeat(43), "reauth", START)).toBeNull();
+    expect(await takeSessionChallenge(db, "", "reauth", START)).toBeNull();
+  });
+
+  test("takeSessionChallenge at the same time: exactly one caller gets the challenge", async () => {
+    const id = await open();
+    await setSessionChallenge(db, id, "reauth", "uno-solo", START);
+
+    const results = await Promise.all(
+      Array.from({ length: 6 }, () => takeSessionChallenge(db, id, "reauth", after(SECOND_MS))),
+    );
+
+    expect(results.filter((challenge) => challenge !== null)).toEqual(["uno-solo"]);
+  });
+
+  test("challenges belong to their session: another session cannot take them", async () => {
+    const mine = await open();
+    const other = await open();
+    await setSessionChallenge(db, mine, "reauth", "mio", START);
+
+    expect(await takeSessionChallenge(db, other, "reauth", after(SECOND_MS))).toBeNull();
+    expect(await takeSessionChallenge(db, mine, "reauth", after(SECOND_MS))).toBe("mio");
+  });
+
+  test("the challenge is never part of what the panel knows about a session", async () => {
+    const id = await open();
+    await setSessionChallenge(db, id, "reauth", "secreto", START);
+
+    const session = await validateSession(db, id, after(SECOND_MS));
+
+    expect(JSON.stringify(session)).not.toContain("secreto");
+    expect(Object.keys(session ?? {}).sort()).toEqual(["createdAt", "device", "id", "lastSeenAt", "passkeyId", "reauthAt"]);
+  });
+});
+
+describe("recent confirmation with the key", () => {
+  function sessionConfirmedAt(reauthAt: Date | null): AdminSession {
+    return { id: "a".repeat(43), passkeyId: null, device: DEVICE, createdAt: START, lastSeenAt: START, reauthAt };
+  }
+
+  test("markReauthed notes the moment, and the session reports it", async () => {
+    const id = await open();
+
+    await markReauthed(db, id, after(3 * MINUTE_MS));
+
+    const session = await validateSession(db, id, after(4 * MINUTE_MS));
+    expect(session?.reauthAt).toEqual(after(3 * MINUTE_MS));
+  });
+
+  test("markReauthed moves the moment forward each time", async () => {
+    const id = await createSession(db, { passkeyId: null, device: DEVICE, reauthed: true }, START);
+
+    await markReauthed(db, id, after(10 * MINUTE_MS));
+
+    expect((await validateSession(db, id, after(11 * MINUTE_MS)))?.reauthAt).toEqual(after(10 * MINUTE_MS));
+  });
+
+  test("markReauthed on a session that does not exist does nothing", async () => {
+    await expect(markReauthed(db, "z".repeat(43), START)).resolves.toBeUndefined();
+  });
+
+  test("hasRecentReauth is true at 4:59 and false at 5:00", () => {
+    const session = sessionConfirmedAt(START);
+
+    expect(hasRecentReauth(session, after(REAUTH_WINDOW_MS - SECOND_MS))).toBe(true);
+    expect(hasRecentReauth(session, after(REAUTH_WINDOW_MS))).toBe(false);
+    expect(REAUTH_WINDOW_MS).toBe(5 * MINUTE_MS);
+  });
+
+  test("hasRecentReauth is true right after confirming", () => {
+    expect(hasRecentReauth(sessionConfirmedAt(START), START)).toBe(true);
+  });
+
+  test("hasRecentReauth is false when the key was never used to confirm", () => {
+    expect(hasRecentReauth(sessionConfirmedAt(null), START)).toBe(false);
+  });
+
+  test("hasRecentReauth uses the current time when none is given", () => {
+    expect(hasRecentReauth(sessionConfirmedAt(new Date()))).toBe(true);
+    expect(hasRecentReauth(sessionConfirmedAt(new Date(Date.now() - 6 * MINUTE_MS)))).toBe(false);
   });
 });

@@ -7,6 +7,11 @@
 //   anota como mucho una vez por minuto, para no escribir en la base en cada
 //   clic.
 //
+// - cada sesión puede guardar un desafío WebAuthn (`challenge…`) para una
+//   confirmación con la llave (`reauth`) o para registrar otra (`register`), de
+//   un solo uso y 5 minutos de vida, y la hora de su última confirmación
+//   (`reauthAt`), que habilita por 5 minutos las acciones delicadas.
+//
 // La hora la pone quien llama (`now`, por defecto la actual): así los tests
 // recorren las 8 horas sin esperar y todo se compara contra la misma hora.
 
@@ -16,12 +21,17 @@ import type { Db } from "../../db/client";
 import { adminEnrollmentCodes, adminPendingLogins, adminSessions } from "../../db/schema";
 import {
   AUTH_RECORD_RETENTION_MS,
+  CHALLENGE_MS,
+  REAUTH_WINDOW_MS,
   SESSION_IDLE_MS,
   SESSION_MAX_MS,
   SESSION_RETENTION_MS,
   SESSION_TOUCH_INTERVAL_MS,
 } from "./policy";
 import { SESSION_ID_BYTES, isSessionId } from "./session";
+
+/** Para qué se pidió el desafío guardado en una sesión. */
+export type ChallengePurpose = "reauth" | "register";
 
 /** Lo que el resto del panel sabe de una sesión: nada secreto (ni el desafío, ni el vencimiento). */
 export type AdminSession = {
@@ -141,6 +151,74 @@ export async function listActiveSessions(db: Db, now: Date = new Date()): Promis
     .from(adminSessions)
     .where(isOpen(now))
     .orderBy(desc(adminSessions.createdAt));
+}
+
+/**
+ * Guarda en la sesión el desafío de una ceremonia WebAuthn, en lugar de cualquier
+ * otro que tuviera, con 5 minutos de vida. No hace nada si la sesión no existe.
+ */
+export async function setSessionChallenge(
+  db: Db,
+  sessionId: string,
+  purpose: ChallengePurpose,
+  challenge: string,
+  now: Date = new Date(),
+): Promise<void> {
+  await db
+    .update(adminSessions)
+    .set({
+      challenge,
+      challengePurpose: purpose,
+      challengeExpiresAt: new Date(now.getTime() + CHALLENGE_MS),
+    })
+    .where(eq(adminSessions.id, sessionId));
+}
+
+/**
+ * Saca el desafío de la sesión y lo gasta: es de un solo uso. Devuelve `null` si
+ * no había ninguno, si era para otro propósito o si ya venció (a los 5 minutos
+ * justos); en esos casos también queda gastado, así un pedido equivocado no deja
+ * un desafío vivo para el siguiente.
+ *
+ * Es un compare-and-swap: se lee el desafío y se lo borra solo si sigue siendo ese
+ * mismo, así de varios pedidos simultáneos solo uno se lo lleva.
+ */
+export async function takeSessionChallenge(
+  db: Db,
+  sessionId: string,
+  purpose: ChallengePurpose,
+  now: Date = new Date(),
+): Promise<string | null> {
+  const [stored] = await db
+    .select({
+      challenge: adminSessions.challenge,
+      purpose: adminSessions.challengePurpose,
+      expiresAt: adminSessions.challengeExpiresAt,
+    })
+    .from(adminSessions)
+    .where(eq(adminSessions.id, sessionId));
+  if (!stored || stored.challenge === null) return null;
+
+  const [taken] = await db
+    .update(adminSessions)
+    .set({ challenge: null, challengePurpose: null, challengeExpiresAt: null })
+    .where(and(eq(adminSessions.id, sessionId), eq(adminSessions.challenge, stored.challenge)))
+    .returning({ id: adminSessions.id });
+  if (!taken) return null; // otro pedido se lo llevó primero
+
+  const isForThisPurpose = stored.purpose === purpose;
+  const isStillValid = stored.expiresAt !== null && stored.expiresAt.getTime() > now.getTime();
+  return isForThisPurpose && isStillValid ? stored.challenge : null;
+}
+
+/** Anota que la llave se acaba de usar para confirmar: abre la ventana de las acciones delicadas. */
+export async function markReauthed(db: Db, sessionId: string, now: Date = new Date()): Promise<void> {
+  await db.update(adminSessions).set({ reauthAt: now }).where(eq(adminSessions.id, sessionId));
+}
+
+/** ¿Se confirmó con la llave hace menos de 5 minutos? (A los 5 justos, ya no.) */
+export function hasRecentReauth(session: AdminSession, now: Date = new Date()): boolean {
+  return session.reauthAt !== null && now.getTime() - session.reauthAt.getTime() < REAUTH_WINDOW_MS;
 }
 
 /**

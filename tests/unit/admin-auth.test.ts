@@ -418,11 +418,22 @@ describe("hashIp", () => {
 });
 
 describe("login rate limit", () => {
-  test("offers only the reservation API the login uses", async () => {
-    // Las funciones viejas (mirar si está bloqueada y anotar después) dejaban pasar una ráfaga.
+  test("offers only the reservation API for the password and the plain counters for the second step", async () => {
+    // Las funciones viejas de la contraseña (mirar si está bloqueada y anotar después) dejaban pasar una ráfaga:
+    // la contraseña solo se revisa con `reserveLoginAttempt`. El segundo paso (llave o código) sí cuenta con
+    // `isLoginBlocked` y `recordLoginFailure`: lo que se adivina ahí es una firma o un código de 32^10, y todo
+    // el paso vive en un ingreso a medio camino de 5 minutos, así que una ráfaga no adelanta nada.
     const exported = Object.keys(await import("@/admin/auth/rate-limit")).sort();
 
-    expect(exported).toEqual(["LOGIN_MAX_FAILURES", "LOGIN_WINDOW_MS", "confirmLoginSuccess", "reserveLoginAttempt"]);
+    expect(exported).toEqual([
+      "LOGIN_MAX_FAILURES",
+      "LOGIN_WINDOW_MS",
+      "confirmLoginSuccess",
+      "failuresInWindow",
+      "isLoginBlocked",
+      "recordLoginFailure",
+      "reserveLoginAttempt",
+    ]);
   });
 
   let db: Db;

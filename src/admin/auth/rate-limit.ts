@@ -14,6 +14,11 @@
 // en el pooler de Supabase. Si el intento resulta correcto, `confirmLoginSuccess`
 // da vuelta su fila a éxito; si se bloquea, su fila se borra (un bloqueo no
 // se prolonga por seguir intentando).
+//
+// El segundo paso (una llave inválida, un código incorrecto) no reserva:
+// `isLoginBlocked` mira antes y `recordLoginFailure` anota después. Una ráfaga
+// ahí no adelanta nada: lo que se adivina es una firma o un código de 32^10
+// combinaciones, y todo el paso vive en un ingreso a medio camino de 5 minutos.
 
 import { and, count, eq, gt, lt } from "drizzle-orm";
 import type { Db } from "../../db/client";
@@ -71,6 +76,25 @@ export async function reserveLoginAttempt(
   }
   await purgeOldAttempts(db, at);
   return reservation.id;
+}
+
+/**
+ * Anota un fallo del segundo paso (una llave inválida o de otra cuenta, un código
+ * incorrecto o vencido). La contraseña no pasa por acá: sus fallos los anota
+ * `reserveLoginAttempt`.
+ */
+export async function recordLoginFailure(db: Db, ipHash: string, at: Date = new Date()): Promise<void> {
+  await db.insert(loginAttempts).values({ ipHash, succeeded: false, createdAt: at });
+}
+
+/** Cuántos fallos tiene esta IP en los 15 minutos anteriores a `now`. */
+export function failuresInWindow(db: Db, ipHash: string, now: Date = new Date()): Promise<number> {
+  return countRecentFailures(db, ipHash, now);
+}
+
+/** ¿Llegó esta IP al tope de fallos? Si es así, el próximo intento ya no se revisa. */
+export async function isLoginBlocked(db: Db, ipHash: string, now: Date = new Date()): Promise<boolean> {
+  return (await failuresInWindow(db, ipHash, now)) >= LOGIN_MAX_FAILURES;
 }
 
 /** La contraseña era correcta: la reserva deja de contar como fallo. */
