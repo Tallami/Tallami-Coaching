@@ -297,9 +297,10 @@ describe("the blocked-sign-in notice", () => {
   });
 
   test("a parallel burst of wrong passwords never notifies more than one block", async () => {
-    // Las peticiones de la ráfaga que pasan el tope cuentan todas 5 fallos; el tope global deja salir un solo aviso
-    // (exacto en `admin-alerts-throttle.test.ts`; acá puede ser ninguno si una fila de un intento rechazado
-    // todavía no se borró cuando las demás contaron, y es lo que se acepta).
+    // Con el tope global, de una ráfaga sale un solo aviso aunque todos los pedidos cuenten 5 o más fallos (exacto en
+    // `admin-alerts-throttle.test.ts`). Acá la ráfaga pasa por el ingreso de verdad: si todos los pedidos se anotan
+    // antes de que alguno cuente, todos quedan rechazados sin dejar ningún fallo y no hay nada que avisar, así que el
+    // tope que se afirma es "no más de uno".
     await Promise.all(Array.from({ length: 12 }, () => submitPassword("incorrecta")));
 
     expect(events().length).toBeLessThanOrEqual(1);

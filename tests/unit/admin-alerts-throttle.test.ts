@@ -125,6 +125,26 @@ describe("notifyIfJustBlocked", () => {
     expect(notifySecurityEvent).toHaveBeenCalledOnce();
   });
 
+  test("a burst where every request counts above the limit still notifies exactly one block", async () => {
+    // Las filas de los intentos rechazados todavía no se borraron cuando los demás cuentan: todos ven más de 5.
+    await seedFailures("conexion-a", LOGIN_MAX_FAILURES + 3, START);
+
+    await Promise.all(Array.from({ length: 8 }, () => notifyIfJustBlocked(db, "conexion-a", START)));
+
+    expect(vi.mocked(notifySecurityEvent).mock.calls).toEqual([["login-blocked"]]);
+  });
+
+  test("failures five, six and seven in a row notify one block, not three", async () => {
+    await seedFailures("conexion-a", LOGIN_MAX_FAILURES - 1, START);
+
+    for (let failures = LOGIN_MAX_FAILURES; failures <= LOGIN_MAX_FAILURES + 2; failures += 1) {
+      await seedFailures("conexion-a", 1, START);
+      await notifyIfJustBlocked(db, "conexion-a", START);
+    }
+
+    expect(vi.mocked(notifySecurityEvent).mock.calls).toEqual([["login-blocked"]]);
+  });
+
   test("another connection blocked inside the same window adds no second notice", async () => {
     await seedFailures("conexion-a", LOGIN_MAX_FAILURES, START);
     await seedFailures("conexion-b", LOGIN_MAX_FAILURES, after(MINUTE_MS));

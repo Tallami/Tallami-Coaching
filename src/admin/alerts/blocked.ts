@@ -4,14 +4,17 @@
 //
 // Dos condiciones, las dos necesarias:
 //
-// 1. la conexión acaba de llegar al tope de fallos (`failuresInWindow === LOGIN_MAX_FAILURES`);
+// 1. la conexión llegó al tope de fallos (`failuresInWindow >= LOGIN_MAX_FAILURES`);
 // 2. el aviso global tiene lugar (`claimAlertSlot`).
 //
 // La primera sola no alcanza: una ráfaga de contraseñas malas en paralelo hace que todos los
-// pedidos cuenten justo 5 (cinco avisos), y quien siga probando vuelve a llenar el tope cada
+// pedidos cuenten el tope a la vez (cinco avisos), y quien siga probando vuelve a llenarlo cada
 // vez que se le vence el fallo más viejo (cinco por ventana por conexión, sin límite si rota
 // de IP). La segunda lo acota: un solo email de bloqueo por ventana, sin importar cuántas
-// conexiones se bloqueen. El bloqueo en sí no depende del aviso.
+// conexiones se bloqueen. Con ese tope `>=` es seguro, y además asegura que haya un aviso:
+// en una ráfaga las filas de los intentos rechazados todavía no se borraron cuando los demás
+// cuentan, y todos pueden ver más de 5 (con `===` no avisaría ninguno). El bloqueo en sí no
+// depende del aviso.
 
 import type { Db } from "../../db/client";
 import { LOGIN_MAX_FAILURES, LOGIN_WINDOW_MS, failuresInWindow } from "../auth/rate-limit";
@@ -22,7 +25,7 @@ import { claimAlertSlot } from "./throttle";
 export const LOGIN_BLOCKED_ALERT_KEY = "alerta:login-blocked";
 
 /**
- * Avisa del bloqueo si el fallo que se acaba de anotar llena el tope de esta conexión y en
+ * Avisa del bloqueo si, con el fallo que se acaba de anotar, esta conexión llegó al tope y en
  * esta ventana todavía no se avisó de ninguno. Se llama solo después de un fallo anotado de
  * verdad: un intento ya bloqueado no deja ninguna fila (`reserveLoginAttempt`) y no llega
  * acá. Nunca tira: un error al contar o al anotar el aviso no puede cambiar lo que contesta
@@ -30,7 +33,7 @@ export const LOGIN_BLOCKED_ALERT_KEY = "alerta:login-blocked";
  */
 export async function notifyIfJustBlocked(db: Db, ipHash: string, now: Date = new Date()): Promise<void> {
   try {
-    if ((await failuresInWindow(db, ipHash, now)) !== LOGIN_MAX_FAILURES) return;
+    if ((await failuresInWindow(db, ipHash, now)) < LOGIN_MAX_FAILURES) return;
     if (await claimAlertSlot(db, LOGIN_BLOCKED_ALERT_KEY, LOGIN_WINDOW_MS, now)) notifySecurityEvent("login-blocked");
   } catch (error) {
     const reason = error instanceof Error ? error.name : typeof error;
