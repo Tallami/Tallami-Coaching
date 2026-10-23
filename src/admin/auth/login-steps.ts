@@ -17,13 +17,20 @@
 //    (llave de otro sitio, firma o contador malos, una llave que no es de acá);
 // 4. gastar el ingreso (`consumePendingLogin`, un solo uso) ANTES de crear nada:
 //    de dos pedidos con la misma respuesta, solo uno llega a abrir una sesión;
-// 5. guardar lo que haga falta, abrir la sesión y cambiar la cookie del ingreso por
-//    la de la sesión.
+// 5. guardar lo que haga falta, abrir la sesión, cambiar la cookie del ingreso por
+//    la de la sesión y avisar por email (después de responder: `notify.ts`).
+//
+// Los avisos nunca cambian lo que contesta el paso: salen con `after()` y no tiran.
+// Un fallo que llena el tope de intentos avisa del bloqueo, una sola vez
+// (`notifyIfJustBlocked`).
 
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { getDb, type Db } from "../../db/client";
+import { notifyIfJustBlocked } from "../alerts/blocked";
+import { notifySecurityEvent } from "../alerts/notify";
+import type { SecurityEvent } from "../alerts/render";
 import { getMissingConfig } from "./config";
 import type { LoginCodeRedeemed, LoginStepFailure, LoginStepSuccess } from "./login-errors";
 import {
@@ -53,6 +60,25 @@ import { createSession } from "./sessions";
 const EXPIRED: LoginStepFailure = { ok: false, error: "expired" };
 const BLOCKED: LoginStepFailure = { ok: false, error: "blocked" };
 const FAILED: LoginStepFailure = { ok: false, error: "failed" };
+
+/**
+ * Qué se avisa por email al abrir la sesión, según el tipo de paso. La primera llave es
+ * un registro y un ingreso a la vez, y avisa una sola vez como primera llave; un código
+ * registra una llave nueva y además entra, así que son dos avisos.
+ */
+const EVENTS_BY_MODE: Record<PendingMode, readonly SecurityEvent[]> = {
+  passkey: ["login"],
+  "first-key": ["first-passkey"],
+  code: ["passkey-added", "login"],
+};
+
+/** Programa los avisos del paso `mode` que acaba de abrir la sesión; los de llaves llevan el nombre de la llave. */
+function notifyStepCompleted(mode: PendingMode, passkeyName: string | undefined): void {
+  for (const event of EVENTS_BY_MODE[mode]) {
+    if (event !== "login" && passkeyName !== undefined) notifySecurityEvent(event, { passkeyName });
+    else notifySecurityEvent(event);
+  }
+}
 
 /** Un ingreso a medio camino válido, con la base donde vive. */
 export type PendingStep = { db: Db; pending: PendingLogin };
@@ -92,6 +118,8 @@ export async function beginLoginStep(mode: PendingMode): Promise<PendingStep | L
 
 /** Cómo termina cada tipo de paso: qué verifica y qué guarda. */
 export type StepCompletion<Verified> = {
+  /** El nombre de la llave que registra este paso, si registra una: va en el aviso por email. */
+  passkeyName?: string;
   /** Verifica la respuesta del navegador contra el desafío. `null` si no cierra: cuenta como intento fallido. */
   verify: (db: Db, challenge: string) => Promise<Verified | null>;
   /**
@@ -121,7 +149,10 @@ export async function finishLoginStep<Verified>(
   if (attemptId === null) return BLOCKED;
   const challenge = await takePendingChallenge(db, pending.id);
   const verified = challenge === null ? null : await completion.verify(db, challenge);
-  if (verified === null) return FAILED;
+  if (verified === null) {
+    await notifyIfJustBlocked(db, pending.ipHash);
+    return FAILED;
+  }
 
   // La llave es buena: pase lo que pase con el ingreso, este intento no es un fallo.
   await confirmLoginSuccess(db, attemptId);
@@ -134,6 +165,7 @@ export async function finishLoginStep<Verified>(
   const cookieStore = await cookies();
   cookieStore.set(ADMIN_COOKIE, await createSessionToken(sessionId), sessionCookieOptions(secure));
   cookieStore.delete({ name: PENDING_COOKIE, path: pendingCookieOptions(secure).path });
+  notifyStepCompleted(mode, completion.passkeyName);
   return { ok: true, redirectTo: pending.nextPath };
 }
 
@@ -164,7 +196,10 @@ export async function redeemLoginCode(
 
   const attemptId = await reserveLoginAttempt(db, pending.ipHash);
   if (attemptId === null) return BLOCKED;
-  if (!(await redeem(db))) return FAILED;
+  if (!(await redeem(db))) {
+    await notifyIfJustBlocked(db, pending.ipHash);
+    return FAILED;
+  }
 
   await confirmLoginSuccess(db, attemptId);
   return (await switchPendingToCode(db, pending.id)) ? { ok: true } : EXPIRED;

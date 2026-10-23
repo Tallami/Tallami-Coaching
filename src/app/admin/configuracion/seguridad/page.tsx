@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { getAlertStatus } from "@/admin/alerts/config";
 import { listPasskeys } from "@/admin/auth/passkeys";
 import { getAdminSession, requireAdmin } from "@/admin/auth/require-admin";
 import { listActiveSessions } from "@/admin/auth/sessions";
@@ -13,7 +14,7 @@ import { getDb } from "@/db/client";
 
 export const metadata: Metadata = { title: "Seguridad" };
 
-/** Configuración → Seguridad: las llaves de acceso, el código para otro dispositivo y las sesiones abiertas. */
+/** Configuración → Seguridad: las llaves de acceso, el código para otro dispositivo, las sesiones abiertas y los avisos por email. */
 export default async function SecurityPage() {
   await requireAdmin();
   const session = await getAdminSession();
@@ -40,6 +41,7 @@ export default async function SecurityPage() {
         // El nombre que propone el navegador de este dispositivo ("Chrome en Windows") es el de la sesión.
         defaultKeyName={session.device}
         origin={getWebAuthnConfig().origin}
+        alerts={getAlertStatus()}
       />
     </PanelShell>
   );

@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 import { z } from "zod";
+import { notifySecurityEvent } from "@/admin/alerts/notify";
 import {
   authenticationOptions,
   credentialIdOf,
@@ -132,6 +133,7 @@ export async function finishAddPasskeyAction(response: unknown, name: string): P
     return { ok: false, error: "failed" };
   }
   await insertPasskey(db, { ...data, name: parsedName.data }, { onlyIfNone: false });
+  notifySecurityEvent("passkey-added", { passkeyName: parsedName.data });
   return { ok: true };
 }
 
@@ -164,6 +166,7 @@ export async function deletePasskeyAction(id: string): Promise<DeletePasskeyResu
   const deletion = await deletePasskeyUnlessLast(await getDb(), id);
   if (deletion.outcome !== "deleted") return { ok: false, error: deletion.outcome };
 
+  notifySecurityEvent("passkey-removed", { passkeyName: deletion.name });
   if (!deletion.closedSessionIds.includes(session.id)) return { ok: true };
   await clearSessionCookie();
   return { ok: true, redirectTo: LOGIN_PATH };
@@ -180,6 +183,7 @@ export async function generateEnrollmentCodeAction(): Promise<EnrollmentCodeResu
 
   const now = new Date();
   const code = await generateEnrollmentCode(await getDb(), session.id, now);
+  notifySecurityEvent("code-generated");
   return {
     ok: true,
     code: formatEnrollmentCode(code),
@@ -195,5 +199,6 @@ export async function closeAllSessionsAction(): Promise<CloseAllSessionsResult> 
 
   await revokeAllSessions(await getDb());
   await clearSessionCookie();
+  notifySecurityEvent("sessions-closed");
   return { ok: true, redirectTo: LOGIN_PATH };
 }

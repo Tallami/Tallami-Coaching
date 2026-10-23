@@ -198,7 +198,11 @@ describe("deletePasskeyUnlessLast", () => {
     const phone = await add("celular");
     await add("notebook");
 
-    expect(await deletePasskeyUnlessLast(db, phone.id, NOW)).toEqual({ outcome: "deleted", closedSessionIds: [] });
+    expect(await deletePasskeyUnlessLast(db, phone.id, NOW)).toEqual({
+      outcome: "deleted",
+      name: "Llave celular",
+      closedSessionIds: [],
+    });
 
     expect((await listPasskeys(db)).map((key) => key.credentialId)).toEqual(["notebook"]);
   });
@@ -274,7 +278,7 @@ describe("deletePasskeyUnlessLast", () => {
 
     const result = await deletePasskeyUnlessLast(db, phone.id, NOW);
 
-    expect(result).toEqual({ outcome: "deleted", closedSessionIds: [orphan] });
+    expect(result).toEqual({ outcome: "deleted", name: "Llave celular", closedSessionIds: [orphan] });
     expect(await validateSession(db, orphan, LATER)).toBeNull();
   });
 
@@ -299,7 +303,7 @@ describe("deletePasskeyUnlessLast", () => {
     expect(await countPasskeys(db)).toBe(2);
     expect(await validateSession(db, session, LATER)).not.toBeNull();
     const retry = await deletePasskeyUnlessLast(db, phone.id, NOW);
-    expect(retry).toEqual({ outcome: "deleted", closedSessionIds: [session] });
+    expect(retry).toEqual({ outcome: "deleted", name: "Llave celular", closedSessionIds: [session] });
   });
 });
 

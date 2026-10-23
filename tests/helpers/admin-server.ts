@@ -95,6 +95,11 @@ async function serverEnv(pgliteDir: string, port: number): Promise<Record<string
     PGLITE_DIR: resetPgliteDir(pgliteDir),
     EXCHANGE_RATE_SOURCE: "fixed",
     DATABASE_URL: "",
+    // Sin clave de Resend ni dirección, el panel no manda avisos por email: ningún test manda uno de
+    // verdad aunque el entorno de quien corre los tests tenga las variables, y Seguridad dice "sin configurar".
+    RESEND_API_KEY: "",
+    ADMIN_ALERT_EMAIL: "",
+    ADMIN_ALERT_FROM: "",
     // Con esta marca, Next (`@next/env`) no lee los `.env*` de la carpeta: los servidores de prueba
     // usan solo este entorno, nunca el `.env.local` de quien corre los tests. Ese archivo puede
     // traer una `DATABASE_URL` real, y su hash de contraseña lleva `$` escapados que la expansión

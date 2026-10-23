@@ -118,9 +118,12 @@ export async function renamePasskey(db: Db, id: string, name: string): Promise<b
   return renamed.length > 0;
 }
 
-/** Qué pasó al pedir borrar una llave: `deleted` trae los ids de las sesiones que se cerraron con el borrado. */
+/**
+ * Qué pasó al pedir borrar una llave: `deleted` trae el nombre que tenía (para el aviso
+ * por email) y los ids de las sesiones que se cerraron con el borrado.
+ */
 export type PasskeyDeletion =
-  | { outcome: "deleted"; closedSessionIds: string[] }
+  | { outcome: "deleted"; name: string; closedSessionIds: string[] }
   | { outcome: "last" | "missing" };
 
 /**
@@ -146,12 +149,15 @@ export async function deletePasskeyUnlessLast(
   if (!UUID_PATTERN.test(id)) return { outcome: "missing" };
   return db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(${sql.raw(String(PASSKEY_LOCK_ID))})`);
-    const [target] = await tx.select({ id: adminPasskeys.id }).from(adminPasskeys).where(eq(adminPasskeys.id, id));
+    const [target] = await tx
+      .select({ name: adminPasskeys.name })
+      .from(adminPasskeys)
+      .where(eq(adminPasskeys.id, id));
     if (!target) return { outcome: "missing" };
     const [existing] = await tx.select({ total: count() }).from(adminPasskeys);
     if ((existing?.total ?? 0) <= 1) return { outcome: "last" };
     await tx.delete(adminPasskeys).where(eq(adminPasskeys.id, id));
-    return { outcome: "deleted", closedSessionIds: await revokeKeylessSessions(tx, now) };
+    return { outcome: "deleted", name: target.name, closedSessionIds: await revokeKeylessSessions(tx, now) };
   });
 }
 

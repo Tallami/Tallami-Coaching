@@ -41,6 +41,8 @@ vi.mock("@/db/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/db/client")>()),
   getDb: vi.fn(),
 }));
+// Los avisos por email tienen sus tests (`admin-alerts*.test.ts`); acá no hay pedido de Next donde programarlos.
+vi.mock("@/admin/alerts/notify", () => ({ notifySecurityEvent: vi.fn() }));
 
 const ORIGIN = "http://localhost:3100";
 const SITE = { rpID: "localhost", origin: ORIGIN };

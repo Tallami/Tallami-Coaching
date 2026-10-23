@@ -45,6 +45,7 @@ export async function finishFirstPasskeyAction(
   if (!parsedName.success) return { ok: false, error: "failed" };
 
   return finishLoginStep("first-key", {
+    passkeyName: parsedName.data,
     verify: (_db, challenge) => verifyRegistration(response, challenge),
     async commit(db, data) {
       const passkey = await insertPasskey(db, { ...data, name: parsedName.data }, { onlyIfNone: true });

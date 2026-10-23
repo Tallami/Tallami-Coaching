@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { AlertStatus } from "@/admin/alerts/config";
 import type { Passkey } from "@/admin/auth/passkeys";
 import type { AdminSession } from "@/admin/auth/sessions";
 import { formatMoment } from "@/admin/dates";
@@ -18,6 +19,8 @@ interface SecurityViewProps {
   defaultKeyName: string;
   /** El origen configurado de las llaves (`getWebAuthnConfig().origin`), para el aviso de "otra dirección". */
   origin: string;
+  /** A dónde van los avisos por email (`getAlertStatus()`), o `null` si no están configurados. */
+  alerts: AlertStatus | null;
 }
 
 function toPasskeyRow(passkey: Passkey): PasskeyRow {
@@ -37,6 +40,22 @@ function toSessionRow(session: AdminSession, currentSessionId: string): SessionR
     lastSeenAt: formatMoment(session.lastSeenAt),
     isCurrent: session.id === currentSessionId,
   };
+}
+
+/** El estado de los avisos por email. Con la dirección de prueba de Resend avisa a quién le llegan. */
+function AlertsStatus({ alerts }: { alerts: AlertStatus | null }) {
+  if (alerts === null) return <p className="font-bold">Avisos por email: sin configurar</p>;
+  return (
+    <>
+      <p className="font-bold">{`Avisos por email: activos (a ${alerts.maskedEmail})`}</p>
+      {alerts.usesTestSender ? (
+        <p className="mt-2 text-[0.875rem] leading-snug text-ink-2">
+          Salen de la dirección de prueba de Resend, que solo entrega al email de tu cuenta de Resend. Para avisar a
+          otra dirección hace falta verificar un dominio propio en Resend.
+        </p>
+      ) : null}
+    </>
+  );
 }
 
 interface SecuritySectionProps {
@@ -67,12 +86,20 @@ function SecuritySection({ id, title, description, children }: SecuritySectionPr
 /**
  * El cuerpo de Configuración → Seguridad (el encabezado lo pone la página): las llaves
  * de acceso con agregar, renombrar y borrar; el código para registrar otro dispositivo;
- * las sesiones abiertas con "Cerrar todas"; y el estado de los avisos por email.
+ * las sesiones abiertas con "Cerrar todas"; y el estado de los avisos por email (a qué
+ * dirección van, enmascarada, o que no están configurados).
  *
  * De una llave no se muestra si es la de este dispositivo: el panel no puede saberlo
  * (la llave puede venir del celular por código QR).
  */
-export function SecurityView({ passkeys, sessions, currentSessionId, defaultKeyName, origin }: SecurityViewProps) {
+export function SecurityView({
+  passkeys,
+  sessions,
+  currentSessionId,
+  defaultKeyName,
+  origin,
+  alerts,
+}: SecurityViewProps) {
   return (
     <div className="flex max-w-3xl flex-col gap-6">
       <SecuritySection
@@ -113,9 +140,9 @@ export function SecurityView({ passkeys, sessions, currentSessionId, defaultKeyN
       <SecuritySection
         id="security-alerts"
         title="Avisos por email"
-        description="Cuando estén configurados, un email por cada ingreso y por cada cambio de seguridad."
+        description="Un email por cada ingreso y por cada cambio de seguridad del panel."
       >
-        <p className="font-bold">Avisos por email: sin configurar</p>
+        <AlertsStatus alerts={alerts} />
       </SecuritySection>
     </div>
   );

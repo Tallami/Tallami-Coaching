@@ -43,6 +43,8 @@ vi.mock("@/db/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/db/client")>()),
   getDb: vi.fn(),
 }));
+// Los avisos por email tienen sus tests (`admin-alerts*.test.ts`); acá no hay pedido de Next donde programarlos.
+vi.mock("@/admin/alerts/notify", () => ({ notifySecurityEvent: vi.fn() }));
 // Fuera de un pedido de Next, `connection()` tira; acá todo es un pedido de verdad.
 vi.mock("next/server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("next/server")>()),

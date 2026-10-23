@@ -3,6 +3,7 @@
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { notifyIfJustBlocked } from "@/admin/alerts/blocked";
 import { getMissingConfig } from "@/admin/auth/config";
 import { describeDevice } from "@/admin/auth/device";
 import { attemptLogin } from "@/admin/auth/login";
@@ -45,6 +46,8 @@ async function startSecondStep(
   const db = await getDb();
   const ipHash = loginIpHash(getClientIp(requestHeaders));
   const result = await attemptLogin(db, ipHash, password);
+  // Un intento bloqueado no deja ningún fallo anotado: el aviso es solo del fallo que llena el tope.
+  if (result === "invalid") await notifyIfJustBlocked(db, ipHash);
   if (result !== "ok") return { error: result };
 
   await purgeExpiredAuthRecords(db);

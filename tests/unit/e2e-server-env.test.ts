@@ -57,6 +57,18 @@ describe("environment of the e2e servers", () => {
     expect((await securityServerEnv()).DATABASE_URL).toBe("");
   });
 
+  test("every server blanks the email variables, so no test can send a real email and the panel says 'sin configurar'", async () => {
+    vi.stubEnv("RESEND_API_KEY", "re_una_clave_real");
+    vi.stubEnv("ADMIN_ALERT_EMAIL", "alguien@example.com");
+    vi.stubEnv("ADMIN_ALERT_FROM", "Panel <avisos@example.com>");
+
+    for (const env of [await adminServerEnv(), await demoServerEnv(), await securityServerEnv()]) {
+      expect(env.RESEND_API_KEY).toBe("");
+      expect(env.ADMIN_ALERT_EMAIL).toBe("");
+      expect(env.ADMIN_ALERT_FROM).toBe("");
+    }
+  });
+
   test.each(CONFIGS)("the %s Playwright config starts its server with DATABASE_URL blank", async (_name, config) => {
     vi.stubEnv("DATABASE_URL", "postgres://usuario:clave@db.example.com:6543/postgres");
 

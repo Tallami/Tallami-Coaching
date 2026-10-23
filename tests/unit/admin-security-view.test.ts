@@ -48,6 +48,7 @@ function render(props: Partial<Parameters<typeof SecurityView>[0]> = {}): string
       currentSessionId: CURRENT,
       defaultKeyName: "Chrome en Windows",
       origin: ORIGIN,
+      alerts: null,
       ...props,
     }),
   );
@@ -113,8 +114,27 @@ describe("SecurityView", () => {
     expect(render({ defaultKeyName: "Edge en Windows" })).toContain('value="Edge en Windows"');
   });
 
-  test("says the email alerts are not configured yet", () => {
-    expect(render()).toContain("Avisos por email: sin configurar");
+  test("says the email alerts are not configured when there is nothing to send them with", () => {
+    const markup = render({ alerts: null });
+
+    expect(markup).toContain("Avisos por email: sin configurar");
+    expect(markup).not.toContain("activos");
+  });
+
+  test("says where the email alerts go, with the address masked", () => {
+    const markup = render({ alerts: { maskedEmail: "t***@gmail.com", usesTestSender: false } });
+
+    expect(markup).toContain("Avisos por email: activos (a t***@gmail.com)");
+    expect(markup).not.toContain("sin configurar");
+    expect(markup).not.toContain("dirección de prueba");
+  });
+
+  test("warns that Resend's test address only delivers to the Resend account's own email", () => {
+    const markup = render({ alerts: { maskedEmail: "t***@gmail.com", usesTestSender: true } });
+
+    expect(markup).toContain("Avisos por email: activos (a t***@gmail.com)");
+    expect(markup).toContain("dirección de prueba de Resend");
+    expect(markup).toContain("solo entrega al email de tu cuenta de Resend");
   });
 
   test("never prints a code before one is asked for", () => {
