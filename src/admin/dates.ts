@@ -71,3 +71,9 @@ export function formatDay(isoDay: string): string {
   const [year, month, day] = isoDay.split("-");
   return `${day}/${month}/${year}`;
 }
+
+/** Un instante en hora de Argentina, como se lee en pantalla: "15/10/2026, 14:30". */
+export function formatMoment(date: Date): string {
+  const [day, time] = dateToArgentinaLocal(date).split("T");
+  return `${formatDay(day)}, ${time}`;
+}

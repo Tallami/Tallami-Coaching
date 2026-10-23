@@ -23,3 +23,6 @@ export type LoginStepFailure = { ok: false; error: "expired" | "blocked" | "fail
 
 /** El segundo paso salió bien: la sesión ya está abierta y hay que ir a `redirectTo`. */
 export type LoginStepSuccess = { ok: true; redirectTo: string };
+
+/** El código para otro dispositivo sirvió: todavía no hay sesión, falta registrar la llave de este dispositivo. */
+export type LoginCodeRedeemed = { ok: true };

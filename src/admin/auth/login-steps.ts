@@ -1,8 +1,11 @@
 // El segundo paso del ingreso, lo que comparten sus páginas y sus acciones: usar
-// una llave registrada (`/admin/login/llave`) o registrar la primera
-// (`/admin/login/primera-llave`). Ninguna pasa por `requireAdmin()`: son justamente
-// lo que abre la sesión. Su verificación es el ingreso a medio camino de la cookie
-// (`pending-logins.ts`): sin uno válido y del tipo que corresponde no se hace nada.
+// una llave registrada (`/admin/login/llave`), registrar la primera
+// (`/admin/login/primera-llave`) o, con un código generado en otro dispositivo,
+// registrar la de este (también en `/admin/login/llave`; `redeemLoginCode` canjea el
+// código y `finishLoginStep("code", …)` registra la llave). Ninguna pasa por
+// `requireAdmin()`: son justamente lo que abre la sesión. Su verificación es el
+// ingreso a medio camino de la cookie (`pending-logins.ts`): sin uno válido y del tipo
+// que corresponde no se hace nada.
 //
 // Al terminar, el orden es el que protege (`finishLoginStep`):
 //
@@ -22,12 +25,13 @@ import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { getDb, type Db } from "../../db/client";
 import { getMissingConfig } from "./config";
-import type { LoginStepFailure, LoginStepSuccess } from "./login-errors";
+import type { LoginCodeRedeemed, LoginStepFailure, LoginStepSuccess } from "./login-errors";
 import {
   PENDING_COOKIE,
   consumePendingLogin,
   pendingCookieOptions,
   readPendingLogin,
+  switchPendingToCode,
   takePendingChallenge,
   type PendingLogin,
   type PendingMode,
@@ -131,6 +135,39 @@ export async function finishLoginStep<Verified>(
   cookieStore.set(ADMIN_COOKIE, await createSessionToken(sessionId), sessionCookieOptions(secure));
   cookieStore.delete({ name: PENDING_COOKIE, path: pendingCookieOptions(secure).path });
   return { ok: true, redirectTo: pending.nextPath };
+}
+
+/**
+ * Canjea el código para otro dispositivo en un ingreso de tipo `passkey` y, si sirve,
+ * lo pasa a tipo `code`: falta registrar la llave de este dispositivo
+ * (`finishLoginStep("code", …)`). No abre ninguna sesión. Va en el mismo orden que
+ * `finishLoginStep`:
+ *
+ * 1. reservar el intento antes de mirar el código: una ráfaga de pedidos no puede
+ *    probar más de 5 (`rate-limit.ts`);
+ * 2. canjear (`redeem`, que gasta el código: un solo uso); si no sirve, la reserva
+ *    queda anotada como fallo (código incorrecto, vencido, usado, o de una sesión que
+ *    se cerró);
+ * 3. con el código bueno, confirmar el éxito y cambiar el tipo del ingreso. Si el
+ *    ingreso venció justo en el medio, `expired`: el código ya se gastó y hay que
+ *    generar otro.
+ *
+ * Solo parte de un ingreso `passkey`: uno de primera llave no tiene ninguna sesión de
+ * la que pueda haber salido un código, y uno que ya canjeó uno no necesita otro.
+ */
+export async function redeemLoginCode(
+  redeem: (db: Db) => Promise<boolean>,
+): Promise<LoginCodeRedeemed | LoginStepFailure> {
+  const step = await readRequestPending();
+  if (step === null || step.pending.mode !== "passkey") return EXPIRED;
+  const { db, pending } = step;
+
+  const attemptId = await reserveLoginAttempt(db, pending.ipHash);
+  if (attemptId === null) return BLOCKED;
+  if (!(await redeem(db))) return FAILED;
+
+  await confirmLoginSuccess(db, attemptId);
+  return (await switchPendingToCode(db, pending.id)) ? { ok: true } : EXPIRED;
 }
 
 /** Lo que muestra la página de un paso: el paso mismo, o que la sesión ya está abierta. */

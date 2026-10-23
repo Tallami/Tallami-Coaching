@@ -14,6 +14,7 @@ export const ADMIN_ROUTES = {
   billing: "/admin/facturacion",
   billingExport: "/admin/facturacion/exportar",
   settings: "/admin/configuracion",
+  security: "/admin/configuracion/seguridad",
 } as const;
 
 /** La ficha (y edición) de la venta `id`. */

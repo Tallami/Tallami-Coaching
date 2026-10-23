@@ -119,7 +119,8 @@ export async function renamePasskey(db: Db, id: string, name: string): Promise<b
 /**
  * Borra la llave, salvo que sea la última: `"last"` y no se toca nada. `"missing"`
  * si no existe. Las sesiones que se abrieron con ella quedan sin llave
- * (`on delete set null`); cerrarlas es cosa de quien llama.
+ * (`on delete set null`); cerrarlas es cosa de quien llama, después del borrado y
+ * con `revokeKeylessSessions`: por la llave ya no se las encuentra.
  */
 export async function deletePasskeyUnlessLast(db: Db, id: string): Promise<"deleted" | "last" | "missing"> {
   if (!UUID_PATTERN.test(id)) return "missing";

@@ -17,6 +17,7 @@ import {
   markReauthed,
   purgeExpiredAuthRecords,
   revokeAllSessions,
+  revokeKeylessSessions,
   revokeSession,
   revokeSessionsForPasskey,
   setSessionChallenge,
@@ -276,6 +277,31 @@ describe("revoking sessions", () => {
     const lonely = await addPasskey("sin-sesiones");
 
     expect(await revokeSessionsForPasskey(db, lonely, START)).toEqual([]);
+  });
+
+  test("revokeKeylessSessions closes the open sessions left without a key, which is what deleting a key does to its sessions", async () => {
+    const phone = await addPasskey("celular");
+    const laptop = await addPasskey("notebook");
+    const withLaptop = await open(START, laptop);
+    const phoneSession = await open(START, phone);
+    const alreadyClosed = await open(START, phone);
+    await revokeSession(db, alreadyClosed, after(MINUTE_MS));
+    await db.delete(adminPasskeys).where(eq(adminPasskeys.id, phone)); // `on delete set null`
+
+    const closed = await revokeKeylessSessions(db, after(5 * MINUTE_MS));
+
+    expect(closed).toEqual([phoneSession]);
+    expect(await validateSession(db, phoneSession, after(6 * MINUTE_MS))).toBeNull();
+    expect(await validateSession(db, withLaptop, after(6 * MINUTE_MS))).not.toBeNull();
+    // Cerrada una vez, conserva la primera hora de cierre.
+    const [row] = await db.select().from(adminSessions).where(eq(adminSessions.id, alreadyClosed));
+    expect(row.revokedAt).toEqual(after(MINUTE_MS));
+  });
+
+  test("revokeKeylessSessions with nothing to close says nothing", async () => {
+    await open(START, await addPasskey("con-sesion"));
+
+    expect(await revokeKeylessSessions(db, START)).toEqual([]);
   });
 });
 

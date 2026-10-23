@@ -98,6 +98,14 @@ describe("SettingsView", () => {
     expect(markup).toContain("Confirmá con él");
   });
 
+  test("points to Seguridad, where the keys, the code for another device and the open sessions are", () => {
+    const markup = render();
+
+    expect(markup).toContain('href="/admin/configuracion/seguridad"');
+    expect(markup).toContain("Seguridad del ingreso");
+    expect(markup).toContain("llaves de acceso");
+  });
+
   test("the saved notice points to the meter in Facturación", () => {
     const markup = render({ justSaved: true });
 

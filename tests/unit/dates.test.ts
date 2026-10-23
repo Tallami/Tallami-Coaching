@@ -3,6 +3,7 @@ import {
   argentinaLocalToDate,
   dateToArgentinaLocal,
   formatDay,
+  formatMoment,
   isValidIsoDate,
   todayInArgentina,
 } from "@/admin/dates";
@@ -60,5 +61,15 @@ describe("formatDay", () => {
   test("writes a day as day/month/year without touching time zones", () => {
     expect(formatDay("2026-10-12")).toBe("12/10/2026");
     expect(formatDay("2019-01-05")).toBe("05/01/2019");
+  });
+});
+
+describe("formatMoment", () => {
+  test("writes an instant as the Argentine day and time, the way it is read on screen", () => {
+    expect(formatMoment(new Date("2026-10-15T17:30:00.000Z"))).toBe("15/10/2026, 14:30");
+  });
+
+  test("an instant just after midnight UTC is still the day before in Argentina", () => {
+    expect(formatMoment(new Date("2026-10-16T01:15:00.000Z"))).toBe("15/10/2026, 22:15");
   });
 });

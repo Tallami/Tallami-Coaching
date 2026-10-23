@@ -26,17 +26,39 @@ interface FirstPasskeyProps {
   expiredHref: string;
   /** El login con el aviso de demasiados intentos. */
   blockedHref: string;
+  /** La línea bajo el título. Por defecto, la de la primera llave. */
+  subtitle?: string;
+  /** El texto de arriba del formulario. Por defecto, el de la primera llave. */
+  intro?: string;
+  /** Lo que dice el botón. Por defecto, "Registrar mi llave". */
+  submitLabel?: string;
 }
 
+const DEFAULT_SUBTITLE = "Registrá tu primera llave.";
+const DEFAULT_INTRO =
+  "Desde ahora el panel pide, además de la contraseña, una llave de acceso: la huella, la cara o el PIN de un dispositivo tuyo. Todavía no hay ninguna: registrá la de este dispositivo.";
+const DEFAULT_SUBMIT_LABEL = "Registrar mi llave";
 const FAILED_MESSAGE = "No pudimos registrar la llave. Probá de nuevo.";
 const MESSAGE_ID = "first-passkey-message";
 
 /**
  * El segundo paso cuando todavía no hay ninguna llave: registrar la de este
  * dispositivo, con un nombre para reconocerla después. Hasta registrarla, el panel
- * no muestra nada.
+ * no muestra nada. También es la pantalla de registrar la llave de un dispositivo
+ * nuevo después de canjear un código (`EnrollmentCodeStep`), con otros textos.
  */
-export function FirstPasskey({ begin, finish, origin, defaultName, restartHref, expiredHref, blockedHref }: FirstPasskeyProps) {
+export function FirstPasskey({
+  begin,
+  finish,
+  origin,
+  defaultName,
+  restartHref,
+  expiredHref,
+  blockedHref,
+  subtitle = DEFAULT_SUBTITLE,
+  intro = DEFAULT_INTRO,
+  submitLabel = DEFAULT_SUBMIT_LABEL,
+}: FirstPasskeyProps) {
   const hydrated = useHydrated();
   const [name, setName] = useState(defaultName);
   const [nameError, setNameError] = useState<string | undefined>();
@@ -64,12 +86,9 @@ export function FirstPasskey({ begin, finish, origin, defaultName, restartHref, 
   }
 
   return (
-    <LoginCard subtitle="Registrá tu primera llave.">
+    <LoginCard subtitle={subtitle}>
       <form onSubmit={register} className="mt-8 flex flex-col gap-5">
-        <p>
-          Desde ahora el panel pide, además de la contraseña, una llave de acceso: la huella, la cara o el PIN de
-          un dispositivo tuyo. Todavía no hay ninguna: registrá la de este dispositivo.
-        </p>
+        <p>{intro}</p>
         <Field
           id="passkey-name"
           label="Nombre de la llave"
@@ -98,7 +117,7 @@ export function FirstPasskey({ begin, finish, origin, defaultName, restartHref, 
           <Notice tone="info">Activá JavaScript para registrar tu llave.</Notice>
         </noscript>
         <Button type="submit" disabled={!hydrated || busy} aria-describedby={message ? MESSAGE_ID : undefined}>
-          {busy ? "Esperando tu dispositivo…" : "Registrar mi llave"}
+          {busy ? "Esperando tu dispositivo…" : submitLabel}
         </Button>
         <p className="text-[0.9375rem] leading-snug text-ink-2">
           En una PC con Windows, activá antes el PIN de Windows Hello: es la llave de esa PC.

@@ -95,6 +95,13 @@ function hasCredentialShape(value: unknown): value is CredentialShape {
   );
 }
 
+/** El id de la credencial que dice traer la respuesta del navegador, si tiene uno: para buscar con qué llave verificarla. */
+export function credentialIdOf(response: unknown): string | null {
+  if (typeof response !== "object" || response === null) return null;
+  const { id } = response as { id?: unknown };
+  return typeof id === "string" && id.length > 0 ? id : null;
+}
+
 /** El motivo en una sola línea y corto: el mensaje de la librería repite texto que manda el navegador (origen, desafío). */
 const MAX_LOGGED_REASON_LENGTH = 200;
 

@@ -1,7 +1,7 @@
 "use server";
 
 import type { PublicKeyCredentialRequestOptionsJSON } from "@simplewebauthn/server";
-import { authenticationOptions, verifyAuthentication } from "@/admin/auth/ceremonies";
+import { authenticationOptions, credentialIdOf, verifyAuthentication } from "@/admin/auth/ceremonies";
 import type { LoginStepFailure, LoginStepSuccess } from "@/admin/auth/login-errors";
 import { beginLoginStep, finishLoginStep } from "@/admin/auth/login-steps";
 import { findPasskeyByCredentialId, listPasskeys, recordPasskeyUse } from "@/admin/auth/passkeys";
@@ -10,13 +10,6 @@ import { setPendingChallenge } from "@/admin/auth/pending-logins";
 // El segundo paso con una llave ya registrada. Las dos acciones son puertas del
 // panel (sin `requireAdmin()`): verifican el ingreso a medio camino de la cookie,
 // que solo existe si la contraseña era correcta (ver `src/admin/auth/login-steps.ts`).
-
-/** El id de la credencial que dice traer la respuesta del navegador, si tiene uno. */
-function credentialIdOf(response: unknown): string | null {
-  if (typeof response !== "object" || response === null) return null;
-  const { id } = response as { id?: unknown };
-  return typeof id === "string" && id.length > 0 ? id : null;
-}
 
 /**
  * Las opciones para pedirle la llave al navegador (cualquiera de las registradas,

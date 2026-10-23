@@ -144,6 +144,24 @@ export async function revokeSessionsForPasskey(
   return closed.map((row) => row.id);
 }
 
+/**
+ * Cierra las sesiones abiertas que quedaron sin llave y devuelve sus ids. Borrar una
+ * llave les suelta la llave a las sesiones que se abrieron con ella (`on delete set
+ * null`), así que después del borrado `revokeSessionsForPasskey` ya no las encuentra:
+ * esto sí. Con al menos una llave registrada no puede haber una sesión legítima sin
+ * llave (sería entrar con la contraseña sola), así que cerrarlas nunca sobra. Va
+ * después del borrado y no antes: el borrado decide (la última llave no se borra) y
+ * una sesión que se abra con esa llave mientras tanto también queda sin ella.
+ */
+export async function revokeKeylessSessions(db: Db, now: Date = new Date()): Promise<string[]> {
+  const closed = await db
+    .update(adminSessions)
+    .set({ revokedAt: now })
+    .where(and(isNull(adminSessions.passkeyId), isOpen(now)))
+    .returning({ id: adminSessions.id });
+  return closed.map((row) => row.id);
+}
+
 /** Las sesiones abiertas a la hora `now`, la más nueva primero. */
 export async function listActiveSessions(db: Db, now: Date = new Date()): Promise<AdminSession[]> {
   return db
