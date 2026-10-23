@@ -79,6 +79,20 @@ export function isAdminPath(pathname: string): boolean {
   );
 }
 
+/**
+ * ¿Es una de las puertas del panel, que se abren sin sesión? `/admin/setup` y todo
+ * el ingreso: `/admin/login` y sus pasos (`/admin/login/llave`,
+ * `/admin/login/primera-llave`…), que hacen sus propias verificaciones con la
+ * cookie del ingreso a medio camino. Recibe la ruta ya normalizada. Debajo de
+ * `/admin/login/` no vale un segmento `.` o `..` (que llegaría decodificado de un
+ * `%2F..%2F`): con eso la dirección saldría del ingreso hacia otra página del panel.
+ */
+function isDoor(pathname: string): boolean {
+  if (pathname === SETUP_PATH || pathname === LOGIN_PATH) return true;
+  if (!pathname.startsWith(`${LOGIN_PATH}/`)) return false;
+  return pathname.split("/").every((segment) => segment !== "." && segment !== "..");
+}
+
 /** Encabezados de toda respuesta del panel: ni los buscadores ni ninguna caché la guardan. */
 function withPanelHeaders(response: NextResponse): NextResponse {
   response.headers.set("X-Robots-Tag", "noindex, nofollow");
@@ -137,7 +151,7 @@ function unauthorizedAction(target: string): NextResponse {
 /**
  * Decide qué pasa con un pedido a `/admin…`:
  * - panel sin configurar → `/admin/setup` (o, si es un Server Action, 401 que manda a ese mismo lugar);
- * - `/admin/login` y `/admin/setup` → pasan (son las puertas);
+ * - `/admin/login` (con sus pasos, `/admin/login/…`) y `/admin/setup` → pasan (son las puertas, ver `isDoor`);
  * - con sesión válida → pasa;
  * - sin ella → redirección al login con `?next=`; si es un Server Action, 401 con
  *   `x-action-redirect` al login (ver `unauthorizedAction`).
@@ -152,7 +166,7 @@ export async function guardAdmin(request: NextRequest): Promise<NextResponse> {
     return redirectTo(request, SETUP_PATH);
   }
 
-  if (pathname === LOGIN_PATH || pathname === SETUP_PATH) {
+  if (isDoor(pathname)) {
     return withPanelHeaders(NextResponse.next());
   }
 

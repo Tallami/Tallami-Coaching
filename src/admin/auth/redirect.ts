@@ -7,6 +7,10 @@ import { ADMIN_ROUTES } from "../routes";
 export const PANEL_PATH = ADMIN_ROUTES.overview;
 export const LOGIN_PATH = "/admin/login";
 export const SETUP_PATH = "/admin/setup";
+/** El segundo paso del ingreso: confirmar con una llave ya registrada. */
+export const PASSKEY_STEP_PATH = `${LOGIN_PATH}/llave`;
+/** El segundo paso cuando todavía no hay ninguna llave: registrar la primera. */
+export const FIRST_KEY_STEP_PATH = `${LOGIN_PATH}/primera-llave`;
 
 const MAX_NEXT_LENGTH = 2048;
 /** Origen inventado: sirve para que `URL` resuelva la ruta y para detectar si saltó a otro sitio. */
@@ -50,10 +54,24 @@ export function safeNextPath(raw: unknown): string {
  * `?error=` si hay un aviso para mostrar.
  */
 export function loginPath({ next, error }: { next?: string; error?: string } = {}): string {
+  return withNext(LOGIN_PATH, next, error ? { error } : {});
+}
+
+/**
+ * La página de un paso del ingreso (`PASSKEY_STEP_PATH` o `FIRST_KEY_STEP_PATH`),
+ * con `?next=` si el destino no es el panel mismo. Ese `next` solo sirve para
+ * volver a empezar si el ingreso vence: a dónde se va al terminar lo dice el
+ * ingreso a medio camino guardado en la base, nunca la dirección.
+ */
+export function loginStepPath(step: string, next?: string): string {
+  return withNext(step, next);
+}
+
+function withNext(pathname: string, next: string | undefined, extra: Record<string, string> = {}): string {
   const params = new URLSearchParams();
   const target = safeNextPath(next);
   if (target !== PANEL_PATH) params.set("next", target);
-  if (error) params.set("error", error);
+  for (const [name, value] of Object.entries(extra)) params.set(name, value);
   const query = params.toString();
-  return query ? `${LOGIN_PATH}?${query}` : LOGIN_PATH;
+  return query ? `${pathname}?${query}` : pathname;
 }

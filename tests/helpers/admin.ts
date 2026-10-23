@@ -1,6 +1,6 @@
 // Ayudas de los e2e del panel: un `test` donde cada test navega con su propia
 // IP, tokens de sesión (firmados a mano o de un ingreso de verdad) y el inicio
-// de sesión.
+// de sesión en dos pasos (contraseña y llave de prueba, ver `webauthn.ts`).
 
 import { randomBytes } from "node:crypto";
 import { expect, test as base, type Page } from "@playwright/test";
@@ -12,6 +12,7 @@ import {
   ADMIN_TEST_PASSWORD_HASH,
   ADMIN_TEST_SESSION_SECRET,
 } from "./admin-server";
+import { SEEDED_SLOTS, enableVirtualAuthenticator, injectTestPasskey } from "./webauthn";
 
 export {
   ADMIN_TEST_OLD_PASSWORD_HASH,
@@ -91,11 +92,44 @@ export async function signTestToken({
     .sign(key);
 }
 
-/** Entra al panel con la contraseña de prueba y espera a estar adentro. */
-export async function loginAsAdmin(page: Page): Promise<void> {
-  await page.goto("/admin/login");
+/** El paso de la llave, con o sin `?next=`. */
+export const PASSKEY_STEP_URL = /\/admin\/login\/llave(\?|$)/;
+/** El botón del paso de la llave: "Usar mi llave", o "Probar de nuevo" después de un aviso. */
+export const PASSKEY_BUTTON = { name: /^(Usar mi llave|Probar de nuevo)$/ } as const;
+
+/**
+ * Deja en `page` un autenticador virtual nuevo con la llave de prueba `slot`: por
+ * defecto la del worker (`parallelIndex`), registrada de antemano en los servidores
+ * principal y de datos de ejemplo. Otro slot (por ejemplo 99) es una llave que el
+ * panel no conoce.
+ */
+export async function armTestPasskey(page: Page, slot?: number): Promise<void> {
+  const chosen = slot ?? test.info().parallelIndex;
+  if (slot === undefined && chosen >= SEEDED_SLOTS) {
+    throw new Error(`Hay más workers que llaves de prueba (${SEEDED_SLOTS}): subí SEEDED_SLOTS o bajá los workers.`);
+  }
+  const authenticatorId = await enableVirtualAuthenticator(page);
+  await injectTestPasskey(page, authenticatorId, chosen);
+}
+
+/** En el paso de la llave: carga la llave de prueba del worker y la usa ("Usar mi llave"). */
+export async function confirmWithTestPasskey(page: Page): Promise<void> {
+  await expect(page).toHaveURL(PASSKEY_STEP_URL);
+  await armTestPasskey(page);
+  await page.getByRole("button", PASSKEY_BUTTON).click();
+}
+
+/** Escribe la contraseña de prueba en el login (que ya tiene que estar abierto) y la envía. */
+export async function submitTestPassword(page: Page): Promise<void> {
   await page.getByLabel("Contraseña").fill(ADMIN_TEST_PASSWORD);
   await page.getByRole("button", { name: "Ingresar" }).click();
+}
+
+/** Entra al panel como Tallami (contraseña y llave de prueba) y espera a estar adentro. */
+export async function loginAsAdmin(page: Page): Promise<void> {
+  await page.goto("/admin/login");
+  await submitTestPassword(page);
+  await confirmWithTestPasskey(page);
   await expect(page).toHaveURL(/\/admin$/);
 }
 

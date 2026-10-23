@@ -1,18 +1,21 @@
 import { defineConfig, devices } from "@playwright/test";
-import { adminServerEnv } from "./tests/helpers/admin-server";
+import { E2E_PORTS, SEED_E2E_PASSKEYS_COMMAND, adminServerEnv, e2eBaseUrl } from "./tests/helpers/admin-server";
 
-const PORT = 3100;
-const BASE_URL = `http://localhost:${PORT}`;
+const PORT = E2E_PORTS.main;
+const BASE_URL = e2eBaseUrl(PORT);
 
 export default defineConfig({
   testDir: "./tests/e2e",
   // Los tests que verifican totales corren con los datos de ejemplo, en el
-  // servidor de `playwright.demo.config.ts` (`npm run test:e2e` corre los dos).
+  // servidor de `playwright.demo.config.ts`, y los que cambian la seguridad del
+  // ingreso (la primera llave, cerrar todo) en el de `playwright.security.config.ts`
+  // (`npm run test:e2e` corre los tres).
   testIgnore: [
     "**/admin-overview.spec.ts",
     "**/admin-services-demo.spec.ts",
     "**/admin-billing-demo.spec.ts",
     "**/admin-quality.spec.ts",
+    "**/admin-security.spec.ts",
   ],
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
@@ -24,7 +27,9 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: `npm run build && npm run start -- --port ${PORT}`,
+    // Las llaves de prueba se registran antes de levantar el servidor: los tests
+    // entran al panel con contraseña y llave (`loginAsAdmin`).
+    command: `npm run build && ${SEED_E2E_PASSKEYS_COMMAND} && npm run start -- --port ${PORT}`,
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
@@ -34,8 +39,9 @@ export default defineConfig({
       // dependen de la red ni de que X siga mostrando esos tweets.
       TWEETS_SOURCE: "snapshots",
       // Panel de admin: contraseña y secreto de prueba, una base PGlite
-      // vacía en una carpeta temporal (se borra al arrancar) y cotizaciones
-      // fijas en lugar del BCRA (ver `tests/helpers/admin-server.ts`).
+      // vacía en una carpeta temporal (se borra al arrancar), las llaves de
+      // acceso de esta dirección y cotizaciones fijas en lugar del BCRA (ver
+      // `tests/helpers/admin-server.ts`).
       ...(await adminServerEnv()),
     },
   },

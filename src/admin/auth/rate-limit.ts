@@ -15,10 +15,11 @@
 // da vuelta su fila a éxito; si se bloquea, su fila se borra (un bloqueo no
 // se prolonga por seguir intentando).
 //
-// El segundo paso (una llave inválida, un código incorrecto) no reserva:
-// `isLoginBlocked` mira antes y `recordLoginFailure` anota después. Una ráfaga
-// ahí no adelanta nada: lo que se adivina es una firma o un código de 32^10
-// combinaciones, y todo el paso vive en un ingreso a medio camino de 5 minutos.
+// El final del segundo paso (verificar la llave) reserva igual que la contraseña,
+// antes de mirar la respuesta (`src/admin/auth/login-steps.ts`): una llave
+// inválida o de otro sitio queda anotada como fallo y una buena confirma el
+// éxito. `isLoginBlocked` solo sirve para contestar de antemano, al pedir las
+// opciones de la llave, que esa conexión ya no puede entrar.
 
 import { and, count, eq, gt, lt } from "drizzle-orm";
 import type { Db } from "../../db/client";

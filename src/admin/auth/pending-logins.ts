@@ -10,7 +10,8 @@
 //   (no hay ninguna: registrar la primera) o `code` (se canjeó un código y falta
 //   registrar la llave del dispositivo nuevo).
 // - Lleva el desafío de la ceremonia en curso (`challenge`); cada pedido de
-//   opciones lo reemplaza y el ingreso, al terminar, se consume entero.
+//   opciones lo reemplaza, cada respuesta lo gasta (`takePendingChallenge`) y el
+//   ingreso, al terminar, se consume entero.
 //
 // La hora la pone quien llama (`now`, por defecto la actual), como en `sessions.ts`.
 
@@ -108,6 +109,26 @@ export async function setPendingChallenge(db: Db, id: string, challenge: string)
     .update(adminPendingLogins)
     .set({ challenge })
     .where(and(eq(adminPendingLogins.id, id), isNull(adminPendingLogins.consumedAt)));
+}
+
+/**
+ * Saca el desafío del ingreso y lo gasta: cada respuesta del navegador se compara
+ * contra un desafío una sola vez, salga bien o mal, y el intento siguiente tiene
+ * que pedir uno nuevo. `null` si no había, o si el ingreso venció o ya se usó. El
+ * ingreso en sí sigue vivo (lo gasta `consumePendingLogin`).
+ *
+ * Es un compare-and-swap: se borra solo si sigue siendo el mismo desafío que se
+ * leyó, así de dos pedidos simultáneos solo uno se lo lleva.
+ */
+export async function takePendingChallenge(db: Db, id: string, now: Date = new Date()): Promise<string | null> {
+  const pending = await readPendingLogin(db, id, now);
+  if (pending === null || pending.challenge === null) return null;
+  const taken = await db
+    .update(adminPendingLogins)
+    .set({ challenge: null })
+    .where(and(eq(adminPendingLogins.id, id), eq(adminPendingLogins.challenge, pending.challenge), isPending(now)))
+    .returning({ id: adminPendingLogins.id });
+  return taken.length > 0 ? pending.challenge : null;
 }
 
 /**

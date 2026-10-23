@@ -7,7 +7,7 @@
 //
 // Es solo para tests: no hay manera de que llegue al código de producción.
 
-import { createHash, generateKeyPairSync, randomBytes, sign } from "node:crypto";
+import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, randomBytes, sign } from "node:crypto";
 import type {
   AuthenticationResponseJSON,
   PublicKeyCredentialCreationOptionsJSON,
@@ -39,7 +39,7 @@ function cborBytes(bytes: Buffer): Buffer {
 }
 
 /** La clave pública en COSE (EC2, ES256, P-256), como la guarda un autenticador. */
-function coseKey(x: Buffer, y: Buffer): Buffer {
+export function coseKey(x: Buffer, y: Buffer): Buffer {
   return Buffer.concat([
     Buffer.from([0xa5]), // mapa de 5 pares
     Buffer.from([0x01, 0x02]), // kty: EC2
@@ -100,11 +100,22 @@ export type VirtualAuthenticator = {
   ): AuthenticationResponseJSON;
 };
 
-/** Un dispositivo con una llave nueva que se comporta bien en el sitio `site`. */
-export function createVirtualAuthenticator(site: { rpID: string; origin: string }): VirtualAuthenticator {
-  const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
-  const { x, y } = publicKey.export({ format: "jwk" });
-  const credentialId = randomBytes(16);
+/** Una llave ya hecha: la clave privada P-256 en PKCS#8 (base64) y el id de la credencial (base64url). */
+export type FixedKey = { privateKeyPkcs8: string; credentialId: string };
+
+/**
+ * Un dispositivo que se comporta bien en el sitio `site`, con una llave nueva o, con
+ * `fixedKey`, con esa (por ejemplo, una de las llaves de prueba de los e2e).
+ */
+export function createVirtualAuthenticator(
+  site: { rpID: string; origin: string },
+  fixedKey?: FixedKey,
+): VirtualAuthenticator {
+  const privateKey = fixedKey
+    ? createPrivateKey({ key: Buffer.from(fixedKey.privateKeyPkcs8, "base64"), format: "der", type: "pkcs8" })
+    : generateKeyPairSync("ec", { namedCurve: "P-256" }).privateKey;
+  const { x, y } = createPublicKey(privateKey).export({ format: "jwk" });
+  const credentialId = fixedKey ? Buffer.from(fixedKey.credentialId, "base64url") : randomBytes(16);
   const rpIdHashFor = (rpID: string) => sha256(rpID);
 
   const flags = (userVerified: boolean, extra = 0) =>

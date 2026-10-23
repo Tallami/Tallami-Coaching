@@ -9,6 +9,7 @@ import {
   readPendingLogin,
   setPendingChallenge,
   switchPendingToCode,
+  takePendingChallenge,
 } from "@/admin/auth/pending-logins";
 import type { Db } from "@/db/client";
 import { adminPendingLogins } from "@/db/schema";
@@ -143,6 +144,51 @@ describe("setPendingChallenge", () => {
 
     const [row] = await db.select().from(adminPendingLogins).where(eq(adminPendingLogins.id, id));
     expect(row.challenge).toBeNull();
+  });
+});
+
+describe("takePendingChallenge", () => {
+  test("hands the challenge over once and leaves none behind: the next try needs a new one", async () => {
+    const id = await createPendingLogin(db, INPUT, START);
+    await setPendingChallenge(db, id, "desafio");
+
+    expect(await takePendingChallenge(db, id, after(SECOND_MS))).toBe("desafio");
+    expect(await takePendingChallenge(db, id, after(2 * SECOND_MS))).toBeNull();
+    expect((await readPendingLogin(db, id, after(2 * SECOND_MS)))?.challenge).toBeNull();
+  });
+
+  test("taking it does not use up the login itself", async () => {
+    const id = await createPendingLogin(db, INPUT, START);
+    await setPendingChallenge(db, id, "desafio");
+
+    await takePendingChallenge(db, id, START);
+
+    expect(await readPendingLogin(db, id, START)).not.toBeNull();
+    expect(await consumePendingLogin(db, id, START)).toBe(true);
+  });
+
+  test("two at the same time: only one gets it", async () => {
+    const id = await createPendingLogin(db, INPUT, START);
+    await setPendingChallenge(db, id, "desafio");
+
+    const taken = await Promise.all([takePendingChallenge(db, id, START), takePendingChallenge(db, id, START)]);
+
+    expect(taken.filter((challenge) => challenge === "desafio")).toHaveLength(1);
+    expect(taken.filter((challenge) => challenge === null)).toHaveLength(1);
+  });
+
+  test("is null when nothing was asked for, or the login expired, was consumed or does not exist", async () => {
+    const without = await createPendingLogin(db, INPUT, START);
+    const expired = await createPendingLogin(db, INPUT, START);
+    await setPendingChallenge(db, expired, "vencido");
+    const consumed = await createPendingLogin(db, INPUT, START);
+    await setPendingChallenge(db, consumed, "usado");
+    await consumePendingLogin(db, consumed, START);
+
+    expect(await takePendingChallenge(db, without, START)).toBeNull();
+    expect(await takePendingChallenge(db, expired, after(5 * MINUTE_MS))).toBeNull();
+    expect(await takePendingChallenge(db, consumed, START)).toBeNull();
+    expect(await takePendingChallenge(db, "a".repeat(43), START)).toBeNull();
   });
 });
 

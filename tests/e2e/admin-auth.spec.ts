@@ -1,19 +1,30 @@
 import { request as httpRequest, type IncomingHttpHeaders } from "node:http";
 import AxeBuilder from "@axe-core/playwright";
-import type { Page } from "@playwright/test";
+import type { BrowserContext, Page } from "@playwright/test";
 import {
   ADMIN_COOKIE,
   ADMIN_TEST_OLD_PASSWORD_HASH,
   ADMIN_TEST_PASSWORD,
+  PASSKEY_BUTTON,
+  PASSKEY_STEP_URL,
+  armTestPasskey,
+  confirmWithTestPasskey,
   expect,
   loginAndReadSessionCookie,
   loginAsAdmin,
   signTestToken,
+  submitTestPassword,
   test,
   uniqueTestIp,
 } from "../helpers/admin";
 
 const LOGIN_URL = /\/admin\/login(\?|$)/;
+/** La cookie del ingreso a medio camino (`src/admin/auth/pending-logins.ts`). */
+const PENDING_COOKIE = "tallami_admin_pending";
+/** Una llave que el panel no tiene registrada (los servidores registran los slots 0 a 31). */
+const UNKNOWN_SLOT = 99;
+const CANCELLED_MESSAGE =
+  "Cancelaste o tu dispositivo no tiene una llave para este panel. Probá de nuevo, o usá tu celular con el código QR.";
 const LOCKED_AFTER = 5;
 /** Lo máximo que dura una sesión (y su cookie): 8 horas. */
 const SESSION_SECONDS = 8 * 60 * 60;
@@ -65,6 +76,16 @@ async function submitPassword(page: Page, password: string): Promise<void> {
   await page.getByRole("button", { name: "Ingresar" }).click();
 }
 
+/** El aviso del paso de la llave. */
+function passkeyMessage(page: Page) {
+  return page.locator("#passkey-message");
+}
+
+/** El valor de la cookie de sesión del navegador, o `undefined`. */
+async function sessionCookie(context: BrowserContext): Promise<string | undefined> {
+  return (await context.cookies()).find(({ name }) => name === ADMIN_COOKIE)?.value;
+}
+
 test.describe("without a session", () => {
   for (const path of ["/admin", "/admin/ventas", "/admin/servicios"]) {
     test(`admin pages redirect to login without a session: ${path}`, async ({
@@ -93,6 +114,7 @@ test.describe("without a session", () => {
 
     await expect(page).toHaveURL(/next=%2Fadmin%2Fventas%3Fmes%3D2026-10/);
     await submitPassword(page, ADMIN_TEST_PASSWORD);
+    await confirmWithTestPasskey(page);
 
     await expect(page).toHaveURL(/\/admin\/ventas\?mes=2026-10$/);
   });
@@ -389,6 +411,7 @@ test.describe("login", () => {
     for (const hostile of ["//evil.example/x", "https://evil.example/", "/es", "/\\evil.example"]) {
       await page.goto(`/admin/login?next=${encodeURIComponent(hostile)}`);
       await submitPassword(page, ADMIN_TEST_PASSWORD);
+      await confirmWithTestPasskey(page);
 
       await expect(page, hostile).toHaveURL(/^http:\/\/localhost:3100\/admin$/);
       await page.getByRole("button", { name: "Salir" }).click();
@@ -408,6 +431,153 @@ test.describe("login", () => {
     expect(
       results.violations.map(({ id, nodes }) => ({ id, targets: nodes.map((n) => n.target) })),
     ).toEqual([]);
+  });
+});
+
+// Con llaves registradas (las de prueba, cargadas antes de levantar el servidor) la
+// contraseña sola no alcanza: después viene el paso de la llave.
+test.describe("the second step: the passkey", () => {
+  test("the password alone leaves you at the passkey step, without a session: the panel still sends you to the login", async ({
+    context,
+    page,
+  }) => {
+    await page.goto("/admin/login");
+    await submitTestPassword(page);
+
+    await expect(page).toHaveURL(PASSKEY_STEP_URL);
+    await expect(page.getByRole("button", { name: "Usar mi llave" })).toBeVisible();
+    const cookies = await context.cookies();
+    expect(cookies.some(({ name }) => name === ADMIN_COOKIE)).toBe(false);
+    expect(cookies.find(({ name }) => name === PENDING_COOKIE)).toMatchObject({
+      httpOnly: true,
+      sameSite: "Strict",
+      path: "/admin/login",
+    });
+
+    for (const path of ["/admin", "/admin/ventas"]) {
+      await page.goto(path);
+      await expect(page, path).toHaveURL(LOGIN_URL);
+      await expect(page.getByText(PANEL_MARKER), path).toHaveCount(0);
+    }
+  });
+
+  test("a key this panel does not know shows what to do and does not enter; cancelling is never a failed attempt", async ({
+    context,
+    page,
+  }) => {
+    await page.goto("/admin/login");
+    await submitTestPassword(page);
+    await expect(page).toHaveURL(PASSKEY_STEP_URL);
+    await armTestPasskey(page, UNKNOWN_SLOT);
+
+    // Más veces que el límite de intentos: el navegador no encuentra la llave y nada llega al servidor.
+    for (let attempt = 1; attempt <= LOCKED_AFTER + 1; attempt += 1) {
+      await page.getByRole("button", PASSKEY_BUTTON).click();
+      await expect(passkeyMessage(page), `intento ${attempt}`).toHaveText(CANCELLED_MESSAGE);
+      await expect(page.getByRole("button", { name: "Probar de nuevo" })).toBeEnabled();
+    }
+    await expect(page).toHaveURL(PASSKEY_STEP_URL);
+    expect(await sessionCookie(context)).toBeUndefined();
+
+    // Con la llave de verdad entra: ninguno de esos intentos contó para el bloqueo.
+    await confirmWithTestPasskey(page);
+    await expect(page).toHaveURL(/\/admin$/);
+    await expect(page.getByText(PANEL_MARKER)).toBeVisible();
+  });
+
+  test("after entering, going back to the passkey step or using an old tab of it never opens a second session", async ({
+    context,
+    page,
+  }) => {
+    await page.goto("/admin/login");
+    await submitTestPassword(page);
+    await expect(page).toHaveURL(PASSKEY_STEP_URL);
+    const oldTab = await context.newPage();
+    await oldTab.goto("/admin/login/llave");
+    await expect(oldTab.getByRole("button", { name: "Usar mi llave" })).toBeEnabled();
+
+    await confirmWithTestPasskey(page);
+    await expect(page).toHaveURL(/\/admin$/);
+    const session = await sessionCookie(context);
+    expect(session).toBeDefined();
+
+    // "Atrás" hasta el paso de la llave: el ingreso ya se usó y no hay nada que repetir.
+    await page.goBack();
+    await expect(page).toHaveURL(PASSKEY_STEP_URL);
+    await expect(page.getByText("Ya entraste.")).toBeVisible();
+    await expect(page.getByRole("button", PASSKEY_BUTTON)).toHaveCount(0);
+
+    // La pestaña vieja todavía muestra el botón; usarlo vuelve al ingreso, que ya tiene sesión, y de ahí al panel.
+    await armTestPasskey(oldTab);
+    await oldTab.getByRole("button", PASSKEY_BUTTON).click();
+    await expect(oldTab).toHaveURL(/\/admin$/);
+    await expect(oldTab.getByText(PANEL_MARKER)).toBeVisible();
+
+    expect(await sessionCookie(context)).toBe(session);
+  });
+
+  test("a step without its pending login goes back to the login saying it expired", async ({ context, page }) => {
+    await page.goto("/admin/ventas");
+    await submitTestPassword(page);
+    await expect(page).toHaveURL(PASSKEY_STEP_URL);
+
+    // Como si hubieran pasado los 5 minutos: el navegador ya no manda la cookie del ingreso.
+    await context.clearCookies({ name: PENDING_COOKIE });
+    await page.getByRole("button", PASSKEY_BUTTON).click();
+
+    await expect(page).toHaveURL(/\/admin\/login\?next=%2Fadmin%2Fventas&error=expired$/);
+    await expect(loginAlert(page)).toHaveText("Tu ingreso venció, empezá de nuevo.");
+
+    await page.goto("/admin/login/llave");
+    await expect(page).toHaveURL(/\/admin\/login\?error=expired$/);
+    await page.goto("/admin/login/primera-llave");
+    await expect(page).toHaveURL(/\/admin\/login\?error=expired$/);
+  });
+
+  test("with keys registered, the first-key page is not there: it sends you to the passkey step", async ({ page }) => {
+    await page.goto("/admin/login");
+    await submitTestPassword(page);
+    await expect(page).toHaveURL(PASSKEY_STEP_URL);
+
+    await page.goto("/admin/login/primera-llave");
+
+    await expect(page).toHaveURL(PASSKEY_STEP_URL);
+    await expect(page.getByRole("button", { name: "Usar mi llave" })).toBeVisible();
+  });
+
+  test("the keys only work at the address of the panel, and the step says which one it is", async ({ baseURL, page }) => {
+    // La misma máquina por otra dirección (como la IP de la red o una vista previa de Vercel).
+    const elsewhere = baseURL!.replace("localhost", "127.0.0.1");
+    await page.goto(`${elsewhere}/admin/login`);
+    await submitTestPassword(page);
+    await expect(page).toHaveURL(PASSKEY_STEP_URL);
+    await armTestPasskey(page);
+
+    await page.getByRole("button", PASSKEY_BUTTON).click();
+
+    await expect(passkeyMessage(page)).toHaveText(`Las llaves solo funcionan en ${baseURL}.`);
+    await expect(page.getByText(PANEL_MARKER)).toHaveCount(0);
+  });
+
+  test("the passkey step is accessible and fits a phone", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto("/admin/login");
+    await submitTestPassword(page);
+    await expect(page).toHaveURL(PASSKEY_STEP_URL);
+    await armTestPasskey(page, UNKNOWN_SLOT);
+    await page.getByRole("button", PASSKEY_BUTTON).click();
+    await expect(passkeyMessage(page)).toBeVisible();
+
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+      .analyze();
+
+    expect(
+      results.violations.map(({ id, nodes }) => ({ id, targets: nodes.map((n) => n.target) })),
+    ).toEqual([]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+    // Tras el aviso, el foco vuelve al botón: Enter prueba de nuevo.
+    await expect(page.getByRole("button", { name: "Probar de nuevo" })).toBeFocused();
   });
 });
 
@@ -447,15 +617,21 @@ test.describe("public pages", () => {
   test("after logging in, the public pages neither set nor receive the session cookie", async ({
     page,
   }) => {
-    // Control: `allHeaders()` sí deja ver la cookie cuando el servidor la manda (el login).
+    // Control: `allHeaders()` sí deja ver la cookie cuando el servidor la manda (al terminar
+    // el paso de la llave, que es el que abre la sesión).
+    const sessionCookies: string[] = [];
+    page.on("response", async (response) => {
+      if (response.request().method() !== "POST" || !response.url().includes("/admin/login")) return;
+      const setCookie = (await response.allHeaders())["set-cookie"] ?? "";
+      if (setCookie.includes(`${ADMIN_COOKIE}=`)) sessionCookies.push(setCookie);
+    });
     await page.goto("/admin/login");
-    await page.getByLabel("Contraseña").fill(ADMIN_TEST_PASSWORD);
-    const [loginResponse] = await Promise.all([
-      page.waitForResponse((response) => response.request().method() === "POST" && response.url().includes("/admin/login")),
-      page.getByRole("button", { name: "Ingresar" }).click(),
-    ]);
-    expect((await loginResponse.allHeaders())["set-cookie"] ?? "").toContain(`${ADMIN_COOKIE}=`);
+    await submitTestPassword(page);
+    await expect(page).toHaveURL(PASSKEY_STEP_URL);
+    expect(sessionCookies).toEqual([]);
+    await confirmWithTestPasskey(page);
     await expect(page).toHaveURL(/\/admin$/);
+    await expect.poll(() => sessionCookies.length).toBe(1);
 
     for (const path of ["/es", "/pt", "/en"]) {
       const response = await page.goto(path);

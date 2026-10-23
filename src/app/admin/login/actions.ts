@@ -8,10 +8,17 @@ import { describeDevice } from "@/admin/auth/device";
 import { attemptLogin } from "@/admin/auth/login";
 import { loginIpHash } from "@/admin/auth/login-ip";
 import type { LoginErrorCode } from "@/admin/auth/login-errors";
-import { loginPath, safeNextPath } from "@/admin/auth/redirect";
+import { stepPathFor } from "@/admin/auth/login-steps";
+import { countPasskeys } from "@/admin/auth/passkeys";
+import {
+  PENDING_COOKIE,
+  createPendingLogin,
+  pendingCookieOptions,
+  type PendingMode,
+} from "@/admin/auth/pending-logins";
+import { loginPath, loginStepPath, safeNextPath } from "@/admin/auth/redirect";
 import { getClientIp, shouldUseSecureCookie } from "@/admin/auth/request";
-import { ADMIN_COOKIE, createSessionToken, sessionCookieOptions } from "@/admin/auth/session";
-import { createSession, purgeExpiredAuthRecords } from "@/admin/auth/sessions";
+import { purgeExpiredAuthRecords } from "@/admin/auth/sessions";
 import { getDb } from "@/db/client";
 
 /** Tope del largo de la contraseña: scrypt cuesta lo mismo, pero no hay por qué procesar un texto enorme. */
@@ -25,38 +32,43 @@ function backToLogin(error: LoginErrorCode, next: string): never {
 
 /**
  * Verifica la contraseña (con límite de intentos por IP) y, si es correcta, abre
- * una sesión en la base y devuelve su id; si no, el motivo del rechazo. De paso
- * borra los registros viejos de sesiones, ingresos y códigos.
- *
- * Con solo la contraseña la sesión se abre ya, sin llave: es provisorio, el
- * ingreso con llave de acceso la reemplaza por un paso más.
+ * un ingreso a medio camino: todavía no hay sesión, falta la llave. Si ya hay
+ * alguna llave registrada, el paso siguiente es usarla; si no hay ninguna, es
+ * registrar la primera. De paso borra los registros viejos de sesiones, ingresos
+ * y códigos.
  */
-async function openSessionWithPassword(
+async function startSecondStep(
   requestHeaders: Headers,
   password: string,
-): Promise<{ sessionId: string } | { error: LoginErrorCode }> {
+  next: string,
+): Promise<{ pendingId: string; mode: PendingMode } | { error: LoginErrorCode }> {
   const db = await getDb();
-  const result = await attemptLogin(db, loginIpHash(getClientIp(requestHeaders)), password);
+  const ipHash = loginIpHash(getClientIp(requestHeaders));
+  const result = await attemptLogin(db, ipHash, password);
   if (result !== "ok") return { error: result };
 
   await purgeExpiredAuthRecords(db);
-  const sessionId = await createSession(db, {
-    passkeyId: null,
+  // Con al menos una llave registrada, la contraseña sola nunca lleva a registrar otra.
+  const mode: PendingMode = (await countPasskeys(db)) > 0 ? "passkey" : "first-key";
+  const pendingId = await createPendingLogin(db, {
+    mode,
+    nextPath: next,
+    ipHash,
     device: describeDevice(requestHeaders.get("user-agent")),
-    reauthed: false,
   });
-  return { sessionId };
+  return { pendingId, mode };
 }
 
 /**
- * Inicia sesión: verifica la contraseña, abre la sesión en la base y guarda la
- * cookie que lleva su id; después va a `next` (una ruta del panel; ver
- * `safeNextPath`).
+ * El primer paso del ingreso: verifica la contraseña y, si es correcta, guarda la
+ * cookie del ingreso a medio camino y sigue al segundo paso (la llave, o registrar
+ * la primera). La sesión la abre recién ese paso; `next` (una ruta del panel, ver
+ * `safeNextPath`) queda guardado en el ingreso para ir ahí al terminar.
  *
  * Ante cualquier falla de contraseña el aviso es el mismo, también cuando el
  * hash o el secreto no están configurados: el formulario no dice qué falta.
- * Esta acción es la única del panel que no llama a `requireAdmin()`: es la
- * puerta.
+ * Esta acción no llama a `requireAdmin()`: es la puerta (como las del segundo
+ * paso, que verifican el ingreso a medio camino).
  */
 export async function loginAction(formData: FormData): Promise<void> {
   const next = safeNextPath(formData.get("next"));
@@ -66,20 +78,20 @@ export async function loginAction(formData: FormData): Promise<void> {
   }
 
   const requestHeaders = await headers();
-  let outcome: Awaited<ReturnType<typeof openSessionWithPassword>>;
+  let outcome: Awaited<ReturnType<typeof startSecondStep>>;
   try {
-    outcome = await openSessionWithPassword(requestHeaders, password.data);
+    outcome = await startSecondStep(requestHeaders, password.data, next);
   } catch (error) {
-    // Base caída o mal configurada: no se deja entrar sin poder anotar el intento ni abrir la sesión.
+    // Base caída o mal configurada: no se deja seguir sin poder anotar el intento ni guardar el ingreso.
     console.error("Panel: no se pudo verificar el ingreso.", error);
     return backToLogin("unavailable", next);
   }
   if ("error" in outcome) return backToLogin(outcome.error, next);
 
   (await cookies()).set(
-    ADMIN_COOKIE,
-    await createSessionToken(outcome.sessionId),
-    sessionCookieOptions(shouldUseSecureCookie(requestHeaders)),
+    PENDING_COOKIE,
+    outcome.pendingId,
+    pendingCookieOptions(shouldUseSecureCookie(requestHeaders)),
   );
-  redirect(next);
+  redirect(loginStepPath(stepPathFor(outcome.mode), next));
 }

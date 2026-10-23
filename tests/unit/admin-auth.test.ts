@@ -1,4 +1,6 @@
 import { randomBytes, scryptSync } from "node:crypto";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { SignJWT } from "jose";
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { attemptLogin } from "@/admin/auth/login";
@@ -418,11 +420,10 @@ describe("hashIp", () => {
 });
 
 describe("login rate limit", () => {
-  test("offers only the reservation API for the password and the plain counters for the second step", async () => {
-    // Las funciones viejas de la contraseña (mirar si está bloqueada y anotar después) dejaban pasar una ráfaga:
-    // la contraseña solo se revisa con `reserveLoginAttempt`. El segundo paso (llave o código) sí cuenta con
-    // `isLoginBlocked` y `recordLoginFailure`: lo que se adivina ahí es una firma o un código de 32^10, y todo
-    // el paso vive en un ingreso a medio camino de 5 minutos, así que una ráfaga no adelanta nada.
+  test("offers the reservation API and the plain counters", async () => {
+    // Mirar si está bloqueada y anotar después deja pasar una ráfaga (todos los pedidos simultáneos ven
+    // "cero fallos"): la contraseña y el final del segundo paso se revisan con `reserveLoginAttempt` (ver el
+    // test de abajo). `isLoginBlocked` solo contesta de antemano que no tiene sentido pedir la llave.
     const exported = Object.keys(await import("@/admin/auth/rate-limit")).sort();
 
     expect(exported).toEqual([
@@ -434,6 +435,25 @@ describe("login rate limit", () => {
       "recordLoginFailure",
       "reserveLoginAttempt",
     ]);
+  });
+
+  test("the password and the end of the second step reserve the attempt before checking anything", () => {
+    // Se lee el código fuente: la regla es qué funciones usa cada paso, no lo que devuelven.
+    const source = (file: string) => readFileSync(path.join(process.cwd(), file), "utf8");
+    const password = source("src/app/admin/login/actions.ts");
+    const secondStep = source("src/admin/auth/login-steps.ts");
+
+    expect(password).not.toMatch(/\bisLoginBlocked\b|\brecordLoginFailure\b/);
+    expect(source("src/admin/auth/login.ts")).toMatch(/\breserveLoginAttempt\b/);
+    expect(secondStep).toMatch(/\breserveLoginAttempt\b/);
+    expect(secondStep).toMatch(/\bconfirmLoginSuccess\b/);
+    for (const file of [
+      "src/admin/auth/login-steps.ts",
+      "src/app/admin/login/llave/actions.ts",
+      "src/app/admin/login/primera-llave/actions.ts",
+    ]) {
+      expect(source(file), file).not.toMatch(/\brecordLoginFailure\b/);
+    }
   });
 
   let db: Db;

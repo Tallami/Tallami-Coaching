@@ -33,10 +33,32 @@ export const ADMIN_TEST_OLD_PASSWORD_HASH = ADMIN_TEST_PASSWORD_HASH.replace(
 export const ADMIN_TEST_SESSION_SECRET =
   "secreto-de-prueba-solo-para-los-e2e-0123456789";
 
+/**
+ * Los puertos de los tres servidores de los e2e: el principal (`playwright.config.ts`),
+ * el de los datos de ejemplo (`playwright.demo.config.ts`) y el de la seguridad del
+ * ingreso (`playwright.security.config.ts`). Nunca el 3000, que es el de desarrollo.
+ */
+export const E2E_PORTS = { main: 3100, demo: 3101, security: 3102 } as const;
+
+/** La dirección de un servidor de los e2e: también es el origen de sus llaves de acceso. */
+export function e2eBaseUrl(port: number): string {
+  return `http://localhost:${port}`;
+}
+
+/**
+ * Carga las llaves de prueba (`tests/helpers/webauthn.ts`) en la base de un servidor
+ * antes de arrancarlo. Va en el `webServer.command` de las configuraciones principal y
+ * de datos de ejemplo, que entran al panel con ellas; la de seguridad empieza sin
+ * ninguna. Con `npx`: el comando no corre dentro de npm y `tsx` no está en el PATH.
+ */
+export const SEED_E2E_PASSKEYS_COMMAND = "npx tsx tests/helpers/seed-e2e-passkeys.ts";
+
 /** Base PGlite de los e2e: una carpeta temporal que se borra al arrancar. */
 const E2E_PGLITE_DIR = path.join(os.tmpdir(), "tallami-coaching-e2e-pglite");
 /** Base PGlite de los e2e con datos de ejemplo (`playwright.demo.config.ts`): otra carpeta, también se borra al arrancar. */
 const E2E_DEMO_PGLITE_DIR = path.join(os.tmpdir(), "tallami-coaching-e2e-demo-pglite");
+/** Base PGlite de los e2e de seguridad (`playwright.security.config.ts`): otra carpeta, vacía al arrancar. */
+const E2E_SECURITY_PGLITE_DIR = path.join(os.tmpdir(), "tallami-coaching-e2e-security-pglite");
 
 /**
  * Borra la base de los e2e anteriores. Solo en el proceso principal de
@@ -58,24 +80,32 @@ function resetPgliteDir(dir: string): string {
 }
 
 /**
- * Variables de entorno de un servidor del panel de prueba, con su base en
- * `pgliteDir` (vacía al arrancar). `DATABASE_URL` va siempre vacía, aunque el
- * entorno de quien corre los tests tenga una: los e2e cargan ventas y alumnos y
- * nunca pueden escribir en una base remota.
+ * Variables de entorno de un servidor del panel de prueba en el puerto `port`, con
+ * su base en `pgliteDir` (vacía al arrancar). `DATABASE_URL` va siempre vacía,
+ * aunque el entorno de quien corre los tests tenga una: los e2e cargan ventas y
+ * alumnos y nunca pueden escribir en una base remota.
  */
-async function serverEnv(pgliteDir: string): Promise<Record<string, string>> {
+async function serverEnv(pgliteDir: string, port: number): Promise<Record<string, string>> {
   return {
     ADMIN_PASSWORD_HASH: ADMIN_TEST_PASSWORD_HASH,
     ADMIN_SESSION_SECRET: ADMIN_TEST_SESSION_SECRET,
+    // Las llaves de acceso del servidor son las de su propia dirección (el navegador de los tests
+    // las crea y las usa en `localhost:<puerto>`), no las del sitio público.
+    ADMIN_WEBAUTHN_ORIGIN: e2eBaseUrl(port),
     PGLITE_DIR: resetPgliteDir(pgliteDir),
     EXCHANGE_RATE_SOURCE: "fixed",
     DATABASE_URL: "",
+    // Con esta marca, Next (`@next/env`) no lee los `.env*` de la carpeta: los servidores de prueba
+    // usan solo este entorno, nunca el `.env.local` de quien corre los tests. Ese archivo puede
+    // traer una `DATABASE_URL` real, y su hash de contraseña lleva `$` escapados que la expansión
+    // de variables de Next desarma. (Lo mismo vale para el build que arma el comando del servidor.)
+    __NEXT_PROCESSED_ENV: "true",
   };
 }
 
 /** Variables de entorno con las que Playwright arranca el servidor del panel. */
 export function adminServerEnv(): Promise<Record<string, string>> {
-  return serverEnv(E2E_PGLITE_DIR);
+  return serverEnv(E2E_PGLITE_DIR, E2E_PORTS.main);
 }
 
 /**
@@ -84,5 +114,13 @@ export function adminServerEnv(): Promise<Record<string, string>> {
  * levantar el servidor; la base del servidor principal no se toca).
  */
 export function demoServerEnv(): Promise<Record<string, string>> {
-  return serverEnv(E2E_DEMO_PGLITE_DIR);
+  return serverEnv(E2E_DEMO_PGLITE_DIR, E2E_PORTS.demo);
+}
+
+/**
+ * Lo mismo para el servidor de la seguridad del ingreso: su propia carpeta de
+ * base, vacía al arrancar y sin llaves (su primer test registra la primera).
+ */
+export function securityServerEnv(): Promise<Record<string, string>> {
+  return serverEnv(E2E_SECURITY_PGLITE_DIR, E2E_PORTS.security);
 }

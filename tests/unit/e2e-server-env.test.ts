@@ -6,6 +6,7 @@ import {
   ADMIN_TEST_PASSWORD_HASH,
   adminServerEnv,
   demoServerEnv,
+  securityServerEnv,
 } from "../helpers/admin-server";
 
 // Importar los helpers o las configuraciones de Playwright arma el entorno del
@@ -29,19 +30,76 @@ async function serverEnvOf(configPath: string): Promise<Record<string, string>> 
   return servers[0]?.env ?? {};
 }
 
+const CONFIGS = [
+  ["main", "../../playwright.config", 3100],
+  ["demo", "../../playwright.demo.config", 3101],
+  ["security", "../../playwright.security.config", 3102],
+] as const;
+
+/** La configuración de Playwright tal como la carga Playwright (lo que se mira de cada una). */
+async function configOf(configPath: string) {
+  return (await import(configPath)).default as {
+    testIgnore?: string[];
+    testMatch?: string[];
+    workers?: number;
+    fullyParallel?: boolean;
+    use?: { baseURL?: string };
+    webServer?: { command?: string; reuseExistingServer?: boolean };
+  };
+}
+
 describe("environment of the e2e servers", () => {
-  test("both servers blank DATABASE_URL, so no test can write to a remote database", async () => {
+  test("every server blanks DATABASE_URL, so no test can write to a remote database", async () => {
     vi.stubEnv("DATABASE_URL", "postgres://usuario:clave@db.example.com:6543/postgres");
 
     expect((await adminServerEnv()).DATABASE_URL).toBe("");
     expect((await demoServerEnv()).DATABASE_URL).toBe("");
+    expect((await securityServerEnv()).DATABASE_URL).toBe("");
   });
 
-  test("the main and the demo Playwright configs start their servers with DATABASE_URL blank", async () => {
+  test.each(CONFIGS)("the %s Playwright config starts its server with DATABASE_URL blank", async (_name, config) => {
     vi.stubEnv("DATABASE_URL", "postgres://usuario:clave@db.example.com:6543/postgres");
 
-    expect((await serverEnvOf("../../playwright.config")).DATABASE_URL).toBe("");
-    expect((await serverEnvOf("../../playwright.demo.config")).DATABASE_URL).toBe("");
+    expect((await serverEnvOf(config)).DATABASE_URL).toBe("");
+  });
+
+  test.each(CONFIGS)(
+    "the %s server never reads the .env files of the machine: they could bring a real database or a mangled hash",
+    async (_name, config) => {
+      // Next salta la lectura de `.env*` si el entorno ya viene "procesado" (`@next/env`).
+      expect((await serverEnvOf(config)).__NEXT_PROCESSED_ENV).toBe("true");
+    },
+  );
+
+  test.each(CONFIGS)("the %s server expects passkeys from its own address", async (_name, config, port) => {
+    const loaded = await configOf(config);
+
+    expect((await serverEnvOf(config)).ADMIN_WEBAUTHN_ORIGIN).toBe(`http://localhost:${port}`);
+    expect(loaded.use?.baseURL).toBe(`http://localhost:${port}`);
+  });
+
+  test("the main and the demo servers get the test passkeys before they start; the security one starts with none", async () => {
+    const main = await configOf("../../playwright.config");
+    const demo = await configOf("../../playwright.demo.config");
+    const security = await configOf("../../playwright.security.config");
+
+    for (const command of [main.webServer?.command ?? "", demo.webServer?.command ?? ""]) {
+      expect(command).toMatch(/seed-e2e-passkeys\.ts && npm run start/);
+    }
+    expect(security.webServer?.command ?? "").not.toContain("seed-e2e-passkeys");
+    expect(security.webServer?.reuseExistingServer).toBe(false);
+  });
+
+  test("the security spec runs alone, one test after the other, only on its own server", async () => {
+    const main = await configOf("../../playwright.config");
+    const demo = await configOf("../../playwright.demo.config");
+    const security = await configOf("../../playwright.security.config");
+
+    expect(main.testIgnore).toContain("**/admin-security.spec.ts");
+    expect(demo.testIgnore).toContain("**/admin-security.spec.ts");
+    expect(security.testMatch).toEqual(["**/admin-security.spec.ts"]);
+    expect(security.workers).toBe(1);
+    expect(security.fullyParallel).toBe(false);
   });
 
   test("both servers use the fixed password hash, which is the hash of the test password", async () => {
@@ -64,10 +122,13 @@ describe("environment of the e2e servers", () => {
   test("each server has its own database folder and the fixed exchange rates", async () => {
     const main = await adminServerEnv();
     const demo = await demoServerEnv();
+    const security = await securityServerEnv();
 
-    expect(main.PGLITE_DIR).not.toBe(demo.PGLITE_DIR);
-    expect(main.EXCHANGE_RATE_SOURCE).toBe("fixed");
-    expect(demo.EXCHANGE_RATE_SOURCE).toBe("fixed");
-    expect(main.ADMIN_SESSION_SECRET).toBe(demo.ADMIN_SESSION_SECRET);
+    expect(new Set([main.PGLITE_DIR, demo.PGLITE_DIR, security.PGLITE_DIR]).size).toBe(3);
+    for (const env of [main, demo, security]) {
+      expect(env.EXCHANGE_RATE_SOURCE).toBe("fixed");
+      expect(env.ADMIN_SESSION_SECRET).toBe(main.ADMIN_SESSION_SECRET);
+      expect(env.ADMIN_PASSWORD_HASH).toBe(ADMIN_TEST_PASSWORD_HASH);
+    }
   });
 });

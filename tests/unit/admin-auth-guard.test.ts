@@ -359,6 +359,47 @@ describe("guardAdmin", () => {
     expect(isPassThrough(response)).toBe(true);
   });
 
+  // El segundo paso del ingreso (la llave, o registrar la primera) se hace sin sesión: es justamente lo que la abre.
+  test.each([
+    "/admin/login/llave",
+    "/admin/login/primera-llave",
+    "/admin/login/llave/",
+    "/admin/login/llave?next=%2Fadmin%2Fventas",
+    "/admin/login/llave.rsc",
+    "/admin/login/primera-llave.segments/__PAGE__.segment.rsc",
+  ])("leaves the login step %s open without a session", async (path) => {
+    expect(isPassThrough(await guardAdmin(get(path)))).toBe(true);
+  });
+
+  test("leaves the actions of the login steps open without a session", async () => {
+    for (const path of ["/admin/login/llave", "/admin/login/primera-llave"]) {
+      const response = await guardAdmin(get(path, { "next-action": "40abc" }, "POST"));
+
+      expect(isPassThrough(response), path).toBe(true);
+    }
+  });
+
+  // Solo lo que está de verdad debajo de `/admin/login/` es una puerta: ni algo que empieza igual, ni una
+  // dirección que al decodificarse sube con `..` hasta otra página del panel.
+  test.each([
+    "/admin/loginx",
+    "/admin/loginx/llave",
+    "/admin/login.segments/x",
+    "/admin/ventas",
+    "/admin/login%2F..%2Fventas",
+    "/admin/login/..%2Fventas",
+    "/admin/login/llave%2F..%2F..%2Fventas",
+    "/admin/login/.%2E/ventas",
+  ])("still asks for a session on %s", async (path) => {
+    const response = await guardAdmin(get(path));
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toMatch(/\/admin\/login\?next=/);
+
+    const action = await guardAdmin(get(path, { "next-action": "40abc" }, "POST"));
+    expect(action.status).toBe(401);
+  });
+
   test.each(["/%61dmin", "/%61dmin/ventas", "/admin%2Fventas", "/admin/"])(
     "does not let the spelling %s skip the check",
     async (path) => {

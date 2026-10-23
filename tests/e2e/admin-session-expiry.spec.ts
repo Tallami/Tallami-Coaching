@@ -2,10 +2,11 @@ import AxeBuilder from "@axe-core/playwright";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 import {
   ADMIN_COOKIE,
-  ADMIN_TEST_PASSWORD,
+  confirmWithTestPasskey,
   expect,
   loginAsAdmin,
   signTestToken,
+  submitTestPassword,
   test,
   uniqueTestIp,
 } from "../helpers/admin";
@@ -99,8 +100,8 @@ test.describe("a session that ends while the panel is open", () => {
       await expectNoEnglishError(page);
 
       // La acción no corrió: no se guardó nada.
-      await page.getByLabel("Contraseña").fill(ADMIN_TEST_PASSWORD);
-      await page.getByRole("button", { name: "Ingresar" }).click();
+      await submitTestPassword(page);
+      await confirmWithTestPasskey(page);
       await expect(page).toHaveURL(/\/admin\/ventas\/nueva$/);
       await page.goto(`/admin/ventas?q=${encodeURIComponent(student)}`);
       await expect(page.getByRole("row").filter({ hasText: student })).toHaveCount(0);
@@ -124,8 +125,8 @@ test.describe("a session that ends while the panel is open", () => {
     await expect(page.getByRole("heading", { name: "Panel de Tallami", level: 1 })).toBeVisible();
     await expectNoEnglishError(page);
 
-    await page.getByLabel("Contraseña").fill(ADMIN_TEST_PASSWORD);
-    await page.getByRole("button", { name: "Ingresar" }).click();
+    await submitTestPassword(page);
+    await confirmWithTestPasskey(page);
     await expect(page).toHaveURL(/\/admin$/);
     await page.goto(`/admin/ventas?q=${encodeURIComponent(student)}`);
     await expect(page.getByRole("row").filter({ hasText: student })).toHaveCount(0);

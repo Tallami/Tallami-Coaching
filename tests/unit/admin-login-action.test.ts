@@ -1,11 +1,12 @@
 import { cookies, headers } from "next/headers";
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { loginIpHash } from "@/admin/auth/login-ip";
+import { PENDING_COOKIE } from "@/admin/auth/pending-logins";
 import { LOGIN_MAX_FAILURES } from "@/admin/auth/rate-limit";
-import { ADMIN_COOKIE, hashIp, readSessionClaims } from "@/admin/auth/session";
-import { createSession, validateSession } from "@/admin/auth/sessions";
+import { ADMIN_COOKIE, hashIp } from "@/admin/auth/session";
+import { createSession } from "@/admin/auth/sessions";
 import { getDb, type Db } from "@/db/client";
-import { adminSessions, loginAttempts } from "@/db/schema";
+import { adminPendingLogins, adminSessions, loginAttempts } from "@/db/schema";
 import { interestIpHash } from "@/admin/interest/ip-key";
 import { loginAction } from "@/app/admin/login/actions";
 import {
@@ -45,7 +46,8 @@ async function login(ip: string, password: string, userAgent?: string): Promise<
 
 const WRONG = "NEXT_REDIRECT /admin/login?error=invalid";
 const BLOCKED = "NEXT_REDIRECT /admin/login?error=blocked";
-const IN = "NEXT_REDIRECT /admin";
+/** La contraseña pasó: sigue el segundo paso (la base de estos tests no tiene llaves, así que es registrar la primera). */
+const IN = "NEXT_REDIRECT /admin/login/primera-llave";
 
 describe("the key of the login limit", () => {
   beforeEach(() => {
@@ -106,41 +108,45 @@ describe("loginAction", () => {
     cookieJar.set.mockClear();
     await db.delete(loginAttempts);
     await db.delete(adminSessions);
+    await db.delete(adminPendingLogins);
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
-  describe("the session a right password opens", () => {
+  // Con la contraseña sola ya no se abre ninguna sesión: queda un ingreso a medio camino
+  // que el segundo paso (la llave) convierte en sesión (ver `admin-login-steps.test.ts`).
+  describe("the pending login a right password opens", () => {
     const CHROME_WINDOWS =
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
 
-    test("is saved in the database and its id travels in the cookie", async () => {
+    test("is saved in the database, its id travels in its own cookie, and no session is opened", async () => {
       expect(await login("203.0.113.20", ADMIN_TEST_PASSWORD, CHROME_WINDOWS)).toBe(IN);
 
-      const rows = await db.select().from(adminSessions);
+      const rows = await db.select().from(adminPendingLogins);
       expect(rows).toHaveLength(1);
-      expect(rows[0]).toMatchObject({ passkeyId: null, device: "Chrome en Windows", reauthAt: null, revokedAt: null });
+      expect(rows[0]).toMatchObject({ mode: "first-key", device: "Chrome en Windows", consumedAt: null });
       expect(cookieJar.set).toHaveBeenCalledOnce();
-      const [name, token, options] = cookieJar.set.mock.calls[0];
-      expect(name).toBe(ADMIN_COOKIE);
-      expect(await readSessionClaims(token)).toEqual({ sessionId: rows[0].id });
-      expect(options).toMatchObject({ httpOnly: true, sameSite: "strict", path: "/admin", maxAge: 8 * 60 * 60 });
-      expect(await validateSession(db, rows[0].id)).not.toBeNull();
+      const [name, value, options] = cookieJar.set.mock.calls[0];
+      expect(name).toBe(PENDING_COOKIE);
+      expect(value).toBe(rows[0].id);
+      expect(name).not.toBe(ADMIN_COOKIE);
+      expect(options).toMatchObject({ httpOnly: true, sameSite: "strict", path: "/admin/login", maxAge: 5 * 60 });
+      expect(await db.select().from(adminSessions)).toEqual([]);
     });
 
-    test("ends eight hours after it starts", async () => {
+    test("ends five minutes after it starts", async () => {
       await login("203.0.113.21", ADMIN_TEST_PASSWORD, CHROME_WINDOWS);
 
-      const [row] = await db.select().from(adminSessions);
-      expect(row.expiresAt.getTime() - row.createdAt.getTime()).toBe(8 * 60 * 60 * 1000);
+      const [row] = await db.select().from(adminPendingLogins);
+      expect(row.expiresAt.getTime() - row.createdAt.getTime()).toBe(5 * 60 * 1000);
     });
 
     test("describes the device as unknown when the browser says nothing", async () => {
       await login("203.0.113.22", ADMIN_TEST_PASSWORD);
 
-      const [row] = await db.select().from(adminSessions);
+      const [row] = await db.select().from(adminPendingLogins);
       expect(row.device).toBe("Navegador desconocido");
     });
 
@@ -148,7 +154,7 @@ describe("loginAction", () => {
       await login("203.0.113.23", ADMIN_TEST_PASSWORD, CHROME_WINDOWS);
       await login("203.0.113.24", ADMIN_TEST_PASSWORD, CHROME_WINDOWS);
 
-      const ids = (await db.select({ id: adminSessions.id }).from(adminSessions)).map((row) => row.id);
+      const ids = (await db.select({ id: adminPendingLogins.id }).from(adminPendingLogins)).map((row) => row.id);
       expect(new Set(ids).size).toBe(2);
     });
 
@@ -158,7 +164,7 @@ describe("loginAction", () => {
       }
       await login("203.0.113.25", ADMIN_TEST_PASSWORD, CHROME_WINDOWS);
 
-      expect(await db.select().from(adminSessions)).toEqual([]);
+      expect(await db.select().from(adminPendingLogins)).toEqual([]);
       expect(cookieJar.set).not.toHaveBeenCalled();
     });
 
@@ -169,7 +175,6 @@ describe("loginAction", () => {
       await login("203.0.113.26", ADMIN_TEST_PASSWORD, CHROME_WINDOWS);
 
       const ids = (await db.select({ id: adminSessions.id }).from(adminSessions)).map((row) => row.id);
-      expect(ids).toHaveLength(1);
       expect(ids).not.toContain(oldId);
     });
   });
