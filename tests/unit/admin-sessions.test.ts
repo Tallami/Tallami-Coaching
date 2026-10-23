@@ -19,7 +19,6 @@ import {
   revokeAllSessions,
   revokeKeylessSessions,
   revokeSession,
-  revokeSessionsForPasskey,
   setSessionChallenge,
   takeSessionChallenge,
   validateSession,
@@ -43,6 +42,8 @@ function after(ms: number, base: Date = START): Date {
 }
 
 let db: Db;
+/** La llave con la que se abren las sesiones de estos tests salvo que el test diga otra. */
+let defaultPasskeyId: string;
 
 beforeAll(async () => {
   db = await createTestDb();
@@ -52,14 +53,15 @@ beforeEach(async () => {
   await db.delete(adminPendingLogins);
   await db.delete(adminSessions); // las sesiones arrastran sus códigos (on delete cascade)
   await db.delete(adminPasskeys);
+  defaultPasskeyId = await addPasskey("llave-de-siempre");
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
-/** Una sesión nueva, abierta a las 10:00 salvo que el test diga otra cosa. */
-function open(now: Date = START, passkeyId: string | null = null): Promise<string> {
+/** Una sesión nueva, abierta a las 10:00 con la llave de siempre, salvo que el test diga otra cosa. */
+function open(now: Date = START, passkeyId: string = defaultPasskeyId): Promise<string> {
   return createSession(db, { passkeyId, device: DEVICE, reauthed: false }, now);
 }
 
@@ -85,7 +87,7 @@ describe("createSession", () => {
     const [row] = await db.select().from(adminSessions).where(eq(adminSessions.id, id));
     expect(row).toMatchObject({
       id,
-      passkeyId: null,
+      passkeyId: defaultPasskeyId,
       device: DEVICE,
       createdAt: START,
       lastSeenAt: START,
@@ -254,31 +256,6 @@ describe("revoking sessions", () => {
     expect(await revokeAllSessions(db, START)).toBe(0);
   });
 
-  test("revokeSessionsForPasskey closes only the sessions of that passkey and returns their ids", async () => {
-    const phone = await addPasskey("celular");
-    const laptop = await addPasskey("notebook");
-    const phoneOne = await open(START, phone);
-    const phoneTwo = await open(START, phone);
-    const laptopOne = await open(START, laptop);
-    const passwordOnly = await open(START, null);
-    const phoneAlreadyClosed = await open(START, phone);
-    await revokeSession(db, phoneAlreadyClosed, after(MINUTE_MS));
-
-    const closed = await revokeSessionsForPasskey(db, phone, after(5 * MINUTE_MS));
-
-    expect([...closed].sort()).toEqual([phoneOne, phoneTwo].sort());
-    expect(await validateSession(db, phoneOne, after(6 * MINUTE_MS))).toBeNull();
-    expect(await validateSession(db, phoneTwo, after(6 * MINUTE_MS))).toBeNull();
-    expect(await validateSession(db, laptopOne, after(6 * MINUTE_MS))).not.toBeNull();
-    expect(await validateSession(db, passwordOnly, after(6 * MINUTE_MS))).not.toBeNull();
-  });
-
-  test("revokeSessionsForPasskey says nothing for a passkey with no open sessions", async () => {
-    const lonely = await addPasskey("sin-sesiones");
-
-    expect(await revokeSessionsForPasskey(db, lonely, START)).toEqual([]);
-  });
-
   test("revokeKeylessSessions closes the open sessions left without a key, which is what deleting a key does to its sessions", async () => {
     const phone = await addPasskey("celular");
     const laptop = await addPasskey("notebook");
@@ -318,7 +295,7 @@ describe("listActiveSessions", () => {
     expect(sessions.map((session) => session.id)).toEqual([newer, older]);
     expect(sessions[0]).toEqual({
       id: newer,
-      passkeyId: null,
+      passkeyId: defaultPasskeyId,
       device: DEVICE,
       createdAt: after(-2 * MINUTE_MS),
       lastSeenAt: after(-2 * MINUTE_MS),
@@ -526,7 +503,7 @@ describe("recent confirmation with the key", () => {
   });
 
   test("markReauthed moves the moment forward each time", async () => {
-    const id = await createSession(db, { passkeyId: null, device: DEVICE, reauthed: true }, START);
+    const id = await createSession(db, { passkeyId: defaultPasskeyId, device: DEVICE, reauthed: true }, START);
 
     await markReauthed(db, id, after(10 * MINUTE_MS));
 

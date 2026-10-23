@@ -93,8 +93,8 @@ async function registeredDevice(name = "Celular"): Promise<{ device: VirtualAuth
 }
 
 /** Abre una sesión con la llave `passkey`, con la última confirmación en `reauthAt`; no cambia la cookie del pedido. */
-async function openSession(passkey: Passkey | null, reauthAt: Date | null): Promise<string> {
-  const id = await createSession(db, { passkeyId: passkey?.id ?? null, device: DEVICE, reauthed: false });
+async function openSession(passkey: Passkey, reauthAt: Date | null): Promise<string> {
+  const id = await createSession(db, { passkeyId: passkey.id, device: DEVICE, reauthed: false });
   await db.update(adminSessions).set({ reauthAt }).where(eq(adminSessions.id, id));
   return id;
 }
@@ -105,7 +105,7 @@ async function actAs(sessionId: string): Promise<void> {
 }
 
 /** Una sesión de Tallami con la llave `passkey` y esa confirmación, ya con su cookie puesta. */
-async function signedIn(passkey: Passkey | null, reauthAt: Date | null): Promise<string> {
+async function signedIn(passkey: Passkey, reauthAt: Date | null): Promise<string> {
   const id = await openSession(passkey, reauthAt);
   await actAs(id);
   return id;

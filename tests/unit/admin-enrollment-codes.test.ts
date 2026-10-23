@@ -12,8 +12,8 @@ import {
 } from "@/admin/auth/enrollment-codes";
 import { createSession, revokeSession } from "@/admin/auth/sessions";
 import type { Db } from "@/db/client";
-import { adminEnrollmentCodes, adminSessions } from "@/db/schema";
-import { createTestDb } from "../helpers/db";
+import { adminEnrollmentCodes, adminPasskeys, adminSessions } from "@/db/schema";
+import { createTestDb, insertTestPasskey } from "../helpers/db";
 
 const SECOND_MS = 1000;
 const MINUTE_MS = 60 * SECOND_MS;
@@ -27,6 +27,7 @@ function after(ms: number): Date {
 }
 
 let db: Db;
+let passkeyId: string;
 let sessionId: string;
 
 beforeAll(async () => {
@@ -36,7 +37,9 @@ beforeAll(async () => {
 beforeEach(async () => {
   vi.stubEnv("ADMIN_SESSION_SECRET", SECRET);
   await db.delete(adminSessions); // las sesiones arrastran sus códigos (on delete cascade)
-  sessionId = await createSession(db, { passkeyId: null, device: "Chrome en Windows", reauthed: true }, START);
+  await db.delete(adminPasskeys);
+  passkeyId = await insertTestPasskey(db);
+  sessionId = await createSession(db, { passkeyId, device: "Chrome en Windows", reauthed: true }, START);
 });
 
 afterEach(() => {
@@ -97,7 +100,7 @@ describe("generateEnrollmentCode", () => {
   });
 
   test("a new code cancels the ones of other sessions too: only one code is alive at a time", async () => {
-    const otherSession = await createSession(db, { passkeyId: null, device: "Safari en iPhone", reauthed: true }, START);
+    const otherSession = await createSession(db, { passkeyId, device: "Safari en iPhone", reauthed: true }, START);
     const firstFromOther = await generateEnrollmentCode(db, otherSession, START);
 
     const second = await generateEnrollmentCode(db, sessionId, after(MINUTE_MS));

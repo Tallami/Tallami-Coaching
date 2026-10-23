@@ -12,9 +12,9 @@ import { getAdminSession, hasAdminSession, requireAdmin } from "@/admin/auth/req
 import { ADMIN_COOKIE, createSessionToken } from "@/admin/auth/session";
 import { createSession, revokeSession } from "@/admin/auth/sessions";
 import { getDb, type Db } from "@/db/client";
-import { adminSessions } from "@/db/schema";
+import { adminPasskeys, adminSessions } from "@/db/schema";
 import { ADMIN_TEST_OLD_PASSWORD_HASH } from "../helpers/admin-server";
-import { createTestDb } from "../helpers/db";
+import { createTestDb, insertTestPasskey } from "../helpers/db";
 
 vi.mock("next/headers", () => ({ cookies: vi.fn() }));
 // `redirect` de Next interrumpe tirando un error; el doble hace lo mismo.
@@ -58,6 +58,8 @@ async function signed({
 
 let db: Db;
 let storedHash: string;
+/** La llave con la que se abren las sesiones de estos tests. */
+let passkeyId: string;
 /** El id de una sesión abierta de verdad en la base. */
 let liveSessionId: string;
 
@@ -65,7 +67,7 @@ let liveSessionId: string;
 function openSession(ago = 0): Promise<string> {
   return createSession(
     db,
-    { passkeyId: null, device: DEVICE, reauthed: false },
+    { passkeyId, device: DEVICE, reauthed: false },
     new Date(Date.now() - ago),
   );
 }
@@ -85,6 +87,8 @@ beforeEach(async () => {
   vi.mocked(getDb).mockReset();
   vi.mocked(getDb).mockResolvedValue(db);
   await db.delete(adminSessions);
+  await db.delete(adminPasskeys);
+  passkeyId = await insertTestPasskey(db);
   liveSessionId = await openSession();
 });
 
@@ -206,7 +210,7 @@ describe("getAdminSession", () => {
 
     const session = await getAdminSession();
 
-    expect(session).toMatchObject({ id: liveSessionId, passkeyId: null, device: DEVICE, reauthAt: null });
+    expect(session).toMatchObject({ id: liveSessionId, passkeyId, device: DEVICE, reauthAt: null });
     expect(redirect).not.toHaveBeenCalled();
   });
 

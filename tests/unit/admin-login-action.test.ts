@@ -6,7 +6,7 @@ import { LOGIN_MAX_FAILURES } from "@/admin/auth/rate-limit";
 import { ADMIN_COOKIE, hashIp } from "@/admin/auth/session";
 import { createSession } from "@/admin/auth/sessions";
 import { getDb, type Db } from "@/db/client";
-import { adminPendingLogins, adminSessions, loginAttempts } from "@/db/schema";
+import { adminPasskeys, adminPendingLogins, adminSessions, loginAttempts } from "@/db/schema";
 import { interestIpHash } from "@/admin/interest/ip-key";
 import { loginAction } from "@/app/admin/login/actions";
 import {
@@ -14,7 +14,7 @@ import {
   ADMIN_TEST_PASSWORD_HASH,
   ADMIN_TEST_SESSION_SECRET,
 } from "../helpers/admin-server";
-import { createTestDb } from "../helpers/db";
+import { createTestDb, insertTestPasskey } from "../helpers/db";
 
 vi.mock("next/headers", () => ({ cookies: vi.fn(), headers: vi.fn() }));
 // `redirect` de Next interrumpe tirando un error; el doble hace lo mismo.
@@ -108,6 +108,7 @@ describe("loginAction", () => {
     cookieJar.set.mockClear();
     await db.delete(loginAttempts);
     await db.delete(adminSessions);
+    await db.delete(adminPasskeys);
     await db.delete(adminPendingLogins);
   });
 
@@ -170,7 +171,8 @@ describe("loginAction", () => {
 
     test("comes with a cleanup of the records that nobody needs any more", async () => {
       const longAgo = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000);
-      const oldId = await createSession(db, { passkeyId: null, device: "Chrome en Windows", reauthed: false }, longAgo);
+      const passkeyId = await insertTestPasskey(db);
+      const oldId = await createSession(db, { passkeyId, device: "Chrome en Windows", reauthed: false }, longAgo);
 
       await login("203.0.113.26", ADMIN_TEST_PASSWORD, CHROME_WINDOWS);
 

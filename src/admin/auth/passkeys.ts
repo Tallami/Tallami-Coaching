@@ -7,7 +7,8 @@
 // - la primera llave se registra una sola vez (`insertPasskey` con `onlyIfNone`):
 //   dos registros simultáneos de "primera llave" no pueden sumar dos;
 // - la última llave no se puede borrar (`deletePasskeyUnlessLast`): quedaría el
-//   panel en "solo contraseña".
+//   panel en "solo contraseña". Esa misma transacción cierra las sesiones que
+//   quedan sin llave por el borrado.
 //
 // Las dos cuentan las llaves y después escriben, y entre una cosa y la otra puede
 // colarse otro pedido. Por eso corren en una transacción que primero toma un
@@ -20,6 +21,7 @@ import { and, asc, count, eq, lte, sql } from "drizzle-orm";
 import type { Db } from "../../db/client";
 import { adminPasskeys } from "../../db/schema";
 import type { NewPasskeyData } from "./ceremonies";
+import { revokeKeylessSessions } from "./sessions";
 
 /**
  * El número del bloqueo de aviso de las llaves. Es un número cualquiera: solo
@@ -116,22 +118,40 @@ export async function renamePasskey(db: Db, id: string, name: string): Promise<b
   return renamed.length > 0;
 }
 
+/** Qué pasó al pedir borrar una llave: `deleted` trae los ids de las sesiones que se cerraron con el borrado. */
+export type PasskeyDeletion =
+  | { outcome: "deleted"; closedSessionIds: string[] }
+  | { outcome: "last" | "missing" };
+
 /**
  * Borra la llave, salvo que sea la última: `"last"` y no se toca nada. `"missing"`
- * si no existe. Las sesiones que se abrieron con ella quedan sin llave
- * (`on delete set null`); cerrarlas es cosa de quien llama, después del borrado y
- * con `revokeKeylessSessions`: por la llave ya no se las encuentra.
+ * si no existe.
+ *
+ * Borrar una llave les suelta la llave a las sesiones que se abrieron con ella
+ * (`on delete set null`) y por la llave ya no se las encuentra; con al menos una
+ * llave registrada una sesión sin llave no puede ser legítima. Por eso, en la misma
+ * transacción y justo después del borrado, se cierran todas las sesiones abiertas
+ * que quedaron sin llave (`revokeKeylessSessions`) y sus ids vuelven con
+ * `"deleted"`: o pasan las dos cosas o ninguna (si cerrar las sesiones falla, la llave
+ * sigue y se puede reintentar; nunca queda abierta la sesión de un dispositivo perdido).
+ * El orden es "borrar y barrer lo que quedó sin llave", no "cerrar las de esta llave
+ * y borrar": lo segundo no ve una sesión que se abra con la llave entre una cosa y la
+ * otra. `now` es la hora contra la que se miran las sesiones abiertas.
  */
-export async function deletePasskeyUnlessLast(db: Db, id: string): Promise<"deleted" | "last" | "missing"> {
-  if (!UUID_PATTERN.test(id)) return "missing";
+export async function deletePasskeyUnlessLast(
+  db: Db,
+  id: string,
+  now: Date = new Date(),
+): Promise<PasskeyDeletion> {
+  if (!UUID_PATTERN.test(id)) return { outcome: "missing" };
   return db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(${sql.raw(String(PASSKEY_LOCK_ID))})`);
     const [target] = await tx.select({ id: adminPasskeys.id }).from(adminPasskeys).where(eq(adminPasskeys.id, id));
-    if (!target) return "missing";
+    if (!target) return { outcome: "missing" };
     const [existing] = await tx.select({ total: count() }).from(adminPasskeys);
-    if ((existing?.total ?? 0) <= 1) return "last";
+    if ((existing?.total ?? 0) <= 1) return { outcome: "last" };
     await tx.delete(adminPasskeys).where(eq(adminPasskeys.id, id));
-    return "deleted";
+    return { outcome: "deleted", closedSessionIds: await revokeKeylessSessions(tx, now) };
   });
 }
 

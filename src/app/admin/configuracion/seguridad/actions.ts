@@ -26,7 +26,6 @@ import {
   hasRecentReauth,
   markReauthed,
   revokeAllSessions,
-  revokeKeylessSessions,
   setSessionChallenge,
   takeSessionChallenge,
 } from "@/admin/auth/sessions";
@@ -153,22 +152,19 @@ export async function renamePasskeyAction(id: string, name: string): Promise<Ren
  * se cierran en el acto: es lo que se hace al perder un dispositivo. Si una era la de
  * este navegador, también se borra su cookie y hay que volver al login.
  *
- * Se cierran DESPUÉS de borrar: el borrado les suelta la llave a esas sesiones (`on
- * delete set null`) y ya no se las puede buscar por ella, y antes de saber si el
- * borrado procede (la última llave no se borra) se cerrarían sesiones de una llave
- * que se queda.
+ * El cierre de esas sesiones va dentro del borrado (`deletePasskeyUnlessLast`, una sola
+ * transacción): o pasan las dos cosas o ninguna, y la sesión de un dispositivo perdido
+ * nunca queda abierta con la llave ya borrada.
  */
 export async function deletePasskeyAction(id: string): Promise<DeletePasskeyResult> {
   await requireAdmin();
   const session = await getAdminSession();
   if (!hasRecentReauth(session)) return REAUTH_REQUIRED;
 
-  const db = await getDb();
-  const outcome = await deletePasskeyUnlessLast(db, id);
-  if (outcome !== "deleted") return { ok: false, error: outcome };
+  const deletion = await deletePasskeyUnlessLast(await getDb(), id);
+  if (deletion.outcome !== "deleted") return { ok: false, error: deletion.outcome };
 
-  const closed = await revokeKeylessSessions(db);
-  if (!closed.includes(session.id)) return { ok: true };
+  if (!deletion.closedSessionIds.includes(session.id)) return { ok: true };
   await clearSessionCookie();
   return { ok: true, redirectTo: LOGIN_PATH };
 }

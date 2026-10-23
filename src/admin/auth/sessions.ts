@@ -36,7 +36,11 @@ export type ChallengePurpose = "reauth" | "register";
 /** Lo que el resto del panel sabe de una sesión: nada secreto (ni el desafío, ni el vencimiento). */
 export type AdminSession = {
   id: string;
-  /** La llave con la que se ingresó, o `null` si fue solo con la contraseña. */
+  /**
+   * La llave con la que se ingresó. Es `null` solo si esa llave se borró después:
+   * toda sesión se abre con una llave, y borrar una cierra las suyas
+   * (`deletePasskeyUnlessLast`), así que una sesión abierta sin llave no debería verse.
+   */
   passkeyId: string | null;
   /** Descripción corta del navegador y el sistema ("Chrome en Windows"). */
   device: string;
@@ -65,12 +69,13 @@ function isOpen(now: Date) {
 }
 
 /**
- * Abre una sesión y devuelve su id (32 bytes al azar en base64url). `reauthed`
- * dice si la llave se acaba de usar: cuenta como la última confirmación.
+ * Abre una sesión con la llave `passkeyId` y devuelve su id (32 bytes al azar en
+ * base64url). Nunca se abre una sesión con la contraseña sola. `reauthed` dice si la
+ * llave se acaba de usar: cuenta como la última confirmación.
  */
 export async function createSession(
   db: Db,
-  input: { passkeyId: string | null; device: string; reauthed: boolean },
+  input: { passkeyId: string; device: string; reauthed: boolean },
   now: Date = new Date(),
 ): Promise<string> {
   const id = randomBytes(SESSION_ID_BYTES).toString("base64url");
@@ -130,28 +135,15 @@ export async function revokeAllSessions(db: Db, now: Date = new Date()): Promise
   return closed.length;
 }
 
-/** Cierra las sesiones abiertas que ingresaron con la llave `passkeyId` y devuelve sus ids. */
-export async function revokeSessionsForPasskey(
-  db: Db,
-  passkeyId: string,
-  now: Date = new Date(),
-): Promise<string[]> {
-  const closed = await db
-    .update(adminSessions)
-    .set({ revokedAt: now })
-    .where(and(eq(adminSessions.passkeyId, passkeyId), isOpen(now)))
-    .returning({ id: adminSessions.id });
-  return closed.map((row) => row.id);
-}
-
 /**
  * Cierra las sesiones abiertas que quedaron sin llave y devuelve sus ids. Borrar una
  * llave les suelta la llave a las sesiones que se abrieron con ella (`on delete set
- * null`), así que después del borrado `revokeSessionsForPasskey` ya no las encuentra:
- * esto sí. Con al menos una llave registrada no puede haber una sesión legítima sin
- * llave (sería entrar con la contraseña sola), así que cerrarlas nunca sobra. Va
- * después del borrado y no antes: el borrado decide (la última llave no se borra) y
- * una sesión que se abra con esa llave mientras tanto también queda sin ella.
+ * null`), así que por la llave ya no se las encuentra: se las busca por eso, por no
+ * tener llave. Con al menos una llave registrada no puede haber una sesión legítima
+ * sin llave, así que cerrarlas nunca sobra. Va después del borrado y no antes: el
+ * borrado decide (la última llave no se borra) y una sesión que se abra con esa llave
+ * mientras tanto también queda sin ella. La usa `deletePasskeyUnlessLast`, dentro de
+ * la misma transacción del borrado.
  */
 export async function revokeKeylessSessions(db: Db, now: Date = new Date()): Promise<string[]> {
   const closed = await db

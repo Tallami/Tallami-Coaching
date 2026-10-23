@@ -7,6 +7,7 @@
 // `createTestDb()` es una copia suya (`clone()`, bastante más barata que un
 // arranque en frío). Las copias son independientes entre sí y del molde.
 
+import { randomUUID } from "node:crypto";
 import type { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import type { Db } from "@/db/client";
@@ -31,4 +32,17 @@ function template(): Promise<PGlite> {
 export async function createTestDb(): Promise<Db> {
   const copy = (await (await template()).clone()) as PGlite;
   return drizzle({ client: copy, schema });
+}
+
+/**
+ * Una llave de acceso mínima en la base, y su id. Toda sesión se abre con una llave
+ * (`createSession` la pide), así que los tests que necesitan una sesión sin importarles
+ * la llave usan esta.
+ */
+export async function insertTestPasskey(db: Db, credentialId: string = randomUUID()): Promise<string> {
+  const [row] = await db
+    .insert(schema.adminPasskeys)
+    .values({ credentialId, publicKey: "clave-publica", name: "Llave de prueba" })
+    .returning({ id: schema.adminPasskeys.id });
+  return row.id;
 }
