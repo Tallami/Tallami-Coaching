@@ -3,7 +3,7 @@
 // de programar el envío para después de la respuesta se ocupa `notify.ts`.
 
 import { Resend } from "resend";
-import { getAlertConfig, type AlertConfig } from "./config";
+import { getAlertSetup, type AlertConfig } from "./config";
 import { renderSecurityAlert, type AlertContext, type SecurityEvent } from "./render";
 
 export type { AlertContext, SecurityEvent } from "./render";
@@ -31,7 +31,8 @@ function resendTransport(config: AlertConfig): AlertTransport {
  * Manda el aviso del evento `event`. NUNCA tira: un fallo (Resend caído, clave mala,
  * un transporte que rompe) se registra con `console.error` y nada más, para que el
  * ingreso o el cambio de seguridad que lo causó no dependan del email. Sin
- * configuración (`getAlertConfig()`) no hace nada.
+ * configuración (`getAlertSetup()`) no hace nada; con la dirección mal escrita, deja en el
+ * log qué variable revisar.
  *
  * En el log va el evento y el error, nunca la clave, la dirección ni el contenido del aviso.
  *
@@ -44,8 +45,14 @@ export async function sendSecurityAlert(
   deps: { transport?: AlertTransport; now?: Date } = {},
 ): Promise<void> {
   try {
-    const config = getAlertConfig();
-    if (config === null) return;
+    const setup = getAlertSetup();
+    if (setup.kind === "invalid") {
+      // Qué variable revisar, nunca su valor.
+      console.error(`Aviso de seguridad (${event}): no se mandó, ${setup.variable} no es una dirección válida.`);
+      return;
+    }
+    if (setup.kind === "missing") return;
+    const { config } = setup;
     const rendered = renderSecurityAlert(event, context, deps.now ?? new Date());
     const transport = deps.transport ?? resendTransport(config);
     await transport({ from: config.from, to: config.to, ...rendered });

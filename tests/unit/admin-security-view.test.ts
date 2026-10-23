@@ -48,7 +48,7 @@ function render(props: Partial<Parameters<typeof SecurityView>[0]> = {}): string
       currentSessionId: CURRENT,
       defaultKeyName: "Chrome en Windows",
       origin: ORIGIN,
-      alerts: null,
+      alerts: { kind: "off" },
       ...props,
     }),
   );
@@ -115,14 +115,24 @@ describe("SecurityView", () => {
   });
 
   test("says the email alerts are not configured when there is nothing to send them with", () => {
-    const markup = render({ alerts: null });
+    const markup = render({ alerts: { kind: "off" } });
 
     expect(markup).toContain("Avisos por email: sin configurar");
+    expect(markup).not.toContain("activos");
+    expect(markup).not.toContain("inválida");
+  });
+
+  test("says the configuration is not valid, and which variable to fix, when the address is wrong", () => {
+    const markup = render({ alerts: { kind: "invalid", variable: "ADMIN_ALERT_EMAIL" } });
+
+    expect(markup).toContain("Avisos por email: configuración inválida");
+    expect(markup).toContain("ADMIN_ALERT_EMAIL");
+    expect(markup).not.toContain("sin configurar");
     expect(markup).not.toContain("activos");
   });
 
   test("says where the email alerts go, with the address masked", () => {
-    const markup = render({ alerts: { maskedEmail: "t***@gmail.com", usesTestSender: false } });
+    const markup = render({ alerts: { kind: "active", maskedEmail: "t***@gmail.com", usesTestSender: false } });
 
     expect(markup).toContain("Avisos por email: activos (a t***@gmail.com)");
     expect(markup).not.toContain("sin configurar");
@@ -130,7 +140,7 @@ describe("SecurityView", () => {
   });
 
   test("warns that Resend's test address only delivers to the Resend account's own email", () => {
-    const markup = render({ alerts: { maskedEmail: "t***@gmail.com", usesTestSender: true } });
+    const markup = render({ alerts: { kind: "active", maskedEmail: "t***@gmail.com", usesTestSender: true } });
 
     expect(markup).toContain("Avisos por email: activos (a t***@gmail.com)");
     expect(markup).toContain("dirección de prueba de Resend");

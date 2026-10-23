@@ -3,6 +3,8 @@
 // qué pasó, cuándo (hora de Argentina), desde qué dispositivo y de qué país, y qué
 // hacer si no fue Tallami. Nunca lleva contraseñas, códigos ni enlaces para entrar.
 
+import { ENROLLMENT_CODE_MS } from "../auth/policy";
+import { LOGIN_WINDOW_MS } from "../auth/rate-limit";
 import { dateToArgentinaLocal, formatDay } from "../dates";
 
 /** Lo que dispara un aviso. `passkeys-reset` lo manda el comando de recuperación. */
@@ -31,6 +33,13 @@ const IF_NOT_YOU = "Si no fuiste vos: entrá y cerrá todas las sesiones, y camb
 
 const SIGNATURE = "Aviso automático del panel de Tallami Coaching.";
 
+const MINUTE_MS = 60_000;
+
+/** Una duración en minutos enteros, para decirla en el texto ("10"): sale de la política, no de una copia del número. */
+function minutes(ms: number): number {
+  return Math.round(ms / MINUTE_MS);
+}
+
 const EVENT_TEXT: Record<SecurityEvent, { subject: string; what: string }> = {
   login: {
     subject: "Ingreso al panel de Tallami",
@@ -50,7 +59,7 @@ const EVENT_TEXT: Record<SecurityEvent, { subject: string; what: string }> = {
   },
   "code-generated": {
     subject: "Código para registrar otro dispositivo en el panel de Tallami",
-    what: "Se generó un código para registrar la llave de otro dispositivo. Vence a los 10 minutos y sirve una sola vez.",
+    what: `Se generó un código para registrar la llave de otro dispositivo. Vence a los ${minutes(ENROLLMENT_CODE_MS)} minutos y sirve una sola vez.`,
   },
   "sessions-closed": {
     subject: "Se cerraron todas las sesiones del panel de Tallami",
@@ -58,7 +67,8 @@ const EVENT_TEXT: Record<SecurityEvent, { subject: string; what: string }> = {
   },
   "login-blocked": {
     subject: "Ingreso bloqueado en el panel de Tallami",
-    what: "Se bloqueó el ingreso al panel desde una conexión por demasiados intentos fallidos (contraseña, llave o código). Se destraba solo pasado un rato.",
+    // Se manda un solo aviso de bloqueo por ventana, sea de la conexión que sea (`blocked.ts`).
+    what: `Se bloquearon intentos de ingreso al panel: una conexión llegó al máximo de intentos fallidos (contraseña, llave o código) y queda bloqueada hasta que pasen ${minutes(LOGIN_WINDOW_MS)} minutos de sus intentos. En ese tiempo no se manda otro aviso de bloqueo, aunque otras conexiones también se bloqueen.`,
   },
   "passkeys-reset": {
     subject: "Se borraron las llaves de acceso del panel de Tallami",

@@ -12,7 +12,14 @@ import { LOGIN_MAX_FAILURES } from "@/admin/auth/rate-limit";
 import { ADMIN_COOKIE, createSessionToken } from "@/admin/auth/session";
 import { createSession } from "@/admin/auth/sessions";
 import { getDb, type Db } from "@/db/client";
-import { adminEnrollmentCodes, adminPasskeys, adminPendingLogins, adminSessions, loginAttempts } from "@/db/schema";
+import {
+  adminEnrollmentCodes,
+  adminPasskeys,
+  adminPendingLogins,
+  adminSessions,
+  loginAttempts,
+  settings,
+} from "@/db/schema";
 import {
   beginAddPasskeyAction,
   closeAllSessionsAction,
@@ -112,6 +119,7 @@ beforeEach(async () => {
   // Las ceremonias rechazadas dejan su motivo en el log; acá se rechazan a propósito.
   vi.spyOn(console, "warn").mockImplementation(() => {});
   await db.delete(loginAttempts);
+  await db.delete(settings); // el tope global del aviso de bloqueo
   await db.delete(adminEnrollmentCodes);
   await db.delete(adminSessions);
   await db.delete(adminPendingLogins);
@@ -271,6 +279,30 @@ describe("the blocked-sign-in notice", () => {
     await submitPassword("incorrecta");
 
     expect(events()).toEqual([]);
+  });
+
+  test("a second connection blocked soon after adds no second notice: one per window, whoever it is", async () => {
+    for (let attempt = 0; attempt < LOGIN_MAX_FAILURES; attempt += 1) await submitPassword("incorrecta");
+    expect(events()).toEqual(["login-blocked"]);
+    vi.mocked(headers).mockResolvedValue(
+      new Headers({ host: "localhost:3100", "x-forwarded-for": "198.51.100.9", "user-agent": CHROME_WINDOWS }) as never,
+    );
+
+    for (let attempt = 0; attempt < LOGIN_MAX_FAILURES; attempt += 1) {
+      expect(await submitPassword("incorrecta")).toBe("NEXT_REDIRECT /admin/login?error=invalid");
+    }
+    expect(await submitPassword("incorrecta")).toBe("NEXT_REDIRECT /admin/login?error=blocked");
+
+    expect(events()).toEqual(["login-blocked"]);
+  });
+
+  test("a parallel burst of wrong passwords never notifies more than one block", async () => {
+    // Las peticiones de la ráfaga que pasan el tope cuentan todas 5 fallos; el tope global deja salir un solo aviso
+    // (exacto en `admin-alerts-throttle.test.ts`; acá puede ser ninguno si una fila de un intento rechazado
+    // todavía no se borró cuando las demás contaron, y es lo que se acepta).
+    await Promise.all(Array.from({ length: 12 }, () => submitPassword("incorrecta")));
+
+    expect(events().length).toBeLessThanOrEqual(1);
   });
 
   test("five keys that do not fit notify one block", async () => {

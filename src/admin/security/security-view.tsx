@@ -19,8 +19,8 @@ interface SecurityViewProps {
   defaultKeyName: string;
   /** El origen configurado de las llaves (`getWebAuthnConfig().origin`), para el aviso de "otra dirección". */
   origin: string;
-  /** A dónde van los avisos por email (`getAlertStatus()`), o `null` si no están configurados. */
-  alerts: AlertStatus | null;
+  /** El estado de los avisos por email (`getAlertStatus()`). */
+  alerts: AlertStatus;
 }
 
 function toPasskeyRow(passkey: Passkey): PasskeyRow {
@@ -42,9 +42,23 @@ function toSessionRow(session: AdminSession, currentSessionId: string): SessionR
   };
 }
 
-/** El estado de los avisos por email. Con la dirección de prueba de Resend avisa a quién le llegan. */
-function AlertsStatus({ alerts }: { alerts: AlertStatus | null }) {
-  if (alerts === null) return <p className="font-bold">Avisos por email: sin configurar</p>;
+/**
+ * El estado de los avisos por email: sin configurar (faltan variables), con una variable
+ * mal escrita (se dice cuál, nunca su valor) o activos. Con la dirección de prueba de
+ * Resend avisa a quién le llegan.
+ */
+function AlertsStatus({ alerts }: { alerts: AlertStatus }) {
+  if (alerts.kind === "off") return <p className="font-bold">Avisos por email: sin configurar</p>;
+  if (alerts.kind === "invalid") {
+    return (
+      <>
+        <p className="font-bold">Avisos por email: configuración inválida</p>
+        <p className="mt-2 text-[0.875rem] leading-snug text-ink-2">
+          {`Revisá la variable ${alerts.variable}: no es una dirección de email. Mientras tanto no se manda ningún aviso.`}
+        </p>
+      </>
+    );
+  }
   return (
     <>
       <p className="font-bold">{`Avisos por email: activos (a ${alerts.maskedEmail})`}</p>
@@ -87,7 +101,7 @@ function SecuritySection({ id, title, description, children }: SecuritySectionPr
  * El cuerpo de Configuración → Seguridad (el encabezado lo pone la página): las llaves
  * de acceso con agregar, renombrar y borrar; el código para registrar otro dispositivo;
  * las sesiones abiertas con "Cerrar todas"; y el estado de los avisos por email (a qué
- * dirección van, enmascarada, o que no están configurados).
+ * dirección van, enmascarada; que no están configurados; o qué variable está mal).
  *
  * De una llave no se muestra si es la de este dispositivo: el panel no puede saberlo
  * (la llave puede venir del celular por código QR).

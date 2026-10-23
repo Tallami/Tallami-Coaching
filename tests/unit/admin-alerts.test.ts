@@ -2,6 +2,8 @@ import { headers } from "next/headers";
 import { after } from "next/server";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { getAlertConfig, getAlertStatus, maskEmail } from "@/admin/alerts/config";
+import { ENROLLMENT_CODE_MS } from "@/admin/auth/policy";
+import { LOGIN_WINDOW_MS } from "@/admin/auth/rate-limit";
 import { notifySecurityEvent } from "@/admin/alerts/notify";
 import { renderSecurityAlert, type AlertContext, type SecurityEvent } from "@/admin/alerts/render";
 import { sendSecurityAlert } from "@/admin/alerts/send";
@@ -97,20 +99,38 @@ describe("the status of the alerts, for Configuración → Seguridad", () => {
     expect(maskEmail("a@x.com")).toBe("a***@x.com");
   });
 
-  test("is null when nothing is configured, never exposing the key", () => {
-    expect(getAlertStatus()).toBeNull();
+  test("is off when the variables are missing, never exposing the key", () => {
+    expect(getAlertStatus()).toEqual({ kind: "off" });
+
+    vi.stubEnv("RESEND_API_KEY", API_KEY);
+    expect(getAlertStatus()).toEqual({ kind: "off" });
+
+    vi.stubEnv("RESEND_API_KEY", "");
+    vi.stubEnv("ADMIN_ALERT_EMAIL", TO);
+    expect(getAlertStatus()).toEqual({ kind: "off" });
   });
 
   test("says where they go, masked, and whether the sender is Resend's test address", () => {
     configure();
     const status = getAlertStatus();
 
-    expect(status).toEqual({ maskedEmail: "t***@example.com", usesTestSender: true });
+    expect(status).toEqual({ kind: "active", maskedEmail: "t***@example.com", usesTestSender: true });
     expect(JSON.stringify(status)).not.toContain(API_KEY);
     expect(JSON.stringify(status)).not.toContain("tomas@");
 
     vi.stubEnv("ADMIN_ALERT_FROM", "Panel <avisos@tallami.com>");
-    expect(getAlertStatus()).toEqual({ maskedEmail: "t***@example.com", usesTestSender: false });
+    expect(getAlertStatus()).toEqual({ kind: "active", maskedEmail: "t***@example.com", usesTestSender: false });
+  });
+
+  test("tells an address that is not valid apart from a missing one, naming the variable and never its value", () => {
+    vi.stubEnv("RESEND_API_KEY", API_KEY);
+    vi.stubEnv("ADMIN_ALERT_EMAIL", "tomas arroba gmail");
+
+    const status = getAlertStatus();
+
+    expect(status).toEqual({ kind: "invalid", variable: "ADMIN_ALERT_EMAIL" });
+    expect(JSON.stringify(status)).not.toContain("tomas");
+    expect(getAlertConfig()).toBeNull();
   });
 });
 
@@ -133,8 +153,35 @@ describe("renderSecurityAlert", () => {
     expect(text("passkey-removed")).toContain("Se borró una llave de acceso");
     expect(text("code-generated")).toContain("Se generó un código");
     expect(text("sessions-closed")).toContain("Se cerraron todas las sesiones");
-    expect(text("login-blocked")).toContain("Se bloqueó el ingreso");
+    expect(text("login-blocked")).toContain("Se bloquearon intentos de ingreso");
     expect(text("passkeys-reset")).toContain("Se borraron todas las llaves de acceso");
+  });
+
+  test("the code notice says how long the code lasts, and takes it from the policy: change the policy and the notice follows", async () => {
+    const { text, html } = renderSecurityAlert("code-generated", CONTEXT, AT);
+    expect(text).toContain(`Vence a los ${ENROLLMENT_CODE_MS / 60_000} minutos`);
+    expect(html).toContain(`Vence a los ${ENROLLMENT_CODE_MS / 60_000} minutos`);
+
+    vi.resetModules();
+    vi.doMock("@/admin/auth/policy", async (importOriginal) => ({
+      ...(await importOriginal<typeof import("@/admin/auth/policy")>()),
+      ENROLLMENT_CODE_MS: 20 * 60 * 1000,
+    }));
+    try {
+      const { renderSecurityAlert: renderWithOtherPolicy } = await import("@/admin/alerts/render");
+      expect(renderWithOtherPolicy("code-generated", CONTEXT, AT).text).toContain("Vence a los 20 minutos");
+    } finally {
+      vi.doUnmock("@/admin/auth/policy");
+      vi.resetModules();
+    }
+  });
+
+  test("the block notice does not speak of one connection: it is the only one sent per window, whoever was blocked", () => {
+    const { text } = renderSecurityAlert("login-blocked", CONTEXT, AT);
+
+    expect(text).not.toContain("desde una conexión");
+    expect(text).toContain(`${LOGIN_WINDOW_MS / 60_000} minutos`);
+    expect(text).toContain("no se manda otro aviso de bloqueo");
   });
 
   test("the subjects are all different, so each kind of notice is told apart in the inbox", () => {
@@ -222,6 +269,22 @@ describe("sendSecurityAlert", () => {
     const rendered = renderSecurityAlert("passkey-removed", { ...CONTEXT, passkeyName: "Notebook" }, AT);
     expect(transport).toHaveBeenCalledOnce();
     expect(transport).toHaveBeenCalledWith({ from: TEST_SENDER, to: TO, ...rendered });
+  });
+
+  test("with an address that is not valid it sends nothing and says which variable to fix, not its value", async () => {
+    vi.stubEnv("RESEND_API_KEY", API_KEY);
+    vi.stubEnv("ADMIN_ALERT_EMAIL", "no-es-un-email-valido");
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    const transport = vi.fn().mockResolvedValue(undefined);
+
+    await sendSecurityAlert("login", CONTEXT, { transport });
+
+    expect(transport).not.toHaveBeenCalled();
+    expect(logged).toHaveBeenCalledOnce();
+    const output = JSON.stringify(logged.mock.calls);
+    expect(output).toContain("ADMIN_ALERT_EMAIL");
+    expect(output).not.toContain("no-es-un-email-valido");
+    expect(output).not.toContain(API_KEY);
   });
 
   test("sends nothing, and does not even build the notice, without configuration", async () => {
@@ -377,14 +440,20 @@ describe("notifySecurityEvent", () => {
     expect(text).toContain("país desconocido");
   });
 
-  test("if the request headers cannot be read, it still sends, with the unknown device", async () => {
+  test("if the request headers cannot be read, it still sends, with the unknown device, and logs why by the error's name", async () => {
     configure();
-    vi.mocked(headers).mockRejectedValue(new Error("fuera de un pedido"));
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(headers).mockRejectedValue(new TypeError("fuera de un pedido, cookie=secreta"));
 
     notifySecurityEvent("login");
     await scheduled()[0]();
 
     expect(sdk.send.mock.calls[0][0].text).toContain("Navegador desconocido");
+    expect(logged).toHaveBeenCalledOnce();
+    const output = JSON.stringify(logged.mock.calls);
+    expect(output).toContain("TypeError");
+    expect(output).not.toContain("secreta");
+    expect(output).not.toContain("fuera de un pedido");
   });
 
   test("a failure to send does not escape the scheduled task", async () => {

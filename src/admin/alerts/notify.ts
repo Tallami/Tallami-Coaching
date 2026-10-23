@@ -12,6 +12,10 @@ import { sendSecurityAlert } from "./send";
 /** El encabezado donde Vercel informa el país de la conexión (código de dos letras). */
 const COUNTRY_HEADER = "x-vercel-ip-country";
 
+function errorName(error: unknown): string {
+  return error instanceof Error ? error.name : typeof error;
+}
+
 /**
  * Dónde pasó, según el pedido en curso: el navegador y el sistema del `user-agent` y
  * el país de Vercel. Si el pedido no se puede leer, un dispositivo desconocido: el
@@ -24,7 +28,9 @@ async function requestContext(): Promise<AlertContext> {
       device: describeDevice(requestHeaders.get("user-agent")),
       country: parseCountryCode(requestHeaders.get(COUNTRY_HEADER)),
     };
-  } catch {
+  } catch (error) {
+    // Solo el nombre del error: el mensaje podría traer datos del pedido.
+    console.error(`Aviso de seguridad: no se pudo leer el pedido, se avisa sin dispositivo. ${errorName(error)}`);
     return { device: describeDevice(null), country: null };
   }
 }
