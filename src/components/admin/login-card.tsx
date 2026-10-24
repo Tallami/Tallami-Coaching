@@ -14,7 +14,7 @@ interface LoginCardProps {
 export function LoginCard({ subtitle, children }: LoginCardProps) {
   return (
     <main className="stage grid min-h-dvh place-items-center px-gutter py-12">
-      <div className="w-full max-w-sm border-t-[6px] border-gold bg-paper p-8 text-ink">
+      <div className="on-paper w-full max-w-sm border-t-[6px] border-gold bg-paper p-8 text-ink">
         <Monogram />
         <h1 className="mt-5 text-3xl font-extrabold leading-tight">Panel de Tallami</h1>
         <p className="mt-1 text-ink-2">{subtitle}</p>

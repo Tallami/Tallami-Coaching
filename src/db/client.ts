@@ -21,7 +21,7 @@ import * as schema from "./schema";
 export type Db = PgDatabase<PgQueryResultHKT, typeof schema>;
 
 /** Carpeta de PGlite cuando no se define `PGLITE_DIR`. */
-const DEFAULT_PGLITE_DIR = ".data/pglite";
+export const DEFAULT_PGLITE_DIR = ".data/pglite";
 
 /**
  * Opciones de postgres.js para la base remota (Supabase, pooler de transacciones).

@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 import { PASSKEY_BUTTON, PASSKEY_STEP_URL, expect, submitTestPassword, test, uniqueTestIp } from "../helpers/admin";
+import { focusRingProblems, tabTo } from "../helpers/focus-ring";
 import { addCredential, enableVirtualAuthenticator, getCredentials, type VirtualCredential } from "../helpers/webauthn";
 
 // Los e2e que cambian la seguridad del ingreso de todo el panel, en su propio
@@ -15,6 +16,11 @@ import { addCredential, enableVirtualAuthenticator, getCredentials, type Virtual
 // confirmación con la llave (`withReauth`) no se prueba acá: cada ingreso la deja
 // abierta por 5 minutos y un test no puede esperar más; la cubren
 // `admin-security-actions` y `admin-with-reauth`, en los tests unitarios.
+//
+// Calidad (los tests del final): accesibilidad (axe), sin scroll horizontal y teclado con
+// foco visible en el paso de la llave, en el registro con un código y en Seguridad, a 375
+// y 1440 px. La pantalla de la primera llave solo existe mientras no hay ninguna llave:
+// se mide en el primer test, donde se la puede abrir.
 
 test.describe.configure({ mode: "serial" });
 
@@ -54,6 +60,12 @@ test("with no key yet, the password leads to registering the first one on this d
   const accessibility = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
   expect(accessibility.violations.map(({ id, nodes }) => ({ id, targets: nodes.map((n) => n.target) }))).toEqual([]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+  // La misma pantalla en la PC de escritorio, y con teclado: todo lo que se enfoca muestra su aro.
+  await expect(page.getByRole("button", { name: "Registrar mi llave" })).toBeEnabled();
+  expect(await focusRingProblems(page)).toEqual([]);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expectNoSeriousAccessibilityProblems(page);
+  expect(await focusRingProblems(page)).toEqual([]);
 
   const authenticatorId = await enableVirtualAuthenticator(page);
   await name.fill("PC de prueba");
@@ -323,4 +335,121 @@ test("closing every session sends all the devices to the login, and the keys sti
   } finally {
     await notebook.context.close();
   }
+});
+
+// --- Calidad: accesibilidad, scroll y teclado ---
+
+const PHONE = { width: 375, height: 812 } as const;
+const DESKTOP = { width: 1440, height: 900 } as const;
+const VIEWPORTS = [PHONE, DESKTOP] as const;
+
+/** Con el celular, los enlaces del menú lateral no se enfocan hasta abrirlo: se revisa la página con él abierto. */
+async function openPhoneMenu(page: Page): Promise<void> {
+  const menu = page.getByRole("button", { name: "Menú" });
+  if (await menu.isVisible()) await menu.click();
+}
+
+test("the passkey step and the code step have no accessibility problems, no horizontal scroll and a visible focus ring, on a phone and on a desktop", async ({
+  page,
+}) => {
+  await page.goto("/admin/login");
+  await submitTestPassword(page);
+  await expect(page).toHaveURL(PASSKEY_STEP_URL);
+  const useKey = page.getByRole("button", PASSKEY_BUTTON);
+  const haveCode = page.getByRole("button", { name: "Tengo un código" });
+  await expect(useKey).toBeEnabled();
+
+  for (const viewport of VIEWPORTS) {
+    await page.setViewportSize(viewport);
+    await expectNoSeriousAccessibilityProblems(page);
+    expect(await focusRingProblems(page), `paso de la llave a ${viewport.width}px`).toEqual([]);
+  }
+
+  // Con teclado se llega a los botones nuevos, en orden, y Enter abre el campo del código.
+  await tabTo(page, useKey);
+  await tabTo(page, haveCode);
+  await page.keyboard.press("Enter");
+  await expect(page.getByLabel("Código")).toBeVisible();
+  for (const viewport of VIEWPORTS) {
+    await page.setViewportSize(viewport);
+    await expectNoSeriousAccessibilityProblems(page);
+    expect(await focusRingProblems(page), `paso del código a ${viewport.width}px`).toEqual([]);
+  }
+});
+
+test("registering a device with a code has no accessibility problems, no horizontal scroll and a visible focus ring, on a phone and on a desktop", async ({
+  page,
+  browser,
+}) => {
+  savedKey = await signInWith(page, required(savedKey, "la PC de prueba"));
+  await page.goto(SECURITY_PATH);
+  await page.getByRole("button", { name: "Generar un código" }).click();
+  const code = (await page.getByTestId("enrollment-code").innerText()).trim();
+
+  const newPc = await newDevice(browser);
+  try {
+    await openCodeField(newPc.page);
+    await newPc.page.getByLabel("Código").fill(code);
+    await newPc.page.getByRole("button", { name: "Continuar" }).click();
+    const register = newPc.page.getByRole("button", { name: "Registrar la llave de este dispositivo" });
+    await expect(register).toBeEnabled();
+
+    for (const viewport of VIEWPORTS) {
+      await newPc.page.setViewportSize(viewport);
+      await expectNoSeriousAccessibilityProblems(newPc.page);
+      expect(await focusRingProblems(newPc.page), `registro con código a ${viewport.width}px`).toEqual([]);
+    }
+    await tabTo(newPc.page, register);
+  } finally {
+    await newPc.context.close();
+  }
+});
+
+test("Seguridad has no accessibility problems, no horizontal scroll and a visible focus ring, on a phone and on a desktop", async ({
+  page,
+}) => {
+  savedKey = await signInWith(page, required(savedKey, "la PC de prueba"));
+  await page.goto(SECURITY_PATH);
+  await expect(page.getByRole("heading", { level: 1, name: "Seguridad" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cerrar todas las sesiones" })).toBeEnabled();
+
+  for (const viewport of VIEWPORTS) {
+    await page.setViewportSize(viewport);
+    await expectNoSeriousAccessibilityProblems(page);
+    await openPhoneMenu(page);
+    expect(await focusRingProblems(page), `Seguridad a ${viewport.width}px`).toEqual([]);
+  }
+
+  // Con teclado se llega a cada botón nuevo de la página.
+  await page.setViewportSize(DESKTOP);
+  for (const button of [
+    page.getByRole("button", { name: "Renombrar PC de prueba" }),
+    page.getByRole("button", { name: "Borrar PC de prueba" }),
+    page.getByRole("button", { name: "Agregar una llave en este dispositivo" }),
+    page.getByRole("button", { name: "Generar un código" }),
+    page.getByRole("button", { name: "Cerrar todas las sesiones" }),
+  ]) {
+    await tabTo(page, button, 60);
+  }
+});
+
+test("Seguridad keeps its quality with the code on screen and with the delete confirmation open", async ({ page }) => {
+  savedKey = await signInWith(page, required(savedKey, "la PC de prueba"));
+  await page.goto(SECURITY_PATH);
+  await page.getByRole("button", { name: "Generar un código" }).click();
+  await expect(page.getByTestId("enrollment-code")).toBeVisible();
+  await page.getByRole("button", { name: "Borrar PC de prueba" }).click();
+  await expect(page.getByRole("button", { name: "No, conservarla" })).toBeFocused();
+
+  for (const viewport of VIEWPORTS) {
+    await page.setViewportSize(viewport);
+    await expectNoSeriousAccessibilityProblems(page);
+    await openPhoneMenu(page);
+    expect(await focusRingProblems(page), `Seguridad con el código y la confirmación a ${viewport.width}px`).toEqual([]);
+  }
+
+  // "No, conservarla" deja la llave: la última nunca se borra desde acá sin querer.
+  await page.setViewportSize(DESKTOP);
+  await page.getByRole("button", { name: "No, conservarla" }).click();
+  await expect(page.getByRole("button", { name: "Renombrar PC de prueba" })).toBeVisible();
 });

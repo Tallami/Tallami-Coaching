@@ -25,11 +25,12 @@ La web queda en http://localhost:3000 (redirige a `/es`, `/pt` o `/en` según el
 | `npm run lint` | ESLint |
 | `npm run typecheck` | TypeScript sin emitir archivos (corré antes `npm run build` o `npx next typegen`) |
 | `npm run test` | Tests unitarios (Vitest) |
-| `npm run test:e2e` | Tests end to end (Playwright), en dos tandas: la web en el puerto 3100 (hace el build) y las pantallas del panel que se prueban con datos de ejemplo (resumen, Servicios, Facturación y la calidad de todo el panel: accesibilidad, scroll y teclado) en el 3101 (reutiliza ese build). `test:e2e:main` y `test:e2e:demo` corren cada una por separado (la segunda siempre arma el build antes) |
+| `npm run test:e2e` | Tests end to end (Playwright), en tres tandas: la web en el puerto 3100 (hace el build); las pantallas del panel que se prueban con datos de ejemplo (resumen, Servicios, Facturación y la calidad de todo el panel: accesibilidad, scroll y teclado) en el 3101 (reutiliza ese build); y la seguridad del ingreso (primera llave, códigos, sesiones, y la calidad de esas pantallas) en el 3102 (también reutiliza el build). `test:e2e:main`, `test:e2e:demo` y `test:e2e:security` corren cada una por separado (las dos últimas siempre arman el build antes) |
 | `npm run db:generate` | Genera en `drizzle/` la migración SQL de los cambios hechos en `src/db/schema.ts` (la migración se sube al repo) |
 | `npm run db:migrate` | Aplica las migraciones de `drizzle/` a la base de `DATABASE_URL` (Supabase); sin esa variable avisa en español y no hace nada. La base local (PGlite) se migra sola al abrirse. Todas las tablas llevan RLS activada y sin políticas (la Data API de Supabase no ve nada; la app se conecta como dueño de las tablas): toda tabla nueva termina en `.enableRLS()` en `src/db/schema.ts` y un test lo exige |
 | `npm run db:seed:demo` | Carga en la base local (PGlite) 25 alumnos, unas 120 ventas y unos 750 clics en "Reservar" ficticios de los últimos 14 meses, para ver el resumen y Servicios con números. Se niega a correr si hay `DATABASE_URL`; se puede repetir (refresca las fechas). Con `npm run db:seed:demo -- --clear` los borra, y nada más |
 | `npm run admin:password` | Genera el hash de la contraseña del panel (`ADMIN_PASSWORD_HASH`) y un secreto para las sesiones (`ADMIN_SESSION_SECRET`). Ver "Panel de admin" |
+| `npm run admin:reset-passkeys` | Recuperación: borra todas las llaves de acceso del panel y cierra todas las sesiones, después de pedir que escribas `BORRAR LLAVES`. Ver "Guía de recuperación" |
 | `npm run players:photo -- <usuario>` | Baja la foto de perfil de X de un jugador a `src/assets/players/` |
 | `npm run tweets:record -- <id> [<id> …]` | Guarda la respuesta de X de uno o más tweets en `src/content/tweet-snapshots/` y rehace su índice (necesita internet) |
 | `npm run tweets:index` | Rehace `src/content/tweet-snapshots/index.ts` con los archivos que hay en esa carpeta (sin internet) |
@@ -76,7 +77,7 @@ La foto es opcional: sin foto, la franja muestra la inicial sobre un círculo az
 
 ## Panel de admin
 
-El panel privado de Tallami vive en `/admin` (solo en español, fuera de los idiomas del sitio). Entra una sola persona, con una contraseña. No está enlazado desde el sitio público, lleva `noindex` y `robots.txt` lo bloquea.
+El panel privado de Tallami vive en `/admin` (solo en español, fuera de los idiomas del sitio). Entra una sola persona, en dos pasos: la contraseña y una llave de acceso (la huella, la cara o el PIN de uno de sus dispositivos). No está enlazado desde el sitio público, lleva `noindex` y `robots.txt` lo bloquea.
 
 ### Dejarlo listo
 
@@ -84,20 +85,21 @@ El panel privado de Tallami vive en `/admin` (solo en español, fuera de los idi
 2. Local: copiá las líneas de `.env.local` a un archivo `.env.local`. El hash lleva `$` y Next.js los expande como variables, por eso el script los imprime escritos `\$`: copiá esas líneas, no las de Vercel.
 3. En Vercel (Project Settings → Environment Variables): pegá los valores de la sección "En Vercel", tal cual. Agregá también `DATABASE_URL` (Supabase, pooler de transacciones); en Vercel el panel no usa la base local. Volvé a desplegar.
 4. Abrí `/admin`. Si falta algo, te lleva a `/admin/setup`, que dice qué variable falta (solo el nombre, nunca el valor).
+5. Entrá con la contraseña. Como todavía no hay ninguna llave, el panel te pide registrar la primera en ese mismo dispositivo: seguí "Entrar con contraseña y llave de acceso", más abajo.
 
-Localmente entrá por `http://localhost:3000/admin`, no por la IP de tu red: la cookie de sesión lleva `Secure` en cualquier dirección que no sea `localhost`, y el navegador no la guarda sobre http.
+Localmente entrá por `http://localhost:3000/admin`, no por la IP de tu red: la cookie de sesión lleva `Secure` en cualquier dirección que no sea `localhost`, y el navegador no la guarda sobre http. Las llaves de acceso también quedan atadas a la dirección donde se crean.
 
 ### Usarlo en tu compu
 
 Una vez que hiciste lo de "Dejarlo listo" (la contraseña y el secreto en `.env.local`):
 
 1. Corré `npm run dev` y abrí `http://localhost:3000/admin`.
-2. Entrá con tu contraseña.
+2. Entrá con tu contraseña. La primera vez, el panel te pide registrar una llave en esta compu (la base local empieza sin llaves); es una llave aparte de las de la web en línea, que valen solo para su propia dirección.
 
 No hace falta ninguna cuenta ni internet: el panel guarda todo en una base de datos que corre dentro de tu propia compu.
 
 - **La base.** Se llama PGlite (es Postgres, pero adentro de Node) y vive en la carpeta `.data/pglite` del proyecto. La crea sola la primera vez que abrís el panel. Esa carpeta no se sube a GitHub: lo que cargues acá queda solo en esta compu. Para hacer una copia, cerrá el panel y copiá la carpeta.
-- **Empezar de cero.** Cerrá `npm run dev`, borrá la carpeta `.data/pglite` y volvé a abrirlo: la base vuelve a crearse vacía.
+- **Empezar de cero.** Cerrá `npm run dev`, borrá la carpeta `.data/pglite` y volvé a abrirlo: la base vuelve a crearse vacía (también sin llaves: la primera vez volvés a registrar una).
 - **Verlo con datos.** `npm run db:seed:demo` carga alumnos, ventas y clics ficticios ("Alumno de prueba 1", "Alumno de prueba 2"…) para que el resumen y los gráficos tengan números. Cerrá `npm run dev` antes de correrlo: la base local no admite dos programas a la vez. Se puede repetir las veces que quieras.
 - **Sacar los datos de ejemplo.** `npm run db:seed:demo -- --clear` borra los alumnos, las ventas y los clics de ejemplo y nada más: lo que cargaste a mano, el monotributo y los clics reales quedan como están. Si cargaste una venta tuya a un alumno de ejemplo, ese alumno no se borra y el comando te avisa cuál es.
 
@@ -112,7 +114,7 @@ Estos dos comandos se niegan a correr si hay una `DATABASE_URL` definida: los da
 | Servicios | Cada servicio con sus ventas, ingresos, tendencia, clics en "Reservar" y conversión |
 | Alumnos | Cada alumno con lo que compró y su historial; desde acá los cargás y los editás |
 | Facturación | Lo cobrado que todavía no facturaste, lo cobrado y facturado mes a mes, el monotributo y el CSV para el contador |
-| Configuración | La categoría del monotributo y su tope |
+| Configuración | La categoría del monotributo y su tope; y, en Seguridad, tus llaves de acceso, el código para sumar otro dispositivo y las sesiones abiertas |
 
 **Cargar una venta.** En "Ventas" tocá "Nueva venta" (o "Cargar una venta" en el Resumen). Elegí el alumno (uno que ya está o uno nuevo) y el servicio: el monto se completa con el precio de lista en dólares y lo podés cambiar. Completá la moneda (dólar, peso, real o USDT), el medio de pago, el estado y la fecha de cobro.
 
@@ -190,8 +192,16 @@ Para que el panel funcione en internet (en Vercel) la base no puede ser la local
 
    La conexión de la migración va siempre cifrada: `drizzle.config.ts` le agrega `sslmode=require` a la cadena (`src/db/migrate-url.ts`), la traiga o no y aunque diga `sslmode=disable`; si la cadena ya pide `verify-ca` o `verify-full`, se respeta. La conexión de la web también se cifra siempre, desde el código (`src/db/client.ts`).
 4. **Usar el rol dueño de las tablas.** Las cadenas del paso 2 entran como el usuario `postgres` (en los poolers se escribe `postgres.` y el código de tu proyecto; en la conexión directa, solo `postgres`), que es el dueño de las tablas: dejalas así. Todas las tablas tienen la seguridad por filas (RLS) activada y sin políticas, para que la API pública de Supabase no vea nada; el dueño es el único que pasa, así que con otro rol el panel no podría leer ni escribir.
-5. **Cargar las variables en Vercel.** En el proyecto, Settings → Environment Variables: las tres de "Dejarlo listo" (`ADMIN_PASSWORD_HASH`, `ADMIN_SESSION_SECRET` y `DATABASE_URL`, esta última con la cadena del pooler de transacciones, no la de migración).
+5. **Cargar las variables en Vercel.** En el proyecto, Settings → Environment Variables: las tres de "Dejarlo listo" (`ADMIN_PASSWORD_HASH`, `ADMIN_SESSION_SECRET` y `DATABASE_URL`, esta última con la cadena del pooler de transacciones, no la de migración). Las llaves de acceso quedan atadas a la dirección de la web: si va a tener dominio propio, definí también `NEXT_PUBLIC_SITE_URL` con ese dominio (ver "Deploy (Vercel)") antes de registrar la primera llave. Los avisos por email llevan tres variables más, opcionales (ver "Avisos por email").
 6. **Acercar las funciones a la base.** Por defecto las funciones de Vercel corren en Washington D.C. (`iad1`), lejos de una base en São Paulo, y cada consulta suma demora de ida y vuelta. En el proyecto, Settings → Functions → «Function Regions», elegí São Paulo (`gru1`); la guía oficial [Configuring regions for Vercel Functions](https://vercel.com/docs/functions/configuring-functions/region) lo explica. Después volvé a desplegar y entrá a `/admin`.
+7. **Elegir Node 22 o más.** El proyecto pide Node 22.12 o superior (`engines` en `package.json`). Vercel ofrece Node 22.x y 24.x (la 24 es la que usa un proyecto nuevo por defecto); si el tuyo quedó con una versión más vieja, cambiala en Settings → Build and Deployment, sección «Node.js Version» (guía oficial: [Supported Node.js versions](https://vercel.com/docs/functions/runtimes/node-js/node-js-versions)) y volvé a desplegar.
+
+**Si ya tenías el panel en línea, de antes de las llaves de acceso,** actualizalo en este orden:
+
+1. Corré `npm run db:migrate` (paso 3) *antes* de desplegar: la migración `0004_admin_login_security` crea las tablas de las sesiones, las llaves, los ingresos a medio camino y los códigos. Sin ella, el ingreso del panel nuevo falla.
+2. Desplegá.
+3. Contá con volver a entrar una vez: las cookies de sesión de antes dejan de valer (ahora cada sesión se guarda en la base).
+4. Entrá con la contraseña y registrá la primera llave. Hacelo con la dirección definitiva de la web (ver "La dirección de la web"): si después cambia, las llaves dejan de servir.
 
 Tres protecciones más, que se hacen en los paneles de Supabase y Vercel:
 
@@ -201,15 +211,108 @@ Tres protecciones más, que se hacen en los paneles de Supabase y Vercel:
 
 **Respaldo.** Según la [guía de backups](https://supabase.com/docs/guides/platform/backups) de Supabase, los planes pagos tienen una copia diaria de la base (en el plan Pro, de los últimos 7 días) y en el plan gratis hay que exportar los datos por tu cuenta cada tanto (por ejemplo con `supabase db dump`); revisá ahí qué incluye tu plan. Como ayuda extra, descargá el CSV de Ventas de vez en cuando y guardalo: tiene todas las ventas con sus montos y su factura (no es un respaldo completo: no trae los alumnos sin compras ni sus notas, ni los clics).
 
+### Entrar con contraseña y llave de acceso
+
+Para entrar al panel hacen falta dos cosas: la contraseña y una **llave de acceso** (en inglés, *passkey*): tu huella, tu cara o el PIN de un dispositivo tuyo. Con la contraseña sola no se entra, y quien te robe la contraseña tampoco puede sumar su propia llave. La llave no sale del dispositivo y solo sirve en la dirección de la web donde la creaste.
+
+**El ingreso, paso a paso.**
+
+1. En `/admin/login` escribís la contraseña.
+2. Si ya hay una llave registrada, tocás «Usar mi llave» y el dispositivo te pide la huella, la cara o el PIN. Listo: estás adentro. Entre la contraseña y la llave tenés 5 minutos; si se pasa, el panel te lo dice y volvés a empezar.
+3. Si todavía no hay ninguna llave (la primera vez, o después de la recuperación), aparece una pantalla que dice «Registrá tu primera llave»: ponele un nombre (por ejemplo Celular, PC o Notebook) y tocá «Registrar mi llave». Hasta registrarla no ves nada del panel.
+
+Una sesión se cierra sola a los 30 minutos sin usarla (volver a entrar lleva unos segundos) y, por más que la uses, a las 8 horas. Lo que estabas escribiendo en un formulario se recupera al volver a entrar.
+
+**La PC de escritorio (Windows 10): activá el PIN de Windows Hello.** Tu PC no necesita huella, cámara ni Bluetooth: alcanza con el PIN de Windows Hello, que es la llave de esa PC. Si todavía no lo tenés, activalo antes de registrar la llave. La guía oficial de Microsoft, [Configure Windows Hello](https://support.microsoft.com/en-us/windows/security/configure-windows-hello) (está en inglés y aplica a Windows 10 y 11), explica cómo crearlo desde la configuración de tu cuenta de Windows.
+
+**Registrar la llave de cada dispositivo.** Conviene registrar al menos dos (la PC y el celular, por ejemplo): si perdés uno, entrás con el otro.
+
+- **El primero** (el que uses primero, por ejemplo la PC): después de la contraseña, «Registrá tu primera llave».
+- **Otro dispositivo desde el que ya entraste:** en Configuración tocá «Abrir Seguridad», poné un nombre y tocá «Agregar una llave en este dispositivo».
+- **El celular, la notebook o la PC sin Bluetooth: con un código.** Funciona siempre, en cualquier dispositivo que todavía no tenga llave:
+  1. En un dispositivo donde ya entraste, andá a Configuración → Seguridad, sección «Código para otro dispositivo», y tocá «Generar un código». Es de 10 letras y números, vale 10 minutos y sirve una sola vez. No cierres la sesión de ese dispositivo hasta usarlo: el código muere con ella.
+  2. En el dispositivo nuevo, abrí `/admin/login`, escribí la contraseña, tocá «Tengo un código», escribilo, tocá «Continuar» y después «Registrar la llave de este dispositivo».
+- **Entrar desde un dispositivo sin llave, usando la del celular** (código QR): en el paso de la llave, cuando el navegador te ofrezca usar tu celular, elegilo, escaneá el código QR con la cámara del celular y confirmá con tu huella o tu PIN. El celular tiene que estar cerca, con Bluetooth e internet; la PC de escritorio sin Bluetooth no puede hacerlo: para ella, usá el código. Si querés que ese dispositivo tenga su propia llave, después tocá «Agregar una llave en este dispositivo».
+- **Si un dispositivo no pudiera crear llaves,** una llave de seguridad USB (FIDO2) sirve: el panel no restringe el tipo de llave.
+
+En Configuración → Seguridad ves las llaves (nombre, cuándo se creó y cuándo se usó por última vez), las sesiones abiertas y si los avisos por email están activos. Ahí mismo podés renombrar una llave o borrarla. La última llave no se puede borrar (dejaría el panel con la contraseña sola): para cambiarla, primero agregá otra. Agregar, renombrar o borrar una llave, generar un código y cerrar todas las sesiones piden confirmar de nuevo con tu llave si pasaron más de 5 minutos desde la última vez.
+
+### Guía de recuperación
+
+**Perdiste un dispositivo, pero todavía entrás con otro.** Entrá desde el otro, andá a Configuración → Seguridad y borrá la llave del dispositivo perdido: sus sesiones se cierran en el acto. Si no solo lo perdiste sino que te lo robaron, además tocá «Cerrar todas las sesiones» y cambiá la contraseña (`npm run admin:password`, ver "Dejarlo listo"). Cuando tengas el dispositivo nuevo, registrale una llave con un código.
+
+**Perdiste todos los dispositivos, o cambió la dirección de la web.** Sin ninguna llave no se puede entrar, y eso es a propósito: el panel no tiene una puerta trasera. La recuperación se hace desde tu compu, con el comando `npm run admin:reset-passkeys`, y solo puede hacerla quien tiene las credenciales de la base de datos, o sea vos. Borra todas las llaves y cierra todas las sesiones. Después, entrar con la contraseña vuelve a pedirte la primera llave, como el primer día.
+
+1. Abrí una terminal nueva solo para esto y cargá la `DATABASE_URL` de producción de la misma forma segura que en "Ponerlo en línea", paso 3 (con `Read-Host` en PowerShell o `read -s` en Git Bash, para que la cadena no quede en el historial). Usá la cadena que tiene `DATABASE_URL` en Vercel (el pooler de transacciones). En PowerShell:
+
+   ```powershell
+   $env:DATABASE_URL = Read-Host "Cadena de conexión"
+   npm run admin:reset-passkeys
+   Remove-Item Env:DATABASE_URL
+   ```
+
+   En Git Bash:
+
+   ```bash
+   read -r -s -p "Cadena de conexión: " DATABASE_URL; export DATABASE_URL
+   npm run admin:reset-passkeys
+   unset DATABASE_URL
+   ```
+
+2. El comando te dice sobre qué base va a actuar. Fijate que diga «base remota de DATABASE_URL» con el servidor de tu proyecto de Supabase (nunca muestra la contraseña). Si dice «base local», no cargaste la cadena y borraría las llaves de la base de tu compu, no las de la web: cancelá.
+3. Escribí `BORRAR LLAVES` y Enter. Cualquier otra cosa cancela y no se borra nada. (También se puede mandar la frase sin que pregunte: en PowerShell `"BORRAR LLAVES" | npm run admin:reset-passkeys`, en Git Bash `echo "BORRAR LLAVES" | npm run admin:reset-passkeys`.)
+4. Entrá a `/admin` con la contraseña y registrá una llave nueva **enseguida**: hasta que la registres, quien conozca la contraseña podría registrar la suya. (El panel manda un aviso por email cuando se registra la primera llave.)
+
+El comando también manda el aviso por email «se borraron las llaves», pero solo si en esa misma terminal cargaste `RESEND_API_KEY` y `ADMIN_ALERT_EMAIL` igual que `DATABASE_URL`: no lee ningún archivo `.env`. Si no están, borra igual y te avisa que no mandó el email. Sin `DATABASE_URL`, el comando actúa sobre la base local de tu compu (PGlite), por si necesitás lo mismo en desarrollo.
+
+Si lo que perdiste es la contraseña, no las llaves: generá un hash nuevo con `npm run admin:password`, reemplazá `ADMIN_PASSWORD_HASH` en Vercel y volvé a desplegar (eso cierra todas las sesiones).
+
+**La dirección de la web.** Las llaves quedan atadas a la dirección donde se crearon. En producción esa dirección es la de `NEXT_PUBLIC_SITE_URL` o, si no la definiste, el dominio de producción del proyecto en Vercel (`algo.vercel.app`). Por eso:
+
+- Registrá tus llaves con la dirección definitiva. Si la web pasa de `algo.vercel.app` a un dominio propio, las llaves anteriores dejan de servir y hay que hacer la recuperación de arriba. Lo mejor es definir `NEXT_PUBLIC_SITE_URL` con el dominio propio y volver a desplegar antes de registrar la primera llave.
+- Los deploys de vista previa de Vercel (los de cada rama o pull request) tienen otra dirección: no sirven para entrar al panel. Entrá siempre por la dirección de producción.
+- Las llaves de tu compu (`localhost`) y las de la web en línea son distintas; cada una se registra donde se usa.
+
+### Avisos por email (Resend)
+
+El panel te manda un email en cada ingreso y en cada cambio de seguridad: primera llave, llave agregada o borrada, código generado, todas las sesiones cerradas, intentos fallidos que bloquean una conexión (uno cada 15 minutos como mucho) y la recuperación de arriba. Dicen qué pasó, cuándo (hora de Argentina), desde qué dispositivo y de qué país, y qué hacer si no fuiste vos. Nunca llevan contraseñas, códigos ni enlaces para entrar. Si el email falla, o no está configurado, el ingreso funciona igual: el error queda en los logs de Vercel y nada más.
+
+1. Creá una cuenta en [resend.com](https://resend.com) con **el mismo email donde querés recibir los avisos**.
+2. Creá una clave de API desde la sección de claves de tu cuenta (la guía oficial [Manage API keys](https://resend.com/docs/dashboard/api-keys/introduction) lo explica).
+3. En Vercel (Settings → Environment Variables) cargá `RESEND_API_KEY` (la clave) y `ADMIN_ALERT_EMAIL` (tu email), y volvé a desplegar. Para guardar la clave sin que se pueda volver a leer, marcala como secreta (ver "Seguridad de tus cuentas").
+4. Abrí Configuración → Seguridad: tiene que decir «Avisos por email: activos» con tu email tapado a medias (`t***@gmail.com`). Si dice «sin configurar», falta una de las dos variables; si dice «configuración inválida», `ADMIN_ALERT_EMAIL` no es una dirección de email.
+
+Mientras no tengas un dominio propio, los avisos salen de la dirección de prueba de Resend (`onboarding@resend.dev`), que solo entrega al email de tu cuenta de Resend (es la regla que explica [esta página de Resend](https://resend.com/docs/knowledge-base/403-error-resend-dev-domain)). Alcanza, porque el destinatario sos vos: por eso el paso 1 pide el mismo email. Para que salgan desde una dirección propia, verificá un dominio en Resend ([Verified Domains](https://resend.com/docs/dashboard/domains/introduction)) y cargá `ADMIN_ALERT_FROM` con una dirección de ese dominio, por ejemplo `Panel de Tallami <avisos@tu-dominio.com>`.
+
+### Seguridad de tus cuentas
+
+El panel protege la entrada al panel, pero no sirve de nada si alguien controla las cuentas donde vive: GitHub (el código), Vercel (las variables y el despliegue), Supabase (la base) y el email con el que se recuperan. Activá el segundo factor en las cuatro. Cuando se pueda, elegí una llave de acceso o una llave de seguridad y no un SMS, que se puede robar con un mensaje falso.
+
+- **GitHub.** [Configuring two-factor authentication](https://docs.github.com/es/authentication/securing-your-account-with-two-factor-authentication-2fa/configuring-two-factor-authentication) (está en español): una app de códigos y, además, llaves de acceso o de seguridad.
+- **Vercel.** [Two-factor Authentication](https://vercel.com/docs/two-factor-authentication): una app de códigos o una llave de acceso. Guardá los códigos de recuperación que te da.
+- **Supabase.** [Multi-factor Authentication](https://supabase.com/docs/guides/platform/multi-factor-authentication) (es para tu cuenta de Supabase, no para los usuarios de una app): usa una app de códigos. Supabase no da códigos de recuperación y no puede devolverte la cuenta si perdés todos los factores: registrá un segundo factor de respaldo en otro dispositivo.
+- **Tu email.** El que recupera todas las anteriores. Si es Gmail: [Turn on 2-Step Verification](https://support.google.com/accounts/answer/185839).
+
+Y dos ajustes en los paneles de Vercel y Supabase:
+
+- **Variables secretas en Vercel.** `ADMIN_SESSION_SECRET`, `DATABASE_URL` y `RESEND_API_KEY` no deberían poder leerse una vez guardadas. Al cargarlas, elegí el tipo «Secret» (antes se llamaba «Sensitive»): el valor queda guardado pero ya no se puede ver, solo reemplazar. Guardá los valores en un administrador de contraseñas. La guía oficial es [Config and Secret environment variables](https://vercel.com/docs/environment-variables/sensitive-environment-variables).
+- **Apagar la API de datos de Supabase.** El panel se conecta directo a la base (`DATABASE_URL`) y no usa la Data API (la API REST que Supabase publica por defecto). Si el proyecto no la usa para nada más, apagala: la sección «Disable the Data API» de [Securing your API](https://supabase.com/docs/guides/api/securing-your-api) explica cómo. Además, todas las tablas ya tienen RLS activada y sin políticas, así que aun prendida no ve nada. Y exigí la conexión cifrada en la base, como se explica en "Ponerlo en línea" («Exigir SSL en la base»).
+
 ### Cómo se protege
 
 | Qué | Cómo |
 | --- | --- |
-| Contraseña | Hash scrypt (`scrypt$N$r$p$sal$hash`, N=2^17, r=8, p=1: el primer perfil que recomienda OWASP) con comparación en tiempo constante. Para cambiarla: volvé a correr `npm run admin:password` y reemplazá `ADMIN_PASSWORD_HASH`; eso cierra todas las sesiones abiertas |
+| Contraseña | Primer paso del ingreso; sola no abre nada. Hash scrypt (`scrypt$N$r$p$sal$hash`, N=2^17, r=8, p=1: el primer perfil que recomienda OWASP) con comparación en tiempo constante. Para cambiarla: volvé a correr `npm run admin:password` y reemplazá `ADMIN_PASSWORD_HASH`; eso cierra todas las sesiones abiertas |
+| Llave de acceso (segundo paso) | WebAuthn con SimpleWebAuthn (`src/admin/auth/ceremonies.ts` y `passkeys.ts`): `userVerification: "required"` (huella, cara o PIN del dispositivo), sin attestation, y contador de firma estricto (rechaza una llave repetida o clonada). Las llaves se guardan en la tabla `admin_passkeys` (id de credencial, clave pública, contador, nombre). El dominio (`rpID`) y el origen esperado salen siempre de la configuración del sitio (`src/admin/auth/webauthn-config.ts`), nunca del encabezado `Host`. Con al menos una llave registrada, ningún camino entra ni registra otra llave con la contraseña sola, y la última llave no se puede borrar |
+| Ingreso a medio camino | Pasada la contraseña, el ingreso queda en una fila de `admin_pending_logins` (5 minutos, un solo uso) atada a su propia cookie (`tallami_admin_pending`, `httpOnly`, `SameSite=Strict`, solo para `/admin/login`). No da acceso a ninguna página ni acción del panel. El desafío de la llave dura 5 minutos y se usa una sola vez. La primera llave se registra una sola vez: la base lo comprueba al guardarla, así dos registros a la vez no pueden sumar dos "primeras" |
+| Código para otro dispositivo | 10 caracteres de un alfabeto sin letras ni números que se confunden, vence a los 10 minutos, un solo uso, se guarda solo su hash (HMAC con una clave derivada de `ADMIN_SESSION_SECRET`). Hay uno vivo a la vez y muere con la sesión que lo generó. Un código incorrecto cuenta para el límite de intentos |
+| Confirmación reciente | Agregar, renombrar o borrar una llave, generar un código y cerrar todas las sesiones piden confirmar de nuevo con la llave si la última confirmación tiene más de 5 minutos |
+| Avisos por email | Resend (`src/admin/alerts/`): un email en cada ingreso y en cada cambio de seguridad, enviado después de responder al navegador. Un fallo queda en el log y nada más; nunca llevan contraseñas, códigos ni enlaces para entrar |
+| Recuperación | `npm run admin:reset-passkeys` (`scripts/admin-reset-passkeys.ts`): corre fuera de la web, con las credenciales de la base, y pide escribir `BORRAR LLAVES`. En una sola transacción borra las llaves, cierra las sesiones y borra los ingresos a medio camino y los códigos. Ninguna página del panel lo llama |
 | Sesión | Se guarda en la base (tabla `admin_sessions`, `src/admin/auth/sessions.ts`): se cierra sola a los 30 minutos sin uso y, por más que se use, a las 8 horas del ingreso; "Salir" la cierra en la base, así que la cookie vieja deja de valer. Los registros se borran a los 30 días. La cookie `tallami_admin` lleva un JWT HS256 firmado con `ADMIN_SESSION_SECRET`, audiencia `tallami-admin`, 8 horas, con el id de esa sesión. Cookie: `httpOnly`, `SameSite=Strict`, solo para `/admin`, y `Secure` siempre (excepto http sobre `localhost`). Lleva un claim corto (`pwv`, un HMAC del `ADMIN_PASSWORD_HASH` con el secreto, `src/admin/auth/password-claim.ts`): cambiar la contraseña o el secreto cierra todas las sesiones |
-| Intentos | 5 fallidos por conexión cada 15 minutos (una IPv6 cuenta por su /64, como en los clics), guardados en la tabla `login_attempts` con la clave convertida en un hash (nunca la IP). Los registros se borran a los 30 días |
+| Intentos | 5 fallidos por conexión cada 15 minutos (una IPv6 cuenta por su /64, como en los clics): cuentan la contraseña incorrecta, una llave inválida o de otra cuenta, y un código incorrecto o vencido. Se guardan en la tabla `login_attempts` con la clave convertida en un hash (nunca la IP). Los registros se borran a los 30 días |
 | IP del visitante | Primer valor de `x-forwarded-for`. En Vercel lo escribe Vercel y no se puede falsificar; fuera de Vercel lo manda el propio cliente, así que el límite solo es una defensa real detrás de Vercel |
-| Doble verificación | El `proxy` (`src/proxy.ts`) manda a `/admin/login` a quien no tenga una cookie de sesión válida (solo verifica la firma, sin consultar la base); además cada página y cada Server Action del panel llama a `requireAdmin()` (`src/admin/auth/require-admin.ts`), que verifica en la base que la sesión exista, no esté cerrada ni lleve más de 30 minutos sin uso, y anota el uso. Una página o acción nueva sin esa llamada queda abierta: es obligatoria. Un Server Action sin cookie válida (por ejemplo, con la pestaña abierta de un día para otro: la cookie dura 8 horas) no llega a la acción: el `proxy` contesta 401 con la redirección al ingreso que entiende el navegador de Next, y lo que se estaba cargando no se guarda. Si algo más falla, `src/app/admin/error.tsx` muestra una pantalla en español con "Volver a intentar" e "Ir al ingreso" |
+| Doble chequeo de la sesión | El `proxy` (`src/proxy.ts`) manda a `/admin/login` a quien no tenga una cookie de sesión válida (solo verifica la firma, sin consultar la base); además cada página y cada Server Action del panel llama a `requireAdmin()` (`src/admin/auth/require-admin.ts`), que verifica en la base que la sesión exista, no esté cerrada ni lleve más de 30 minutos sin uso, y anota el uso. Una página o acción nueva sin esa llamada queda abierta: es obligatoria. Un Server Action sin cookie válida (por ejemplo, con la pestaña abierta de un día para otro: la cookie dura 8 horas) no llega a la acción: el `proxy` contesta 401 con la redirección al ingreso que entiende el navegador de Next, y lo que se estaba cargando no se guarda. Si algo más falla, `src/app/admin/error.tsx` muestra una pantalla en español con "Volver a intentar" e "Ir al ingreso" |
 | Redirecciones | `?next=` del login solo acepta rutas `/admin…` del mismo sitio |
 | Conexión a la base | Siempre cifrada: `ssl: "require"` en `src/db/client.ts` (ninguna `DATABASE_URL` puede apagarlo) y `sslmode=require` en `drizzle.config.ts` para las migraciones. Hasta 5 conexiones por instancia de la función (`max: 5`), que se cierran a los 20 s sin uso (`idle_timeout`). No 1: el pooler de transacciones no admite que postgres.js mande varias consultas seguidas por la misma conexión, y con una sola conexión eso pasa en cuanto dos consultas coinciden (el porqué, en el comentario de `REMOTE_DB_OPTIONS`) |
 
@@ -232,7 +335,11 @@ Los botones de reserva del sitio público (`BookingLink`, `src/components/home/b
 
 `npm run test:e2e` arranca el servidor con una contraseña y un secreto de prueba (`tests/helpers/admin-server.ts`), una base PGlite vacía en una carpeta temporal que se borra al iniciar, y `EXCHANGE_RATE_SOURCE=fixed` (cotizaciones fijas, sin llamar al BCRA; en producción de Vercel esa variable se ignora). Cada test navega con su propia IP, así los bloqueos de uno no afectan a los otros.
 
+Los servidores principal y de datos de ejemplo arrancan con 32 llaves de acceso de prueba ya registradas (`tests/helpers/seed-e2e-passkeys.ts`, con `npm run e2e:seed-passkeys`), y el navegador de los tests usa el autenticador virtual de Chrome (`tests/helpers/webauthn.ts`): cada test entra con contraseña y llave como Tallami (`loginAsAdmin`). Las claves privadas de esas llaves salen de un texto público, así que el comando que las carga se niega a tocar cualquier base que no esté en la carpeta temporal del sistema, donde viven todas las bases de los e2e.
+
 Los tests que verifican totales o que necesitan tablas y gráficos con datos (`admin-overview`, `admin-services-demo`, `admin-billing-demo` y `admin-quality`, en `tests/e2e/`) corren aparte, con `playwright.demo.config.ts`: un segundo servidor en el puerto 3101, con el mismo build y su propia base PGlite que se siembra con `buildDemoData(hoy en Argentina)` antes de arrancar (`src/admin/demo-data.ts`). Nadie escribe en esa base, así los números esperados salen de los mismos datos con las mismas funciones que usa la página. `npm run test:e2e:demo` arma el build y corre solo esa tanda; con `npm run test:e2e` el build lo arma la primera.
+
+Los tests que cambian la seguridad de todo el panel (registrar la primera llave, códigos para otro dispositivo, borrar llaves, cerrar todas las sesiones) están en un solo archivo, `tests/e2e/admin-security.spec.ts`, que corre con `playwright.security.config.ts`: un tercer servidor en el puerto 3102, con el mismo build y una base propia sin ninguna llave, un test después del otro (cada uno parte de lo que dejó el anterior). Al final del archivo están las verificaciones de calidad de esas pantallas (el paso de la llave, el registro con un código y Seguridad): axe, sin scroll horizontal y un recorrido con Tab que mide el aro de foco, a 375 y 1440 px. `npm run test:e2e:security` arma el build y corre solo esa tanda.
 
 `tests/e2e/admin-quality.spec.ts` recorre todas las pantallas del panel (también el login y la página de "falta configurar") a 375, 768 y 1440 px: axe sin violaciones serias ni críticas, sin scroll horizontal de la página, el menú lateral y el del celular con el teclado, y un recorrido con Tab que mide que todo lo que se puede enfocar tenga un aro visible con contraste de al menos 3:1.
 
@@ -246,8 +353,8 @@ Variables de entorno (Project Settings → Environment Variables):
 
 | Variable | Qué hace |
 | --- | --- |
-| `NEXT_PUBLIC_SITE_URL` | Origen público del sitio, sin barra final (por ejemplo `https://tallami.com`). Define canonical, hreflang, Open Graph, `sitemap.xml` y `robots.txt`. Se lee en el build: si la cambiás, volvé a desplegar. |
+| `NEXT_PUBLIC_SITE_URL` | Origen público del sitio, sin barra final (por ejemplo `https://tallami.com`). Define canonical, hreflang, Open Graph, `sitemap.xml` y `robots.txt`. Se lee en el build: si la cambiás, volvé a desplegar. También es la dirección a la que quedan atadas las llaves de acceso del panel: si cambia, dejan de servir (ver "La dirección de la web"). |
 
 Si `NEXT_PUBLIC_SITE_URL` no está definida (o está vacía), el build usa `https://${VERCEL_PROJECT_PRODUCTION_URL}`: el dominio de producción del proyecto (por ejemplo `tallami-coaching.vercel.app`), que Vercel define solo. Así los metadatos nunca apuntan a `localhost` en un deploy. Fuera de Vercel y sin ninguna de las dos, se usa `http://localhost:3000`.
 
-Cuando el sitio tenga dominio propio, definí `NEXT_PUBLIC_SITE_URL` con ese dominio para que los buscadores vean la URL definitiva.
+Cuando el sitio tenga dominio propio, definí `NEXT_PUBLIC_SITE_URL` con ese dominio para que los buscadores vean la URL definitiva, y hacelo antes de registrar las llaves de acceso del panel.

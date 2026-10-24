@@ -22,6 +22,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:seed:demo": "tsx scripts/seed-demo.ts",
     "admin:password": "tsx scripts/admin-password.ts",
+    "admin:reset-passkeys": "tsx scripts/admin-reset-passkeys.ts",
     "players:photo": "node scripts/fetch-player-photo.mjs",
     "tweets:record": "node scripts/record-tweet.mjs",
     "tweets:index": "node scripts/tweet-snapshots-index.mjs"

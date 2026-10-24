@@ -170,6 +170,15 @@
   }
 
   /*
+   * Una tarjeta clara sobre el escenario (la del ingreso al panel): el foco vuelve al
+   * azul de las superficies claras. El dorado sobre el papel contrasta 1,35:1 y casi no
+   * se ve (el mínimo es 3:1).
+   */
+  .stage .on-paper :focus-visible {
+    outline-color: var(--color-zone);
+  }
+
+  /*
    * Superficie de pizarra (clara): servicios, cómo funciona y preguntas. La
    * primera lleva el filo dorado; las que le siguen, una línea de tinta.
    * Port de c-analisis.html (líneas 124-125).
