@@ -15,7 +15,10 @@ import {
   type SettingsFormValues,
 } from "@/admin/settings/form-state";
 import { MONOTRIBUTO_CATEGORIES } from "@/admin/settings/categories";
+import { DRAFT_KEYS } from "@/admin/ui/draft-keys";
+import { DraftRestoredNotice } from "@/admin/ui/draft-restored-notice";
 import { Field } from "@/admin/ui/field";
+import { useFormDraft } from "@/admin/ui/form-draft";
 import { NoScriptNote } from "@/admin/ui/no-script-note";
 import { Notice } from "@/admin/ui/notice";
 import { useHydrated } from "@/admin/ui/use-hydrated";
@@ -57,6 +60,7 @@ export function SettingsForm({ action, initialValues, footnote, children, savedN
   const formRef = useRef<HTMLFormElement>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
   const hydrated = useHydrated();
+  const draft = useFormDraft(formRef, DRAFT_KEYS.settings);
 
   // Una respuesta nueva del servidor: los errores vuelven a valer.
   if (state !== handledState) {
@@ -75,6 +79,13 @@ export function SettingsForm({ action, initialValues, footnote, children, savedN
       formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]') ?? summaryRef.current;
     target?.focus();
   }, [state]);
+
+  /** Tira lo recuperado: el formulario vuelve a los valores con los que se abrió. */
+  function discardDraft() {
+    draft.discard();
+    setValues(initialValues);
+    setEditedFields(new Set());
+  }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -97,6 +108,7 @@ export function SettingsForm({ action, initialValues, footnote, children, savedN
       data-hydrated={hydrated ? "true" : "false"}
       className="border-2 border-ink bg-white"
     >
+      {draft.restored ? <DraftRestoredNotice onDiscard={discardDraft} /> : null}
       {savedNotice && state === INITIAL_SETTINGS_FORM_STATE ? <Notice tone="ok">{savedNotice}</Notice> : null}
       <div ref={summaryRef} tabIndex={-1} className="outline-offset-0 empty:hidden">
         {state.formError ? (

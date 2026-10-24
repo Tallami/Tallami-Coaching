@@ -1,5 +1,6 @@
-import type { LoginErrorCode } from "@/admin/auth/login-errors";
+import { SESSION_ENDED_ERROR, type LoginErrorCode } from "@/admin/auth/login-errors";
 import { LoginCard } from "@/components/admin/login-card";
+import { RecoveryClaim } from "@/components/admin/recovery-claim";
 import { SubmitButton } from "@/components/admin/submit-button";
 
 interface LoginFormProps {
@@ -15,6 +16,7 @@ const ERROR_MESSAGES: Record<LoginErrorCode, string> = {
   blocked: "Demasiados intentos fallidos. Probá de nuevo en 15 minutos.",
   unavailable: "No pudimos verificar el ingreso. Probá de nuevo en unos minutos.",
   expired: "Tu ingreso venció, empezá de nuevo.",
+  vencida: "Tu sesión se cerró. Volvé a entrar para seguir.",
 };
 
 const ERROR_ID = "login-error";
@@ -22,6 +24,8 @@ const ERROR_ID = "login-error";
 export function LoginForm({ action, error, next }: LoginFormProps) {
   return (
     <LoginCard subtitle="Acceso privado.">
+      {/* Se llegó por una sesión que terminó: lo que se estaba escribiendo vuelve después de entrar. */}
+      {error === SESSION_ENDED_ERROR ? <RecoveryClaim /> : null}
       <form action={action} className="mt-8 flex flex-col gap-5">
         <input type="hidden" name="next" value={next} />
         <div className="flex flex-col gap-2">

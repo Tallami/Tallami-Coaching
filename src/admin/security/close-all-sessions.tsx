@@ -1,5 +1,6 @@
 "use client";
 
+import { clearStoredDrafts } from "@/admin/ui/draft-store";
 import { Notice } from "@/admin/ui/notice";
 import { useHydrated } from "@/admin/ui/use-hydrated";
 import { closeAllSessionsAction } from "@/app/admin/configuracion/seguridad/actions";
@@ -25,6 +26,8 @@ export function CloseAllSessions({ origin }: CloseAllSessionsProps) {
   function closeAll() {
     void perform(async () => {
       const result = await confirmed(() => closeAllSessionsAction());
+      // Cerrar todo a propósito también borra lo que quedó guardado en la pestaña (borradores de formularios).
+      clearStoredDrafts();
       router.replace(result.redirectTo);
       return null;
     });

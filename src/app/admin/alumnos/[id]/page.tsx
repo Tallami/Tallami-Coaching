@@ -8,6 +8,7 @@ import { StudentHistory } from "@/admin/customers/student-history";
 import { StudentSummary } from "@/admin/customers/student-summary";
 import { todayInArgentina } from "@/admin/dates";
 import { ADMIN_ROUTES } from "@/admin/routes";
+import { DRAFT_KEYS } from "@/admin/ui/draft-keys";
 import { EmptyState } from "@/admin/ui/empty-state";
 import { PageHeader } from "@/admin/ui/page-header";
 import { firstValue } from "@/admin/ui/search-params";
@@ -78,6 +79,7 @@ export default async function StudentPage(props: PageProps<"/admin/alumnos/[id]"
         <StudentForm
           key={JSON.stringify(formValues)}
           mode="edit"
+          draftKey={DRAFT_KEYS.student(student.id)}
           action={updateStudentAction.bind(null, student.id)}
           initialValues={formValues}
           cancelHref={ADMIN_ROUTES.students}

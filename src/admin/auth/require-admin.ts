@@ -18,11 +18,13 @@
 // más de 30 minutos sin uso (`sessions.ts`), y cada pedido anota su uso.
 
 import { cache } from "react";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getDb } from "../../db/client";
 import { getMissingConfig } from "./config";
-import { LOGIN_PATH, SETUP_PATH } from "./redirect";
+import { SESSION_ENDED_ERROR } from "./login-errors";
+import { SETUP_PATH, loginPath } from "./redirect";
+import { sameOriginReferer } from "./referer";
 import { ADMIN_COOKIE, readSessionClaims } from "./session";
 import { validateSession, type AdminSession } from "./sessions";
 
@@ -35,6 +37,16 @@ import { validateSession, type AdminSession } from "./sessions";
  */
 async function readCookieClaims(): Promise<{ sessionId: string } | null> {
   return readSessionClaims((await cookies()).get(ADMIN_COOKIE)?.value);
+}
+
+/**
+ * Al login, avisando que la sesión se cerró y con la página de la que vino el pedido (el `Referer`
+ * de un Server Action es la página del formulario) para volver ahí. Se lee recién acá, ya leída la
+ * cookie: solo hace falta cuando se va a redirigir.
+ */
+async function redirectToLogin(): Promise<never> {
+  const next = sameOriginReferer(await headers());
+  redirect(loginPath({ next, error: SESSION_ENDED_ERROR }));
 }
 
 /** ¿El pedido trae una sesión válida? Sin redirigir: para el login, que decide qué mostrar. */
@@ -53,9 +65,10 @@ export async function hasAdminSession(): Promise<boolean> {
 /**
  * La sesión del pedido, en la base. Si el panel no está configurado va a
  * `/admin/setup`; si no hay sesión válida (sin cookie, falsa, vencida, cerrada o
- * sin uso por más de 30 minutos), a `/admin/login`. `redirect` interrumpe el
- * render o la acción: nada de lo que sigue a esta llamada corre. Si la base no
- * responde, tira: sin poder verificar no se deja pasar a nadie.
+ * sin uso por más de 30 minutos), a `/admin/login?error=vencida`, con `next`
+ * si se sabe de qué página venía. `redirect` interrumpe el render o la acción:
+ * nada de lo que sigue a esta llamada corre. Si la base no responde, tira: sin
+ * poder verificar no se deja pasar a nadie.
  *
  * Envuelta en `cache()` de React: `requireAdmin()` y los que piden la sesión en el
  * mismo render comparten una sola consulta. (Fuera de un render de React, por
@@ -64,9 +77,9 @@ export async function hasAdminSession(): Promise<boolean> {
 export const getAdminSession = cache(async (): Promise<AdminSession> => {
   const claims = await readCookieClaims();
   if (getMissingConfig().length > 0) redirect(SETUP_PATH);
-  if (claims === null) redirect(LOGIN_PATH);
+  if (claims === null) return redirectToLogin();
   const session = await validateSession(await getDb(), claims.sessionId);
-  if (session === null) redirect(LOGIN_PATH);
+  if (session === null) return redirectToLogin();
   return session;
 });
 

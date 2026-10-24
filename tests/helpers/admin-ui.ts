@@ -47,7 +47,7 @@ export async function fillSale(page: Page, draft: SaleDraft): Promise<void> {
 }
 
 /** Completa los datos de la venta (todo menos el alumno). */
-async function fillSaleDetails(page: Page, draft: Omit<SaleDraft, "student">): Promise<void> {
+export async function fillSaleDetails(page: Page, draft: Omit<SaleDraft, "student">): Promise<void> {
   if (draft.item) await page.getByLabel("Servicio", { exact: true }).selectOption(draft.item);
   if (draft.currency) await page.getByLabel("Moneda", { exact: true }).selectOption(draft.currency);
   if (draft.amount !== undefined) await page.getByLabel("Monto", { exact: true }).fill(draft.amount);

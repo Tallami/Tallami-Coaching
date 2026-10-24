@@ -3,6 +3,7 @@ import { requireAdmin } from "@/admin/auth/require-admin";
 import { EMPTY_STUDENT_FORM_VALUES } from "@/admin/customers/form-state";
 import { StudentForm } from "@/admin/customers/student-form";
 import { ADMIN_ROUTES } from "@/admin/routes";
+import { DRAFT_KEYS } from "@/admin/ui/draft-keys";
 import { PageHeader } from "@/admin/ui/page-header";
 import { PanelShell } from "@/app/admin/panel-shell";
 import { createStudentAction } from "../actions";
@@ -21,6 +22,7 @@ export default async function NewStudentPage() {
       <div className="max-w-[40rem]">
         <StudentForm
           mode="create"
+          draftKey={DRAFT_KEYS.newStudent}
           action={createStudentAction}
           initialValues={EMPTY_STUDENT_FORM_VALUES}
           cancelHref={ADMIN_ROUTES.students}

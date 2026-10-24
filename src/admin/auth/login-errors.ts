@@ -2,8 +2,18 @@
 // la dirección (`/admin/login?error=invalid`), así el formulario funciona
 // también sin JavaScript.
 
-/** `expired`: el ingreso a medio camino (contraseña bien, falta la llave) venció o ya se usó. */
-export const LOGIN_ERRORS = ["invalid", "blocked", "unavailable", "expired"] as const;
+/**
+ * El motivo con el que `requireAdmin()` y el `proxy` mandan al login a quien tenía el panel abierto
+ * y ya no tiene sesión (se cerró por inactividad, por las 8 horas, o desde otro dispositivo). El login
+ * lo avisa y deja la marca para que los formularios recuperen lo escrito (`draft-store.ts`).
+ */
+export const SESSION_ENDED_ERROR = "vencida";
+
+/**
+ * `expired`: el ingreso a medio camino (contraseña bien, falta la llave) venció o ya se usó.
+ * `vencida`: la sesión del panel terminó mientras se usaba (`SESSION_ENDED_ERROR`).
+ */
+export const LOGIN_ERRORS = ["invalid", "blocked", "unavailable", "expired", SESSION_ENDED_ERROR] as const;
 
 export type LoginErrorCode = (typeof LOGIN_ERRORS)[number];
 

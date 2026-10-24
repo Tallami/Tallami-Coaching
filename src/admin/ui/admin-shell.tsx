@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { ClearDraftsOnSubmit } from "@/admin/ui/clear-drafts-on-submit";
 import { ADMIN_SECTIONS, type AdminSectionId } from "@/admin/ui/sections";
 import { SidebarFrame } from "@/admin/ui/sidebar-frame";
 import { SubmitButton } from "@/components/admin/submit-button";
@@ -74,11 +75,12 @@ export function AdminShell({ active, logoutAction, children }: AdminShellProps) 
               })}
             </ul>
           </nav>
-          <form action={logoutAction} className="mt-auto">
+          {/* Salir a propósito borra también lo que quedó guardado en la pestaña (borradores de formularios). */}
+          <ClearDraftsOnSubmit action={logoutAction} className="mt-auto">
             <SubmitButton variant="stage-outline" size="sm" pendingLabel="Saliendo…" className="w-full">
               Salir
             </SubmitButton>
-          </form>
+          </ClearDraftsOnSubmit>
         </SidebarFrame>
         <main id="contenido" className="min-w-0 px-gutter py-8 narrow:py-5">
           <div className="mx-auto w-full max-w-[1240px]">{children}</div>

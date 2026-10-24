@@ -15,6 +15,7 @@ function render(props: { mode?: "create" | "edit"; invoiced?: boolean } = {}): s
   return renderToStaticMarkup(
     createElement(SaleForm, {
       mode: props.mode ?? "edit",
+      draftKey: "venta:v1",
       action: noop,
       initialValues: emptySaleFormValues("2026-10-16", true),
       priceListUsd: {},

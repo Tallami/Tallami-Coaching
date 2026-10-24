@@ -5,6 +5,7 @@ import { todayInArgentina } from "@/admin/dates";
 import { emptySaleFormValues } from "@/admin/sales/form-values";
 import { priceListUsd } from "@/admin/sales/price-list";
 import { SaleForm } from "@/admin/sales/sale-form";
+import { DRAFT_KEYS } from "@/admin/ui/draft-keys";
 import { PageHeader } from "@/admin/ui/page-header";
 import { getDb } from "@/db/client";
 import { PanelShell } from "@/app/admin/panel-shell";
@@ -24,6 +25,7 @@ export default async function NewSalePage() {
       />
       <SaleForm
         mode="create"
+        draftKey={DRAFT_KEYS.newSale}
         action={createSaleAction}
         initialValues={emptySaleFormValues(todayInArgentina(), hasCustomers)}
         priceListUsd={priceListUsd()}

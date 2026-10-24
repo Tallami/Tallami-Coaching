@@ -294,7 +294,7 @@ describe("guardAdmin", () => {
       expect(response.status).toBe(401);
       expect(response.headers.get("location")).toBeNull();
       expect(response.headers.get("x-action-redirect")).toBe(
-        "/admin/login?next=%2Fadmin%2Fventas%2Fnueva;replace",
+        "/admin/login?next=%2Fadmin%2Fventas%2Fnueva&error=vencida;replace",
       );
       expect(response.headers.get("cache-control")).toBe("no-store");
       expect(response.headers.get("x-robots-tag")).toBe("noindex, nofollow");
@@ -308,7 +308,7 @@ describe("guardAdmin", () => {
     );
 
     expect(response.headers.get("x-action-redirect")).toBe(
-      "/admin/login?next=%2Fadmin%2Fventas%3Fmes%3D2026-10;replace",
+      "/admin/login?next=%2Fadmin%2Fventas%3Fmes%3D2026-10&error=vencida;replace",
     );
   });
 
@@ -319,6 +319,7 @@ describe("guardAdmin", () => {
       const [target] = redirect.split(";");
 
       expect(target.startsWith("/admin/login?next=%2Fadmin"), path).toBe(true);
+      expect(target.endsWith("&error=vencida"), path).toBe(true);
       expect(redirect.endsWith(";replace"), path).toBe(true);
     }
   });

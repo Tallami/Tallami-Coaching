@@ -19,7 +19,10 @@ import { fillSale, openNewSale, uniqueName, whenInteractive } from "../helpers/a
 // ingreso o, si algo más falla, en la pantalla de error en español, nunca en la
 // página "Application error" de Next.
 
-const NEW_SALE_LOGIN_URL = /\/admin\/login\?next=%2Fadmin%2Fventas%2Fnueva$/;
+// Sin sesión en medio de una acción, el login avisa que la sesión se cerró (`error=vencida`) y recuerda la pantalla.
+const NEW_SALE_LOGIN_URL = /\/admin\/login\?next=%2Fadmin%2Fventas%2Fnueva&error=vencida$/;
+// Volver a pedir la pantalla (no enviar una acción) sin sesión: el `proxy` la manda al login sin aviso.
+const NEW_SALE_RELOAD_LOGIN_URL = /\/admin\/login\?next=%2Fadmin%2Fventas%2Fnueva$/;
 const SAVE_BUTTON = { name: "Guardar venta" } as const;
 const ENGLISH_ERRORS = ["Application error", "unexpected response", "Internal Server Error"];
 
@@ -121,13 +124,14 @@ test.describe("a session that ends while the panel is open", () => {
     await closeFromAnotherBrowser(context, browser);
     await page.getByRole("button", SAVE_BUTTON).click();
 
-    await expect(page).toHaveURL(/\/admin\/login$/);
+    // `requireAdmin()` (no el `proxy`) la manda al login: la página del formulario viene del `Referer` del pedido.
+    await expect(page).toHaveURL(NEW_SALE_LOGIN_URL);
     await expect(page.getByRole("heading", { name: "Panel de Tallami", level: 1 })).toBeVisible();
     await expectNoEnglishError(page);
 
     await submitTestPassword(page);
     await confirmWithTestPasskey(page);
-    await expect(page).toHaveURL(/\/admin$/);
+    await expect(page).toHaveURL(/\/admin\/ventas\/nueva$/);
     await page.goto(`/admin/ventas?q=${encodeURIComponent(student)}`);
     await expect(page.getByRole("row").filter({ hasText: student })).toHaveCount(0);
   });
@@ -143,7 +147,7 @@ test.describe("a session that ends while the panel is open", () => {
 
     await logout.click();
 
-    await expect(page).toHaveURL(/\/admin\/login\?next=%2Fadmin$/);
+    await expect(page).toHaveURL(/\/admin\/login\?next=%2Fadmin&error=vencida$/);
     await expectNoEnglishError(page);
   });
 });
@@ -191,7 +195,7 @@ test.describe("an unexpected failure in the panel", () => {
     await context.clearCookies();
     await page.getByRole("button", { name: "Volver a intentar" }).click();
 
-    await expect(page).toHaveURL(NEW_SALE_LOGIN_URL);
+    await expect(page).toHaveURL(NEW_SALE_RELOAD_LOGIN_URL);
     await expectNoEnglishError(page);
   });
 });

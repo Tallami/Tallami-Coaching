@@ -44,6 +44,7 @@ function saleForm(overrides: Partial<ReturnType<typeof emptySaleFormValues>> = {
   return renderToStaticMarkup(
     createElement(SaleForm, {
       mode: "create",
+      draftKey: "venta:nueva",
       action: noopSale,
       initialValues: { ...emptySaleFormValues("2026-10-16", false), item: "other", ...overrides },
       priceListUsd: {},
@@ -55,6 +56,7 @@ function studentForm(savedNotice?: string): string {
   return renderToStaticMarkup(
     createElement(StudentForm, {
       mode: "edit",
+      draftKey: "alumno:a1",
       action: noopStudent,
       initialValues: EMPTY_STUDENT_FORM_VALUES,
       cancelHref: "/admin/alumnos",

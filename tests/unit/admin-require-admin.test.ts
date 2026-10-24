@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { SignJWT } from "jose";
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
@@ -16,7 +16,7 @@ import { adminPasskeys, adminSessions } from "@/db/schema";
 import { ADMIN_TEST_OLD_PASSWORD_HASH } from "../helpers/admin-server";
 import { createTestDb, insertTestPasskey } from "../helpers/db";
 
-vi.mock("next/headers", () => ({ cookies: vi.fn() }));
+vi.mock("next/headers", () => ({ cookies: vi.fn(), headers: vi.fn() }));
 // `redirect` de Next interrumpe tirando un error; el doble hace lo mismo.
 vi.mock("next/navigation", () => ({
   redirect: vi.fn((url: string) => {
@@ -31,13 +31,23 @@ vi.mock("@/db/client", async (importOriginal) => ({
 const SECRET = "secreto-de-prueba-de-mas-de-32-caracteres";
 const DEVICE = "Chrome en Windows";
 const MINUTE_MS = 60_000;
-const LOGIN_REDIRECT = "NEXT_REDIRECT /admin/login";
+// Sin sesión se va al login avisando que la sesión se cerró (el login deja ahí la marca para recuperar lo escrito).
+const LOGIN_PATH_ENDED = "/admin/login?error=vencida";
+const LOGIN_REDIRECT = `NEXT_REDIRECT ${LOGIN_PATH_ENDED}`;
+const HOST = "localhost:3100";
 
 /** Hace que el pedido actual traiga (o no) esa cookie de sesión. */
 function requestWithCookie(value: string | undefined): void {
   vi.mocked(cookies).mockResolvedValue({
     get: (name: string) => (name === ADMIN_COOKIE && value ? { name, value } : undefined),
   } as Awaited<ReturnType<typeof cookies>>);
+}
+
+/** Hace que el pedido actual venga de esa página (el `Referer` de un Server Action es la página del formulario). */
+function requestFrom(referer: string | undefined, host: string | null = HOST): void {
+  vi.mocked(headers).mockResolvedValue(
+    new Headers({ ...(host ? { host } : {}), ...(referer ? { referer } : {}) }) as Awaited<ReturnType<typeof headers>>,
+  );
 }
 
 /** Una sesión firmada a mano, con el claim de la contraseña vigente (o el de `hash`) y el id `sid`. */
@@ -84,6 +94,8 @@ beforeEach(async () => {
   vi.stubEnv("DATABASE_URL", "");
   vi.mocked(redirect).mockClear();
   vi.mocked(cookies).mockReset();
+  vi.mocked(headers).mockReset();
+  requestFrom(undefined);
   vi.mocked(getDb).mockReset();
   vi.mocked(getDb).mockResolvedValue(db);
   await db.delete(adminSessions);
@@ -121,14 +133,14 @@ describe("requireAdmin", () => {
     requestWithCookie(await makeCookie());
 
     await expect(requireAdmin()).rejects.toThrow(LOGIN_REDIRECT);
-    expect(redirect).toHaveBeenCalledExactlyOnceWith("/admin/login");
+    expect(redirect).toHaveBeenCalledExactlyOnceWith(LOGIN_PATH_ENDED);
   });
 
   test("sends a well-signed token whose session is not in the database to the login", async () => {
     requestWithCookie(await signed());
 
     await expect(requireAdmin()).rejects.toThrow(LOGIN_REDIRECT);
-    expect(redirect).toHaveBeenCalledExactlyOnceWith("/admin/login");
+    expect(redirect).toHaveBeenCalledExactlyOnceWith(LOGIN_PATH_ENDED);
   });
 
   test("sends a session that was closed to the login, even with a perfectly good cookie", async () => {
@@ -167,6 +179,49 @@ describe("requireAdmin", () => {
 
     const [row] = await db.select().from(adminSessions).where(eq(adminSessions.id, quiet));
     expect(Date.now() - row.lastSeenAt.getTime()).toBeLessThan(MINUTE_MS);
+  });
+
+  test("remembers the page the request came from, so signing in again comes back to the form", async () => {
+    // Un Server Action sale con el `Referer` de la página del formulario.
+    requestFrom(`http://${HOST}/admin/ventas/nueva`);
+    const closed = await createSessionToken(liveSessionId);
+    await revokeSession(db, liveSessionId);
+    requestWithCookie(closed);
+
+    await expect(requireAdmin()).rejects.toThrow(
+      "NEXT_REDIRECT /admin/login?next=%2Fadmin%2Fventas%2Fnueva&error=vencida",
+    );
+  });
+
+  test("keeps the query of that page too", async () => {
+    requestFrom(`http://${HOST}/admin/ventas?mes=2026-10`);
+    requestWithCookie(await signed());
+
+    await expect(requireAdmin()).rejects.toThrow(
+      "NEXT_REDIRECT /admin/login?next=%2Fadmin%2Fventas%3Fmes%3D2026-10&error=vencida",
+    );
+  });
+
+  test.each([
+    ["another site", "https://sitio-malo.com/admin/ventas/nueva", HOST],
+    ["a page that is not the panel", `http://${HOST}/es`, HOST],
+    ["the login itself", `http://${HOST}/admin/login`, HOST],
+    ["nothing", undefined, HOST],
+    ["a request with no host", `http://${HOST}/admin/ventas/nueva`, null],
+  ])("does not ask to come back anywhere when the request came from %s", async (_label, referer, host) => {
+    requestFrom(referer, host);
+    requestWithCookie(await signed());
+
+    await expect(requireAdmin()).rejects.toThrow(LOGIN_REDIRECT);
+    expect(redirect).toHaveBeenCalledExactlyOnceWith(LOGIN_PATH_ENDED);
+  });
+
+  test("does not look at the request's headers while the session is good", async () => {
+    requestWithCookie(await createSessionToken(liveSessionId));
+
+    await requireAdmin();
+
+    expect(headers).not.toHaveBeenCalled();
   });
 
   test("sends everything to the setup page when the panel is not configured", async () => {

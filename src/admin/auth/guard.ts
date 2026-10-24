@@ -9,6 +9,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getMissingConfig } from "./config";
+import { SESSION_ENDED_ERROR } from "./login-errors";
 import { LOGIN_PATH, PANEL_PATH, SETUP_PATH, safeNextPath } from "./redirect";
 import { ADMIN_COOKIE, verifySessionToken } from "./session";
 
@@ -110,10 +111,15 @@ function redirectTo(request: NextRequest, pathname: string, next?: string): Next
   return withPanelHeaders(NextResponse.redirect(url, isRead ? 307 : 303));
 }
 
-/** Una ruta del panel con `?next=` si hay a dónde volver, como texto relativo (el valor de `x-action-redirect`). */
-function pathWithNext(pathname: string, next?: string): string {
-  if (!next) return pathname;
-  return `${pathname}?${new URLSearchParams({ next })}`;
+/**
+ * Una ruta del panel con `?next=` si hay a dónde volver y `?error=` si hay un aviso para mostrar, como
+ * texto relativo (el valor de `x-action-redirect`). Mismo orden que `loginPath`: primero `next`.
+ */
+function pathWithNext(pathname: string, next?: string, error?: string): string {
+  const params = new URLSearchParams();
+  if (next) params.set("next", next);
+  if (error) params.set("error", error);
+  return params.size > 0 ? `${pathname}?${params}` : pathname;
 }
 
 /** Adónde volver tras el login: la dirección pedida, sin el parámetro interno del router. */
@@ -175,6 +181,8 @@ export async function guardAdmin(request: NextRequest): Promise<NextResponse> {
   }
 
   const destination = destinationOf(request);
-  if (isServerAction) return unauthorizedAction(pathWithNext(LOGIN_PATH, destination));
+  // Un Server Action sin sesión es alguien que estaba usando el panel: el login avisa que la sesión
+  // se cerró y deja la marca para recuperar lo escrito. Una visita común sin sesión no lo es.
+  if (isServerAction) return unauthorizedAction(pathWithNext(LOGIN_PATH, destination, SESSION_ENDED_ERROR));
   return redirectTo(request, LOGIN_PATH, destination);
 }

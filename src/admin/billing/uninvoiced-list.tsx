@@ -16,7 +16,10 @@ import type { UninvoicedGroupView, UninvoicedRowView } from "@/admin/billing/uni
 import { INVOICE_TYPES } from "@/admin/catalog";
 import { sumMinor } from "@/admin/metrics/math";
 import { saleHref } from "@/admin/routes";
+import { DRAFT_KEYS } from "@/admin/ui/draft-keys";
+import { DraftRestoredNotice } from "@/admin/ui/draft-restored-notice";
 import { Field } from "@/admin/ui/field";
+import { useFormDraft } from "@/admin/ui/form-draft";
 import { NoScriptNote } from "@/admin/ui/no-script-note";
 import { Notice } from "@/admin/ui/notice";
 import { PhoneSummary } from "@/admin/ui/phone-summary";
@@ -192,6 +195,7 @@ export function UninvoicedList({ groups, today, action, savedNotice }: Uninvoice
   const cancelRef = useRef<HTMLButtonElement>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
   const hydrated = useHydrated();
+  const draft = useFormDraft(formRef, DRAFT_KEYS.markInvoiced);
 
   // Una respuesta nueva del servidor: los errores vuelven a valer.
   if (state !== handledState) {
@@ -235,6 +239,14 @@ export function UninvoicedList({ groups, today, action, savedNotice }: Uninvoice
     for (const field of Object.keys(patch)) markEdited(field);
   }
 
+  /** Tira lo recuperado: nada elegido y la factura vuelve a arrancar vacía, con la fecha de hoy. */
+  function discardDraft() {
+    draft.discard();
+    setSelected(new Set());
+    setValues({ type: "", number: "", issuedOn: today });
+    setEditedFields(new Set());
+  }
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     // El botón que se tocó (`intent`) viaja con el formulario.
@@ -265,6 +277,7 @@ export function UninvoicedList({ groups, today, action, savedNotice }: Uninvoice
       data-hydrated={hydrated ? "true" : "false"}
       className="mt-5"
     >
+      {draft.restored ? <DraftRestoredNotice onDiscard={discardDraft} className="mb-4" /> : null}
       {savedNotice && state === INITIAL_INVOICING_FORM_STATE ? (
         <Notice tone="ok" className="mb-4">
           {savedNotice}

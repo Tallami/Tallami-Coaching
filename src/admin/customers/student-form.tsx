@@ -20,7 +20,9 @@ import {
   MAX_NAME_LENGTH,
   MAX_NOTES_LENGTH,
 } from "@/admin/customers/limits";
+import { DraftRestoredNotice } from "@/admin/ui/draft-restored-notice";
 import { Field } from "@/admin/ui/field";
+import { useFormDraft } from "@/admin/ui/form-draft";
 import { NoScriptNote } from "@/admin/ui/no-script-note";
 import { Notice } from "@/admin/ui/notice";
 import { useHydrated } from "@/admin/ui/use-hydrated";
@@ -30,6 +32,8 @@ import { Textarea } from "@/components/ui/textarea";
 
 export interface StudentFormProps {
   mode: "create" | "edit";
+  /** La clave del borrador de este formulario (`DRAFT_KEYS.newStudent`, o `DRAFT_KEYS.student(id)` al editar). */
+  draftKey: string;
   /** La acción que guarda; ante un problema devuelve el estado con los errores. */
   action: (state: StudentFormState, formData: FormData) => Promise<StudentFormState>;
   initialValues: StudentFormValues;
@@ -54,7 +58,7 @@ export interface StudentFormProps {
  * guardar (el país en mayúsculas), la página pasa un `key` nuevo para que el
  * formulario vuelva a armarse con lo guardado.
  */
-export function StudentForm({ mode, action, initialValues, cancelHref, savedNotice }: StudentFormProps) {
+export function StudentForm({ mode, draftKey, action, initialValues, cancelHref, savedNotice }: StudentFormProps) {
   const [values, setValues] = useState(initialValues);
   const [state, dispatch, isSaving] = useActionState(action, INITIAL_STUDENT_FORM_STATE);
   const [, startTransition] = useTransition();
@@ -63,6 +67,7 @@ export function StudentForm({ mode, action, initialValues, cancelHref, savedNoti
   const formRef = useRef<HTMLFormElement>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
   const hydrated = useHydrated();
+  const draft = useFormDraft(formRef, draftKey);
 
   // Una respuesta nueva del servidor: los errores vuelven a valer.
   if (state !== handledState) {
@@ -81,6 +86,13 @@ export function StudentForm({ mode, action, initialValues, cancelHref, savedNoti
       formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]') ?? summaryRef.current;
     target?.focus();
   }, [state]);
+
+  /** Tira lo recuperado: el formulario vuelve a los valores con los que se abrió. */
+  function discardDraft() {
+    draft.discard();
+    setValues(initialValues);
+    setEditedFields(new Set());
+  }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -103,6 +115,7 @@ export function StudentForm({ mode, action, initialValues, cancelHref, savedNoti
       data-hydrated={hydrated ? "true" : "false"}
       className="border-2 border-ink bg-white"
     >
+      {draft.restored ? <DraftRestoredNotice onDiscard={discardDraft} /> : null}
       {savedNotice && state === INITIAL_STUDENT_FORM_STATE ? <Notice tone="ok">{savedNotice}</Notice> : null}
       <div ref={summaryRef} tabIndex={-1} className="outline-offset-0 empty:hidden">
         {state.formError ? (

@@ -29,7 +29,9 @@ import { INITIAL_SALE_FORM_STATE, type SaleFormState } from "@/admin/sales/form-
 import { MAX_DESCRIPTION_LENGTH, MAX_SALE_NOTES_LENGTH } from "@/admin/sales/limits";
 import { RateFields } from "@/admin/sales/rate-fields";
 import { ADMIN_ROUTES } from "@/admin/routes";
+import { DraftRestoredNotice } from "@/admin/ui/draft-restored-notice";
 import { Field } from "@/admin/ui/field";
+import { useFormDraft } from "@/admin/ui/form-draft";
 import { NoScriptNote } from "@/admin/ui/no-script-note";
 import { Notice } from "@/admin/ui/notice";
 import { useHydrated } from "@/admin/ui/use-hydrated";
@@ -41,6 +43,8 @@ import { formatMoney } from "@/lib/money";
 
 export interface SaleFormProps {
   mode: "create" | "edit";
+  /** La clave del borrador de este formulario (`DRAFT_KEYS.newSale`, o `DRAFT_KEYS.sale(id)` al editar). */
+  draftKey: string;
   /** La acción que guarda; ante un problema devuelve el estado con los errores. */
   action: (state: SaleFormState, formData: FormData) => Promise<SaleFormState>;
   initialValues: SaleFormValues;
@@ -101,7 +105,7 @@ const threeColumns = "grid grid-cols-3 gap-x-5 gap-y-5 narrow:grid-cols-1";
  * error y hay que conservar lo escrito. Por lo mismo, el botón de guardar
  * espera a que la página esté lista.
  */
-export function SaleForm({ mode, action, initialValues, priceListUsd, invoiced = false }: SaleFormProps) {
+export function SaleForm({ mode, draftKey, action, initialValues, priceListUsd, invoiced = false }: SaleFormProps) {
   const [values, setValues] = useState(initialValues);
   const [autoFilledAmount, setAutoFilledAmount] = useState<string | null>(null);
   const [state, dispatch, isSaving] = useActionState(action, INITIAL_SALE_FORM_STATE);
@@ -111,6 +115,7 @@ export function SaleForm({ mode, action, initialValues, priceListUsd, invoiced =
   const formRef = useRef<HTMLFormElement>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
   const hydrated = useHydrated();
+  const draft = useFormDraft(formRef, draftKey);
 
   // Una respuesta nueva del servidor: los errores vuelven a valer y, si no hay
   // dólar oficial, el formulario pasa al tipo de cambio manual.
@@ -134,6 +139,14 @@ export function SaleForm({ mode, action, initialValues, priceListUsd, invoiced =
       summaryRef.current;
     target?.focus();
   }, [state]);
+
+  /** Tira lo recuperado: el formulario vuelve a los valores con los que se abrió. */
+  function discardDraft() {
+    draft.discard();
+    setValues(initialValues);
+    setAutoFilledAmount(null);
+    setEditedFields(new Set());
+  }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -167,6 +180,7 @@ export function SaleForm({ mode, action, initialValues, priceListUsd, invoiced =
       data-hydrated={hydrated ? "true" : "false"}
       className="border-2 border-ink bg-white"
     >
+      {draft.restored ? <DraftRestoredNotice onDiscard={discardDraft} /> : null}
       <div ref={summaryRef} tabIndex={-1} className="outline-offset-0 empty:hidden">
         {state.formError ? (
           <Notice tone="error" className="border-l-8">

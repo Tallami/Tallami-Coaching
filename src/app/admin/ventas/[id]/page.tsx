@@ -10,6 +10,7 @@ import { priceListUsd } from "@/admin/sales/price-list";
 import { getSale } from "@/admin/sales/repository";
 import { SaleForm } from "@/admin/sales/sale-form";
 import { SavedValues } from "@/admin/sales/saved-values";
+import { DRAFT_KEYS } from "@/admin/ui/draft-keys";
 import { EmptyState } from "@/admin/ui/empty-state";
 import { Notice } from "@/admin/ui/notice";
 import { PageHeader } from "@/admin/ui/page-header";
@@ -63,6 +64,7 @@ export default async function EditSalePage(props: PageProps<"/admin/ventas/[id]"
       />
       <SaleForm
         mode="edit"
+        draftKey={DRAFT_KEYS.sale(sale.id)}
         action={updateSaleAction.bind(null, sale.id)}
         initialValues={saleToFormValues(sale)}
         priceListUsd={priceListUsd()}

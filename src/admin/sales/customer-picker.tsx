@@ -75,7 +75,24 @@ export function CustomerPicker({ values, errors, onChange }: CustomerPickerProps
 
       {values.customerMode === "existing" ? (
         <>
-          <input type="hidden" name="customerId" value={values.customerId} />
+          {/*
+            El alumno elegido vive en el estado, no en un campo de texto: los dos campos ocultos (`data-draft`)
+            entran al borrador y, al recuperarlo, avisan con `input` para que el estado los tome.
+          */}
+          <input
+            type="hidden"
+            name="customerId"
+            value={values.customerId}
+            data-draft=""
+            onInput={(event) => onChange({ customerId: event.currentTarget.value })}
+          />
+          <input
+            type="hidden"
+            name="customerLabel"
+            value={values.customerLabel}
+            data-draft=""
+            onInput={(event) => onChange({ customerLabel: event.currentTarget.value })}
+          />
           {values.customerId ? (
             <div className="flex flex-wrap items-center justify-between gap-3 border-2 border-ink bg-paper px-4 py-3">
               <p className="min-w-0 font-bold break-words">{values.customerLabel}</p>
