@@ -20,7 +20,7 @@ interface PanelErrorProps {
 export function PanelError({ retry, loginHref }: PanelErrorProps) {
   return (
     <main className="stage grid min-h-dvh place-items-center px-gutter py-12">
-      <div role="alert" className="w-full max-w-lg border-t-[6px] border-gold bg-paper p-8 text-ink">
+      <div role="alert" className="on-paper w-full max-w-lg border-t-[6px] border-gold bg-paper p-8 text-ink">
         <Monogram />
         <h1 className="mt-5 text-3xl font-extrabold leading-tight">Algo salió mal</h1>
         <p className="mt-3 text-ink-2">

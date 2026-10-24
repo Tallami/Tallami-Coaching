@@ -166,8 +166,7 @@ describe("ask", () => {
     });
 
     const answer = ask("> ", input, output);
-    input.write(`${RESET_CONFIRMATION}
-`);
+    input.write(`${RESET_CONFIRMATION}\r\n`);
 
     expect(isConfirmed(await answer)).toBe(true);
     expect(shown).toContain("> ");
@@ -207,6 +206,8 @@ describe("describeTarget", () => {
     expect(describeTarget({})).toContain(".data/pglite");
     expect(describeTarget({ DATABASE_URL: "   ", PGLITE_DIR: "  " })).toContain(".data/pglite");
     expect(describeTarget({})).toContain("local");
+    // El mismo valor que abre la base (`getPgliteDir`): sin los espacios de los costados.
+    expect(describeTarget({ PGLITE_DIR: "  /tmp/mi-base \n" })).toBe("la base local (PGlite), en la carpeta /tmp/mi-base");
   });
 });
 
@@ -226,11 +227,18 @@ describe("describeAlertOutcome", () => {
   const cases: Array<[string, AlertStatus, string]> = [
     ["not configured", { kind: "off" }, "sin configurar"],
     ["a wrong address", { kind: "invalid", variable: "ADMIN_ALERT_EMAIL" }, "ADMIN_ALERT_EMAIL"],
-    ["a configured one", { kind: "active", maskedEmail: "t***@gmail.com", usesTestSender: true }, "t***@gmail.com"],
+    ["a configured one", { kind: "active", maskedEmail: "t***@gmail.com", usesTestSender: true }, "se intentó mandar a t***@gmail.com"],
   ];
 
   test.each(cases)("%s", (_label, status, expected) => {
     expect(describeAlertOutcome(status)).toContain(expected);
+  });
+
+  test("never says the email was sent: sendSecurityAlert swallows its failures, so all it knows is that it tried", () => {
+    const text = describeAlertOutcome({ kind: "active", maskedEmail: "t***@gmail.com", usesTestSender: false });
+
+    expect(text).not.toMatch(/se mandó/);
+    expect(text).toContain("Si algo falló, el motivo aparece arriba");
   });
 });
 

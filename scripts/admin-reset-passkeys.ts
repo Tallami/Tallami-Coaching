@@ -26,9 +26,9 @@ import { pathToFileURL } from "node:url";
 import { getAlertStatus, type AlertStatus } from "../src/admin/alerts/config";
 import { sendSecurityAlert } from "../src/admin/alerts/send";
 import { resetPasskeys, type PasskeyResetResult } from "../src/admin/auth/reset-passkeys";
-import { DEFAULT_PGLITE_DIR, getDb, type Db } from "../src/db/client";
+import { getDb, type Db } from "../src/db/client";
 import { closeDb } from "../src/db/close";
-import { getDatabaseUrl } from "../src/db/config";
+import { getDatabaseUrl, getPgliteDir } from "../src/db/config";
 
 /** La frase que hay que escribir, tal cual, para borrar. */
 export const RESET_CONFIRMATION = "BORRAR LLAVES";
@@ -66,7 +66,7 @@ export function describeTarget(env: { DATABASE_URL?: string; PGLITE_DIR?: string
       ? `la base remota de DATABASE_URL (servidor ${host})`
       : "la base remota de DATABASE_URL";
   }
-  return `la base local (PGlite), en la carpeta ${env.PGLITE_DIR?.trim() || DEFAULT_PGLITE_DIR}`;
+  return `la base local (PGlite), en la carpeta ${getPgliteDir(env)}`;
 }
 
 function counted(amount: number, singular: string, plural: string): string {
@@ -95,7 +95,8 @@ export function describeAlertOutcome(status: AlertStatus): string {
   if (status.kind === "invalid") {
     return `Aviso por email: no se mandó, ${status.variable} no es una dirección de email.`;
   }
-  return `Aviso por email: se mandó a ${status.maskedEmail}. Si algo falló, el motivo aparece arriba.`;
+  // `sendSecurityAlert` no tira nunca: un fallo solo queda en el log, así que acá se sabe que se intentó, no que salió.
+  return `Aviso por email: se intentó mandar a ${status.maskedEmail}. Si algo falló, el motivo aparece arriba.`;
 }
 
 /**

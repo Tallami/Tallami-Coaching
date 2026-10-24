@@ -11,6 +11,7 @@ import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { PanelError } from "../../src/components/admin/panel-error";
 import { SetupChecklist } from "../../src/components/admin/setup-checklist";
 import { expect, loginAsAdmin, test } from "../helpers/admin";
 import { demoToday } from "../helpers/demo";
@@ -286,6 +287,28 @@ test.describe("panel pages without a session", () => {
 
       expect(await blockingViolations(page)).toEqual([]);
       expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+    });
+  }
+
+  // La pantalla que reemplaza a la página de error de Next (`error.tsx`): es una tarjeta clara sobre el
+  // escenario, como la del ingreso, y su aro de foco tiene que verse. Se arma con el mismo componente y
+  // se pone en la página real, con sus estilos.
+  for (const width of AXE_WIDTHS) {
+    test(`the error screen has no serious or critical axe violations, no horizontal scroll and a visible focus ring at ${width}px`, async ({
+      page,
+    }) => {
+      const markup = renderToStaticMarkup(createElement(PanelError, { retry: () => {}, loginHref: "/admin/login" }));
+      await page.setViewportSize({ width, height: VIEWPORT_HEIGHT });
+      await page.goto("/admin/login");
+      await expect(page.getByRole("button", { name: "Ingresar" })).toBeVisible();
+      await page.evaluate((html) => {
+        document.body.innerHTML = html;
+      }, markup);
+      await expect(page.getByRole("heading", { name: "Algo salió mal", level: 1 })).toBeVisible();
+
+      expect(await blockingViolations(page)).toEqual([]);
+      expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+      expect(await focusRingProblems(page)).toEqual([]);
     });
   }
 

@@ -83,10 +83,18 @@ function readFocusRing(): FocusReading | null {
   const text = (element.getAttribute("aria-label") ?? element.textContent ?? "").trim().replace(/\s+/g, " ");
   const type = element.getAttribute("type");
   const name = element.getAttribute("name") ?? element.id;
-  element.dataset.focusAuditSeq ??= String(document.querySelectorAll("[data-focus-audit-seq]").length);
+  // Un contador que solo sube: contar los elementos que ya tienen número repetiría uno si la página
+  // saca del DOM un elemento ya medido, y la revisión creería que dio la vuelta y cortaría antes de tiempo.
+  const counter = window as unknown as { __focusAuditCount?: number };
+  let seq = element.dataset.focusAuditSeq;
+  if (seq === undefined) {
+    counter.__focusAuditCount = (counter.__focusAuditCount ?? 0) + 1;
+    seq = String(counter.__focusAuditCount);
+    element.dataset.focusAuditSeq = seq;
+  }
 
   return {
-    seq: element.dataset.focusAuditSeq,
+    seq,
     label: `<${element.tagName.toLowerCase()}${type ? ` type=${type}` : ""}${name ? ` name=${name}` : ""}> ${text.slice(0, 50)}`,
     isNativeInnerControl:
       ["date", "datetime-local", "month", "week", "time"].includes(type ?? "") && !element.matches(":focus-visible"),
@@ -102,14 +110,17 @@ function readFocusRing(): FocusReading | null {
  * no cierra el ciclo (trampa de teclado) se corta en el tope y falla. Si no llega a
  * medir ningún elemento también falla: una revisión que no midió nada no prueba nada.
  */
-export async function focusRingProblems(page: Page): Promise<string[]> {
+export async function focusRingProblems(
+  page: Page,
+  { maxTabPresses = MAX_TAB_PRESSES }: { maxTabPresses?: number } = {},
+): Promise<string[]> {
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   const problems: string[] = [];
   let firstSeq: string | null = null;
   let measured = 0;
   let closedCycle = false;
 
-  for (let press = 0; press < MAX_TAB_PRESSES; press += 1) {
+  for (let press = 0; press < maxTabPresses; press += 1) {
     await page.keyboard.press("Tab");
     const reading = await page.evaluate(readFocusRing);
     // Antes del primer elemento, un Tab que cae fuera de la página (la barra del navegador) no cierra nada: se sigue.
@@ -128,7 +139,7 @@ export async function focusRingProblems(page: Page): Promise<string[]> {
     }
   }
   if (measured === 0) problems.push("Tab no llegó a ningún elemento: la revisión no midió nada");
-  else if (!closedCycle) problems.push(`Tab no cierra el ciclo en ${MAX_TAB_PRESSES} pulsaciones: ¿trampa de teclado?`);
+  else if (!closedCycle) problems.push(`Tab no cierra el ciclo en ${maxTabPresses} pulsaciones: ¿trampa de teclado?`);
   return problems;
 }
 

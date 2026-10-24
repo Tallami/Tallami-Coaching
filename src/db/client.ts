@@ -14,14 +14,11 @@
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { getDatabaseUrl, isDbConfigured } from "./config";
+import { getDatabaseUrl, getPgliteDir, isDbConfigured } from "./config";
 import * as schema from "./schema";
 
 /** Base de datos con el schema del panel, sea cual sea el driver. */
 export type Db = PgDatabase<PgQueryResultHKT, typeof schema>;
-
-/** Carpeta de PGlite cuando no se define `PGLITE_DIR`. */
-export const DEFAULT_PGLITE_DIR = ".data/pglite";
 
 /**
  * Opciones de postgres.js para la base remota (Supabase, pooler de transacciones).
@@ -77,7 +74,7 @@ async function openDb(): Promise<Db> {
     throw new DbNotConfiguredError();
   }
   const { openPglite } = await import("./pglite");
-  return openPglite(process.env.PGLITE_DIR || DEFAULT_PGLITE_DIR);
+  return openPglite(getPgliteDir());
 }
 
 /** La base del panel; se abre una vez por proceso. */

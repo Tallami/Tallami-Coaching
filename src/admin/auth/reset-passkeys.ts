@@ -11,8 +11,9 @@
 // - borra los ingresos a medio camino y los códigos para otro dispositivo: ni un ingreso
 //   que ya había pasado la contraseña ni un código generado antes sirven después.
 //
-// Lo último que hace es borrar los códigos: si algo falla, no queda hecha la mitad
-// (llaves borradas con sesiones abiertas, o al revés).
+// Es la transacción la que garantiza que no queda hecha la mitad (llaves borradas con
+// sesiones abiertas, o al revés): si cualquier paso falla se deshace todo. El orden no
+// importa para eso; el test lo prueba haciendo fallar el último paso.
 //
 // El siguiente ingreso con la contraseña ya no encuentra llaves y lleva a "registrar la
 // primera llave" (`loadLoginStep`), como el primer día.

@@ -10,8 +10,10 @@
 // ese texto, así que el comando se niega con `DATABASE_URL` (una base remota), sin
 // `PGLITE_DIR` (sería la base local de desarrollo, `.data/pglite`) y con una carpeta que no
 // esté dentro de la carpeta temporal del sistema, que es donde viven todas las bases de los e2e
-// (`admin-server.ts`). Repetirlo no duplica nada: una llave que ya está no se vuelve a guardar.
+// (`admin-server.ts`); la comparación es entre rutas reales, así que un enlace dentro de esa
+// carpeta que lleva a otro lado tampoco pasa. Repetirlo no duplica nada: una llave que ya está no se vuelve a guardar.
 
+import { lstatSync, realpathSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -43,9 +45,33 @@ export async function seedE2ePasskeys(db: Db): Promise<number> {
   return added;
 }
 
-/** `child` está estrictamente dentro de `parent` (no es el mismo y no sale de él con `..`). */
+/**
+ * La ruta real de `target`: sigue los enlaces del tramo que ya existe y deja igual el resto, que
+ * todavía no existe y por eso no puede ser un enlace (la base lo crea al abrirse). Tira si el tramo
+ * que existe no se puede resolver (por ejemplo, un enlace que lleva a una carpeta que no está).
+ */
+function realPathOf(target: string): string {
+  const absolute = path.resolve(target);
+  let existing = absolute;
+  const missing: string[] = [];
+  // `lstat` y no `existsSync`: un enlace roto existe aunque lo que apunta no.
+  while (lstatSync(existing, { throwIfNoEntry: false }) === undefined) {
+    const parent = path.dirname(existing);
+    if (parent === existing) return absolute;
+    missing.unshift(path.basename(existing));
+    existing = parent;
+  }
+  return path.join(realpathSync(existing), ...missing);
+}
+
+/** `child` está estrictamente dentro de `parent` (no es el mismo y no sale de él con `..`), comparando rutas reales. */
 function isStrictlyInside(parent: string, child: string): boolean {
-  const relative = path.relative(path.resolve(parent), path.resolve(child));
+  let relative: string;
+  try {
+    relative = path.relative(realPathOf(parent), realPathOf(child));
+  } catch {
+    return false;
+  }
   return relative !== "" && relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
 }
 

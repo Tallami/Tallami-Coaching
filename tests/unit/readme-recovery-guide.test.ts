@@ -35,6 +35,30 @@ describe("the recovery guide of the README", () => {
     expect(guide).toContain(`\`${RESET_CONFIRMATION}\``);
   });
 
+  test("says where to get the connection string without sending him to Vercel, which does not show it once saved as a Secret", () => {
+    const guide = sectionOf("Guía de recuperación");
+    const step = guide.slice(guide.indexOf("\n1. "), guide.indexOf("\n2. "));
+
+    // La sección de cuentas manda guardar `DATABASE_URL` como «Secret»: en Vercel no se puede volver a leer.
+    expect(sectionOf("Seguridad de tus cuentas")).toContain("ya no se puede ver");
+    expect(step).not.toMatch(/`DATABASE_URL` en Vercel/);
+    // De dónde sale: de su administrador de contraseñas, o de Supabase (Connect), como en "Ponerlo en línea".
+    expect(step).toContain("administrador de contraseñas");
+    expect(step).toContain("Connect");
+    expect(step).toContain("[YOUR-PASSWORD]");
+  });
+
+  test("names the Supabase connection strings that work for the command and why", () => {
+    const guide = sectionOf("Guía de recuperación");
+    const step = guide.slice(guide.indexOf("\n1. "), guide.indexOf("\n2. "));
+
+    // La de las migraciones (directa o pooler de sesión) y también la del pooler de transacciones.
+    expect(step).toContain("Direct connection");
+    expect(step).toContain("Session pooler");
+    expect(step).toContain("Transaction pooler");
+    expect(step).toMatch(/sin sentencias preparadas/);
+  });
+
   test("covers losing one device, losing all of them and changing the domain", () => {
     const guide = sectionOf("Guía de recuperación");
 

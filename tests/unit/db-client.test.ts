@@ -5,6 +5,7 @@ import path from "node:path";
 import { count } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { REMOTE_DB_OPTIONS, DbNotConfiguredError, getDb, type Db } from "@/db/client";
+import { DEFAULT_PGLITE_DIR, getPgliteDir } from "@/db/config";
 import { customers } from "@/db/schema";
 
 // `getDb()` decide el driver con las variables de entorno y guarda la base en
@@ -46,6 +47,20 @@ describe("REMOTE_DB_OPTIONS", () => {
   });
 });
 
+describe("getPgliteDir", () => {
+  test("is the folder of PGLITE_DIR without the spaces around it", () => {
+    expect(getPgliteDir({ PGLITE_DIR: "/tmp/mi-base" })).toBe("/tmp/mi-base");
+    expect(getPgliteDir({ PGLITE_DIR: "  /tmp/mi-base \n" })).toBe("/tmp/mi-base");
+  });
+
+  test("is the development folder when PGLITE_DIR is missing or blank", () => {
+    expect(DEFAULT_PGLITE_DIR).toBe(".data/pglite");
+    expect(getPgliteDir({})).toBe(DEFAULT_PGLITE_DIR);
+    expect(getPgliteDir({ PGLITE_DIR: "" })).toBe(DEFAULT_PGLITE_DIR);
+    expect(getPgliteDir({ PGLITE_DIR: "   " })).toBe(DEFAULT_PGLITE_DIR);
+  });
+});
+
 describe("getDb", () => {
   let dataDir: string;
   // Con una carpeta madre que no existe, como `.data/pglite` en un clon nuevo.
@@ -63,6 +78,15 @@ describe("getDb", () => {
     await closeOpenDb();
     vi.unstubAllEnvs();
     await rm(dataDir, { recursive: true, force: true });
+  });
+
+  test("opens the folder of PGLITE_DIR without the spaces around it: the same one the recovery command names", async () => {
+    vi.stubEnv("PGLITE_DIR", `  ${pgliteDir}  `);
+
+    await getDb();
+
+    expect(existsSync(pgliteDir)).toBe(true);
+    expect(existsSync(`  ${pgliteDir}  `)).toBe(false);
   });
 
   test("on Vercel without DATABASE_URL it refuses instead of using PGlite", async () => {

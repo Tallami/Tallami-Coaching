@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -171,6 +171,62 @@ describe("seedE2ePasskeys", () => {
     ["a path that climbs out of the temp folder", path.join(os.tmpdir(), "..", "base-de-verdad")],
   ])("refuses %s", (_label, folder) => {
     expect(() => assertTestDatabase({ PGLITE_DIR: folder })).toThrow(/carpeta temporal/);
+  });
+
+  // Un enlace dentro de la carpeta temporal que lleva a una base de verdad no se puede dejar pasar por
+  // estar "adentro": se compara la ruta real. En Windows se usa una unión (junction), que no pide permisos;
+  // si el sistema no deja crear ningún tipo de enlace, el test se saltea.
+  describe("a link inside the system temp folder", () => {
+    let outsideTarget: string;
+    let link: string;
+
+    beforeEach(() => {
+      // Afuera de la carpeta temporal y dentro del proyecto (`test-results/` no se sube a git).
+      mkdirSync(path.join(process.cwd(), "test-results"), { recursive: true });
+      outsideTarget = mkdtempSync(path.join(process.cwd(), "test-results", "destino-del-enlace-"));
+      link = path.join(os.tmpdir(), `tallami-enlace-${process.pid}`);
+    });
+
+    afterEach(() => {
+      // Primero el enlace (sin entrar a lo que apunta) y después lo que apuntaba.
+      rmSync(link, { recursive: false, force: true });
+      rmSync(outsideTarget, { recursive: true, force: true });
+    });
+
+    function makeLink(context: { skip: (note?: string) => never }, to: string): void {
+      try {
+        symlinkSync(to, link, "junction");
+      } catch (error) {
+        context.skip(`No se pudo crear un enlace en esta máquina: ${String(error)}`);
+      }
+    }
+
+    test("pointing outside of it is refused, and so is anything inside the link, even a folder that does not exist yet", (context) => {
+      makeLink(context, outsideTarget);
+
+      expect(() => assertTestDatabase({ PGLITE_DIR: link })).toThrow(/carpeta temporal/);
+      expect(() => assertTestDatabase({ PGLITE_DIR: path.join(link, "db") })).toThrow(/carpeta temporal/);
+      expect(() => assertTestDatabase({ PGLITE_DIR: path.join(link, "db", "mas", "adentro") })).toThrow(/carpeta temporal/);
+    });
+
+    test("pointing to a folder that no longer exists is refused too, instead of letting the database create it somewhere else", (context) => {
+      makeLink(context, outsideTarget);
+      rmSync(outsideTarget, { recursive: true, force: true });
+
+      expect(() => assertTestDatabase({ PGLITE_DIR: path.join(link, "db") })).toThrow(/carpeta temporal/);
+    });
+
+    test("pointing to another folder inside the temp folder is allowed", (context) => {
+      const inside = mkdtempSync(path.join(os.tmpdir(), "tallami-destino-"));
+      try {
+        makeLink(context, inside);
+
+        expect(() => assertTestDatabase({ PGLITE_DIR: path.join(link, "db") })).not.toThrow();
+      } finally {
+        rmSync(link, { recursive: false, force: true });
+        rmSync(inside, { recursive: true, force: true });
+      }
+    });
   });
 
   test("the script itself refuses the development database before opening anything", () => {
