@@ -109,7 +109,9 @@ export function SettingsForm({ action, initialValues, footnote, children, savedN
       className="border-2 border-ink bg-white"
     >
       {draft.restored ? <DraftRestoredNotice onDiscard={discardDraft} /> : null}
-      {savedNotice && state === INITIAL_SETTINGS_FORM_STATE ? <Notice tone="ok">{savedNotice}</Notice> : null}
+      {savedNotice && state === INITIAL_SETTINGS_FORM_STATE && !draft.restored ? (
+        <Notice tone="ok">{savedNotice}</Notice>
+      ) : null}
       <div ref={summaryRef} tabIndex={-1} className="outline-offset-0 empty:hidden">
         {state.formError ? (
           <Notice tone="error" className="border-l-8">

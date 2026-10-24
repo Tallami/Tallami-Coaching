@@ -59,7 +59,7 @@ describe("the login after a session that ended", () => {
 
     await mount(createElement(LoginForm, { action: async () => {}, error: "vencida", next: "/admin/ventas/nueva" }));
 
-    expect(sessionStorage.getItem(CLAIM_KEY)).toBe(String(NOW));
+    expect(JSON.parse(sessionStorage.getItem(CLAIM_KEY) ?? "null")).toEqual({ at: NOW, next: "/admin/ventas/nueva" });
   });
 
   test.each([null, "invalid", "blocked", "unavailable", "expired"] as const)(
@@ -72,21 +72,24 @@ describe("the login after a session that ended", () => {
   );
 
   test("opening the same login again does not move the mark later", async () => {
-    saveDraft(sessionStorage, "venta:nueva", [["amount", "40"]], NOW);
-    markRecovery(sessionStorage, NOW + 2000);
+    saveDraft(sessionStorage, "venta:nueva", [["amount", "40"]], NOW, "/admin/ventas/nueva");
+    markRecovery(sessionStorage, NOW + 2000, "/admin/ventas/nueva");
     vi.spyOn(Date, "now").mockReturnValue(NOW + 30 * 60_000);
 
-    await mount(createElement(LoginForm, { action: async () => {}, error: "vencida", next: "/admin" }));
+    await mount(createElement(LoginForm, { action: async () => {}, error: "vencida", next: "/admin/ventas/nueva" }));
 
-    expect(sessionStorage.getItem(CLAIM_KEY)).toBe(String(NOW + 2000));
+    expect(JSON.parse(sessionStorage.getItem(CLAIM_KEY) ?? "null")).toEqual({
+      at: NOW + 2000,
+      next: "/admin/ventas/nueva",
+    });
   });
 });
 
 describe("ClearDraftsOnSubmit", () => {
   test("clears every draft and the mark when the form is sent, and still runs the action", async () => {
-    saveDraft(sessionStorage, "venta:nueva", [["amount", "40"]], NOW);
-    saveDraft(sessionStorage, "configuracion", [["category", "C"]], NOW);
-    markRecovery(sessionStorage, NOW + 1000);
+    saveDraft(sessionStorage, "venta:nueva", [["amount", "40"]], NOW, "/admin/ventas/nueva");
+    saveDraft(sessionStorage, "configuracion", [["category", "C"]], NOW, "/admin/configuracion");
+    markRecovery(sessionStorage, NOW + 1000, "/admin/ventas/nueva");
     sessionStorage.setItem("otra-cosa", "queda");
     const action = vi.fn(async () => {});
 

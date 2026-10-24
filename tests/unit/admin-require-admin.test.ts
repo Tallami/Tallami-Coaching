@@ -193,6 +193,16 @@ describe("requireAdmin", () => {
     );
   });
 
+  test("does not ask to come back to the one-shot flag of a result page", async () => {
+    // Guardó y quedó en `?guardada=1`; la sesión terminó al volver a enviar: el aviso de «guardada» ya no vale.
+    requestFrom(`http://${HOST}/admin/configuracion?guardada=1`);
+    requestWithCookie(await signed());
+
+    await expect(requireAdmin()).rejects.toThrow(
+      "NEXT_REDIRECT /admin/login?next=%2Fadmin%2Fconfiguracion&error=vencida",
+    );
+  });
+
   test("keeps the query of that page too", async () => {
     requestFrom(`http://${HOST}/admin/ventas?mes=2026-10`);
     requestWithCookie(await signed());

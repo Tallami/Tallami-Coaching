@@ -25,7 +25,7 @@ export function LoginForm({ action, error, next }: LoginFormProps) {
   return (
     <LoginCard subtitle="Acceso privado.">
       {/* Se llegó por una sesión que terminó: lo que se estaba escribiendo vuelve después de entrar. */}
-      {error === SESSION_ENDED_ERROR ? <RecoveryClaim /> : null}
+      {error === SESSION_ENDED_ERROR ? <RecoveryClaim next={next} /> : null}
       <form action={action} className="mt-8 flex flex-col gap-5">
         <input type="hidden" name="next" value={next} />
         <div className="flex flex-col gap-2">

@@ -47,6 +47,20 @@ describe("sameOriginReferer", () => {
     expect(sameOriginReferer(request(headers))).toBeUndefined();
   });
 
+  test("leaves out the one-shot flags of a result page: coming back must not show \"guardada\" over data that was not saved", () => {
+    const from = (referer: string) => sameOriginReferer(request({ host: "tallami.com", referer }));
+
+    expect(from("https://tallami.com/admin/configuracion?guardada=1")).toBe("/admin/configuracion");
+    expect(from("https://tallami.com/admin/facturacion?guardada=facturadas&cantidad=3&periodo=este-mes")).toBe(
+      "/admin/facturacion?periodo=este-mes",
+    );
+    expect(from("https://tallami.com/admin/alumnos/6a3f?guardado=editado")).toBe("/admin/alumnos/6a3f");
+    expect(from("https://tallami.com/admin/ventas?exportacion=error&q=ana")).toBe("/admin/ventas?q=ana");
+    expect(from("https://tallami.com/admin/ventas/6a3f?factura=pendiente")).toBe("/admin/ventas/6a3f");
+    // `factura` en la lista de ventas es un filtro de verdad.
+    expect(from("https://tallami.com/admin/ventas?factura=issued")).toBe("/admin/ventas?factura=issued");
+  });
+
   test("goes through the login path's own safety check: only panel pages come back", () => {
     const toLogin = (referer: string) =>
       loginPath({ next: sameOriginReferer(request({ host: "tallami.com", referer })), error: "vencida" });

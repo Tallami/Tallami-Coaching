@@ -4,12 +4,14 @@
 // funcionando igual, sin borradores.
 //
 // Cómo se decide qué vuelve (no se puede saber, al enviar, si el envío va a salir bien):
-// - Al enviar, el formulario deja un borrador "pendiente" con la hora.
+// - Al enviar, el formulario deja un borrador "pendiente" con la hora y la página donde se escribió.
 // - Si el envío salió bien, nadie lo toca: el formulario no vuelve a aparecer con eso.
 // - Si la sesión había terminado, `requireAdmin()` (o el `proxy`) manda al login con
-//   `?error=vencida`, y el login deja una "marca de recuperación" con la hora.
+//   `?error=vencida`, y el login deja una "marca de recuperación" con la hora y la página a la que
+//   vuelve (`next`).
 // - Al abrir un formulario con un borrador pendiente: si hay una marca posterior (y cercana) al
-//   borrador, es de ese envío y se recupera; si no, se tira. Un envío exitoso nunca reaparece.
+//   borrador y es de la página donde se escribió, es de ese envío y se recupera; si no, se tira.
+//   Un envío exitoso nunca reaparece.
 
 export const DRAFT_PREFIX = "tallami-draft:";
 export const CLAIM_KEY = "tallami-draft-claim";
@@ -25,7 +27,15 @@ export type DraftField = readonly [name: string, value: string];
 export interface DraftRecord {
   /** Cuándo se envió el formulario (ms desde 1970). */
   at: number;
+  /** La página donde se escribió (ruta y búsqueda, sin avisos de un solo uso), como la anota el login en la marca. */
+  page: string;
   fields: readonly DraftField[];
+}
+
+/** La marca que deja el login: cuándo se llegó y a qué página se vuelve después de entrar. */
+interface Claim {
+  at: number;
+  next: string;
 }
 
 /** El almacenamiento de la pestaña, o `null` si el navegador no lo deja usar (modo privado, datos bloqueados). */
@@ -51,25 +61,40 @@ function parseDraft(raw: string | null): DraftRecord | null {
   try {
     const parsed: unknown = JSON.parse(raw);
     if (typeof parsed !== "object" || parsed === null) return null;
-    const { at, fields } = parsed as { at?: unknown; fields?: unknown };
+    const { at, page, fields } = parsed as { at?: unknown; page?: unknown; fields?: unknown };
     if (typeof at !== "number" || !Number.isFinite(at)) return null;
+    if (typeof page !== "string") return null;
     if (!Array.isArray(fields) || !fields.every(isField)) return null;
-    return { at, fields };
+    return { at, page, fields };
   } catch {
     // Un borrador ilegible es como no tener borrador: el que llama lo borra.
     return null;
   }
 }
 
-function parseClaim(raw: string | null): number | null {
+function parseClaim(raw: string | null): Claim | null {
   if (raw === null) return null;
-  const at = Number(raw);
-  return Number.isFinite(at) ? at : null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null) return null;
+    const { at, next } = parsed as { at?: unknown; next?: unknown };
+    if (typeof at !== "number" || !Number.isFinite(at) || typeof next !== "string") return null;
+    return { at, next };
+  } catch {
+    // Una marca ilegible es como no tener marca.
+    return null;
+  }
 }
 
-/** Guarda el borrador pendiente de `key`: lo que tenía el formulario al enviarse. */
-export function saveDraft(storage: Storage, key: string, fields: readonly DraftField[], now: number): void {
-  const record: DraftRecord = { at: now, fields };
+/** Guarda el borrador pendiente de `key`: lo que tenía el formulario al enviarse, y la `page` donde estaba. */
+export function saveDraft(
+  storage: Storage,
+  key: string,
+  fields: readonly DraftField[],
+  now: number,
+  page: string,
+): void {
+  const record: DraftRecord = { at: now, page, fields };
   try {
     storage.setItem(draftKey(key), JSON.stringify(record));
   } catch (error) {
@@ -93,9 +118,9 @@ export function takeRecoverableDraft(storage: Storage, key: string): DraftRecord
   removeDraft(storage, key);
   if (draft === null) return null;
 
-  const claimAt = parseClaim(storage.getItem(CLAIM_KEY));
-  const isRecoverable = claimAt !== null && claimAt >= draft.at && claimAt - draft.at <= CLAIM_WINDOW_MS;
-  if (!isRecoverable) return null;
+  const claim = parseClaim(storage.getItem(CLAIM_KEY));
+  if (claim === null || claim.next !== draft.page) return null;
+  if (claim.at < draft.at || claim.at - draft.at > CLAIM_WINDOW_MS) return null;
 
   storage.removeItem(CLAIM_KEY);
   return draft;
@@ -113,15 +138,17 @@ function newestDraftAt(storage: Storage): number {
 }
 
 /**
- * El login llegó por una sesión que terminó: deja la marca de recuperación. Si ya hay una marca
- * más nueva que todos los borradores (el mismo login que se recarga, un rato después), se conserva
- * la primera: la hora que cuenta es la del envío, no la de la recarga.
+ * El login llegó por una sesión que terminó: deja la marca de recuperación, con la página `next` a
+ * la que va a volver. Si ya hay una marca más nueva que todos los borradores (el mismo login que se
+ * recarga, un rato después), se conserva la primera: la hora que cuenta es la del envío, no la de la
+ * recarga.
  */
-export function markRecovery(storage: Storage, now: number): void {
+export function markRecovery(storage: Storage, now: number, next: string): void {
   const existing = parseClaim(storage.getItem(CLAIM_KEY));
-  if (existing !== null && existing >= newestDraftAt(storage)) return;
+  if (existing !== null && existing.at >= newestDraftAt(storage)) return;
   try {
-    storage.setItem(CLAIM_KEY, String(now));
+    const claim: Claim = { at: now, next };
+    storage.setItem(CLAIM_KEY, JSON.stringify(claim));
   } catch (error) {
     console.warn("Panel: no se pudo dejar la marca de recuperación.", error);
   }

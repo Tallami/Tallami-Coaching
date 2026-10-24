@@ -278,7 +278,7 @@ export function UninvoicedList({ groups, today, action, savedNotice }: Uninvoice
       className="mt-5"
     >
       {draft.restored ? <DraftRestoredNotice onDiscard={discardDraft} className="mb-4" /> : null}
-      {savedNotice && state === INITIAL_INVOICING_FORM_STATE ? (
+      {savedNotice && state === INITIAL_INVOICING_FORM_STATE && !draft.restored ? (
         <Notice tone="ok" className="mb-4">
           {savedNotice}
         </Notice>

@@ -2,10 +2,14 @@
 // único dato de «dónde estaba la persona» es el `Referer` del pedido: para un Server Action es la
 // página del formulario.
 
+import { dropOneShotParams } from "./return-path";
+
 /**
  * La ruta (con su búsqueda) de la página que hizo el pedido, solo si es de este mismo sitio; si
- * viene de afuera, no viene, o no se puede comparar, `undefined`. No decide si la ruta es del
- * panel: eso lo hace `safeNextPath` cuando se arma la dirección del login.
+ * viene de afuera, no viene, o no se puede comparar, `undefined`. Sin los parámetros de aviso de
+ * un solo uso (`?guardada=1`): volver a una página con «guardada» pondría el aviso sobre datos que
+ * no se guardaron. No decide si la ruta es del panel: eso lo hace `safeNextPath` cuando se arma la
+ * dirección del login.
  *
  * Se compara el host con el que se pidió (`x-forwarded-host` detrás de un proxy, `host` si no).
  */
@@ -22,5 +26,5 @@ export function sameOriginReferer(headers: Headers): string | undefined {
     return undefined;
   }
   if (referer.host !== host) return undefined;
-  return `${referer.pathname}${referer.search}`;
+  return dropOneShotParams(`${referer.pathname}${referer.search}`);
 }

@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 import {
+  Activity,
   StrictMode,
   act,
   createElement,
   useRef,
   useState,
   type ChangeEvent,
+  type ComponentType,
   type FormEvent,
   type ReactNode,
 } from "react";
@@ -24,6 +26,8 @@ import { useFormDraft } from "@/admin/ui/form-draft";
 const SERVICES = ["lesson", "other"] as const;
 const SALE_IDS = ["s1", "s2", "s3"] as const;
 const KEY = "venta:nueva";
+/** La página del formulario: el borrador se guarda con ella y la marca de recuperación vuelve a ella. */
+const PAGE = "/admin/ventas/nueva";
 
 interface FormState {
   name: string;
@@ -181,6 +185,7 @@ async function untilRestored(): Promise<void> {
 
 beforeEach(() => {
   sessionStorage.clear();
+  window.history.replaceState({}, "", PAGE);
   container = document.createElement("div");
   document.body.append(container);
 });
@@ -206,6 +211,17 @@ describe("useFormDraft: saving", () => {
       ["ids", "s3"],
     ]);
     expect(stored).not.toContain("secreta-123");
+  });
+
+  test("keeps the page it was written on, without the one-shot flags that a result page leaves in the address", async () => {
+    window.history.replaceState({}, "", `${PAGE}?guardada=creada&desde=2026-10-01`);
+    await mount(createElement(PanelLikeForm, { draftKey: KEY }));
+
+    await userSets("customerName", "Ana");
+    await userSends();
+
+    const stored = JSON.parse(sessionStorage.getItem(`${DRAFT_PREFIX}${KEY}`) ?? "null");
+    expect(stored.page).toBe(`${PAGE}?desde=2026-10-01`);
   });
 
   test("keeps nothing until the form is sent", async () => {
@@ -246,7 +262,7 @@ describe("useFormDraft: coming back", () => {
     await mount(createElement(PanelLikeForm, { draftKey: KEY }));
     await fillAndSend();
     await unmount();
-    markRecovery(sessionStorage, Date.now());
+    markRecovery(sessionStorage, Date.now(), PAGE);
 
     await mount(createElement(PanelLikeForm, { draftKey: KEY }));
     await untilRestored();
@@ -269,7 +285,7 @@ describe("useFormDraft: coming back", () => {
     await mount(createElement(PanelLikeForm, { draftKey: KEY }));
     await fillAndSend();
     await unmount();
-    markRecovery(sessionStorage, Date.now());
+    markRecovery(sessionStorage, Date.now(), PAGE);
     await mount(createElement(PanelLikeForm, { draftKey: KEY }));
     await untilRestored();
 
@@ -287,7 +303,7 @@ describe("useFormDraft: coming back", () => {
     await mount(createElement(PanelLikeForm, { draftKey: KEY }));
     await fillAndSend();
     await unmount();
-    markRecovery(sessionStorage, Date.now());
+    markRecovery(sessionStorage, Date.now(), PAGE);
 
     await mount(createElement(StrictMode, null, createElement(PanelLikeForm, { draftKey: KEY })));
     await untilRestored();
@@ -296,11 +312,36 @@ describe("useFormDraft: coming back", () => {
     expect(stateOf().picked).toEqual(["s1", "s3"]);
   });
 
+  test("a page that the router hides and shows again (Activity) keeps what was typed after it came back", async () => {
+    // Next conserva las pantallas anteriores ocultas: al volver a mostrarse sus efectos corren de nuevo, y el
+    // borrador que ya se recuperó no se vuelve a poner por encima de lo que se escribió después.
+    await mount(createElement(PanelLikeForm, { draftKey: KEY }));
+    await fillAndSend();
+    await unmount();
+    markRecovery(sessionStorage, Date.now(), PAGE);
+    // (`Activity` exige `children` en sus props; `createElement` los recibe aparte.)
+    const Screen = Activity as unknown as ComponentType<{ mode: "visible" | "hidden"; children?: ReactNode }>;
+    const page = (mode: "visible" | "hidden") =>
+      createElement(Screen, { mode }, createElement(PanelLikeForm, { draftKey: KEY }));
+    root = createRoot(container);
+    const mounted = root;
+    await act(async () => mounted.render(page("visible")));
+    await untilRestored();
+    await userSets("customerName", "Ana Pérez Gómez");
+
+    await act(async () => mounted.render(page("hidden")));
+    await act(async () => mounted.render(page("visible")));
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 30)));
+
+    expect(stateOf().name).toBe("Ana Pérez Gómez");
+    expect(stateOf().picked).toEqual(["s1", "s3"]);
+  });
+
   test("a recovery mark does not bring back the draft of another form", async () => {
     await mount(createElement(PanelLikeForm, { draftKey: KEY }));
     await fillAndSend();
     await unmount();
-    markRecovery(sessionStorage, Date.now());
+    markRecovery(sessionStorage, Date.now(), PAGE);
 
     await mount(createElement(PanelLikeForm, { draftKey: "alumno:nuevo" }));
     await act(async () => new Promise((resolve) => setTimeout(resolve, 30)));
@@ -310,11 +351,26 @@ describe("useFormDraft: coming back", () => {
     expect(sessionStorage.getItem(`${DRAFT_PREFIX}${KEY}`)).not.toBeNull();
   });
 
+  test("a mark written for another page does not bring it back: a sale that was saved stays saved", async () => {
+    await mount(createElement(PanelLikeForm, { draftKey: KEY }));
+    await fillAndSend();
+    await unmount();
+    // La sesión terminó en otra pantalla y el login volvería a esa.
+    markRecovery(sessionStorage, Date.now(), "/admin/alumnos/nuevo");
+
+    await mount(createElement(PanelLikeForm, { draftKey: KEY }));
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 30)));
+
+    expect(stateOf()).toEqual(EMPTY_STATE);
+    expect(formEl().dataset.restored).toBe("false");
+    expect(sessionStorage.getItem(`${DRAFT_PREFIX}${KEY}`)).toBeNull();
+  });
+
   test("the notice goes away and the draft is gone when it is discarded", async () => {
     await mount(createElement(PanelLikeForm, { draftKey: KEY }));
     await fillAndSend();
     await unmount();
-    markRecovery(sessionStorage, Date.now());
+    markRecovery(sessionStorage, Date.now(), PAGE);
     await mount(createElement(PanelLikeForm, { draftKey: KEY }));
     await untilRestored();
 
@@ -331,7 +387,7 @@ describe("useFormDraft: coming back", () => {
     await mount(createElement(PanelLikeForm, { draftKey: KEY }));
     await fillAndSend();
     await unmount();
-    markRecovery(sessionStorage, Date.now());
+    markRecovery(sessionStorage, Date.now(), PAGE);
     await mount(createElement(PanelLikeForm, { draftKey: KEY }));
     await untilRestored();
 

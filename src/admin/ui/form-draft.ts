@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import { returnPath } from "@/admin/auth/return-path";
 import { readFormFields, writeFormFields } from "./draft-fields";
 import { getDraftStorage, removeDraft, saveDraft, takeRecoverableDraft, type DraftRecord } from "./draft-store";
 
@@ -24,7 +25,9 @@ export interface FormDraft {
 
 export function useFormDraft(formRef: RefObject<HTMLFormElement | null>, key: string): FormDraft {
   const [restored, setRestored] = useState(false);
-  // En desarrollo React corre los efectos dos veces: el borrador se saca una sola vez por clave.
+  // El borrador se saca una sola vez por clave y se pone una sola vez: React corre los efectos dos veces en
+  // desarrollo, y Next deja ocultas las pantallas anteriores y las vuelve a mostrar (los efectos corren de nuevo
+  // con lo escrito después en el formulario, que un borrador ya recuperado no puede pisar).
   const taken = useRef<{ key: string; draft: DraftRecord | null } | null>(null);
 
   useEffect(() => {
@@ -33,7 +36,9 @@ export function useFormDraft(formRef: RefObject<HTMLFormElement | null>, key: st
     if (!form || !storage) return;
 
     const saveOnSubmit = () => {
-      saveDraft(storage, key, readFormFields(form), Date.now());
+      // La página con la que el login va a comparar (la misma cuenta que hace el servidor con el `Referer`).
+      const page = returnPath(`${window.location.pathname}${window.location.search}`);
+      saveDraft(storage, key, readFormFields(form), Date.now(), page);
       // Ya se mandó: el aviso de «recuperamos lo que habías escrito» deja de hacer falta.
       setRestored(false);
     };
@@ -48,8 +53,12 @@ export function useFormDraft(formRef: RefObject<HTMLFormElement | null>, key: st
       const restore = () => {
         pass += 1;
         const changed = writeFormFields(form, draft.fields);
-        if (changed > 0 && pass < MAX_RESTORE_PASSES) timer = window.setTimeout(restore, 0);
-        else setRestored(true);
+        if (changed > 0 && pass < MAX_RESTORE_PASSES) {
+          timer = window.setTimeout(restore, 0);
+          return;
+        }
+        taken.current = { key, draft: null };
+        setRestored(true);
       };
       timer = window.setTimeout(restore, 0);
     }

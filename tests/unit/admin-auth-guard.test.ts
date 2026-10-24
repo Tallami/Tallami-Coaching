@@ -312,6 +312,24 @@ describe("guardAdmin", () => {
     );
   });
 
+  test("the action redirect does not carry the one-shot flags of a result page, only the filters", async () => {
+    const from = async (path: string) =>
+      (await guardAdmin(get(path, { "next-action": "40abc" }, "POST"))).headers.get("x-action-redirect");
+
+    expect(await from("/admin/configuracion?guardada=1")).toBe(
+      "/admin/login?next=%2Fadmin%2Fconfiguracion&error=vencida;replace",
+    );
+    expect(await from("/admin/facturacion?guardada=facturadas&cantidad=3&periodo=este-mes&_rsc=abc")).toBe(
+      "/admin/login?next=%2Fadmin%2Ffacturacion%3Fperiodo%3Deste-mes&error=vencida;replace",
+    );
+    expect(await from("/admin/alumnos/6a3f?guardado=editado")).toBe(
+      "/admin/login?next=%2Fadmin%2Falumnos%2F6a3f&error=vencida;replace",
+    );
+    expect(await from("/admin/ventas?factura=issued")).toBe(
+      "/admin/login?next=%2Fadmin%2Fventas%3Ffactura%3Dissued&error=vencida;replace",
+    );
+  });
+
   test("the action redirect cannot be bent into another site or loop on the login", async () => {
     for (const path of ["/admin/login.segments/x", "/admin//evil.com", "/admin/%2e%2e/es"]) {
       const response = await guardAdmin(get(path, { "next-action": "40abc" }, "POST"));

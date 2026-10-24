@@ -319,6 +319,97 @@ test.describe("what was typed when the session ended", () => {
     await expect(page.getByLabel("Fecha de la factura")).toHaveValue(todayInArgentina());
   });
 
+  test("a sale saved moments ago does not come back when the session ends while moving to another page", async ({
+    context,
+    page,
+  }) => {
+    // Guardó bien una venta (queda su borrador pendiente) y, enseguida, la sesión se cerró desde otro dispositivo:
+    // al pasar a otra pantalla termina en el login. La marca es de la pantalla de la que venía, no de la venta.
+    const cookie = (await context.cookies()).find(({ name }) => name === ADMIN_COOKIE);
+    if (!cookie) throw new Error("El ingreso no dejó la cookie de sesión.");
+    await createSale(page, { student: uniqueName("Venta ya guardada") });
+    expect(await storedDrafts(page)).toEqual([`${DRAFT_PREFIX}venta:nueva`]);
+
+    await logOutFromAnotherTab(context);
+    await context.addCookies([cookie]);
+    await page.getByRole("navigation", { name: "Secciones del panel" }).getByRole("link", { name: "Alumnos" }).click();
+
+    // Vuelve a la pantalla de la que venía, sin el aviso de «guardada» que tenía la dirección.
+    await expectEndedLogin(page, /\/admin\/login\?next=%2Fadmin%2Fventas&error=vencida$/);
+    await signInAgain(page);
+    await expect(page).toHaveURL(/\/admin\/ventas$/);
+    await openNewSale(page);
+    await expectBlankSale(page);
+  });
+
+  test("the student form that was just saved: the saved notice does not show over what comes back", async ({
+    context,
+    page,
+  }) => {
+    const student = uniqueName("Alumna editada");
+    await page.goto("/admin/alumnos/nuevo");
+    await expect(page.locator("form[data-hydrated='true']")).toBeVisible();
+    await page.getByLabel("Nombre", { exact: true }).fill(student);
+    await page.getByRole("button", { name: "Guardar alumno" }).click();
+    // Después de guardar se queda en la ficha, con el aviso de un solo uso en la dirección.
+    await expect(page).toHaveURL(/\/admin\/alumnos\/[0-9a-f-]+\?guardado=creado$/);
+    await expect(page.getByRole("status").filter({ hasText: "Alumno guardado." })).toBeVisible();
+    // Next deja la pantalla anterior oculta debajo de la ficha: se trabaja solo con lo visible.
+    await whenInteractive(page.getByRole("button", { name: "Guardar cambios" }));
+    const nameField = page.getByLabel("Nombre", { exact: true }).locator("visible=true");
+    await expect(nameField).toHaveValue(student);
+    await nameField.fill(`${student} Gómez`);
+    await context.clearCookies();
+    await page.getByRole("button", { name: "Guardar cambios" }).click();
+    await expectEndedLogin(page, /\/admin\/login\?next=%2Fadmin%2Falumnos%2F[0-9a-f-]+&error=vencida$/);
+    await signInAgain(page);
+
+    // La dirección vuelve sin `?guardado=`: solo el aviso de lo recuperado, sobre lo que no se guardó.
+    await expect(page).toHaveURL(/\/admin\/alumnos\/[0-9a-f-]+$/);
+    await expect(DRAFT_NOTICE(page)).toBeVisible();
+    await expect(page.getByLabel("Nombre", { exact: true })).toHaveValue(`${student} Gómez`);
+    await expect(page.getByText("Alumno guardado.")).toHaveCount(0);
+    await expect(page.getByText("Cambios guardados.")).toHaveCount(0);
+  });
+
+  test("Por facturar right after marking: the 'marcadas' notice does not show over the selection that comes back", async ({
+    context,
+    page,
+  }) => {
+    const [first, second, third] = [
+      uniqueName("Ana ya facturada"),
+      uniqueName("Beto ya facturado"),
+      uniqueName("Caro por facturar"),
+    ];
+    for (const student of [first, second, third]) await createSale(page, { student });
+    await page.goto(BILLING_PATH);
+    await expect(page.locator("form[data-hydrated='true']")).toBeVisible();
+    const pickerOf = (student: string) =>
+      page.getByRole("checkbox", { name: new RegExp(`Elegir la venta de ${student}`) });
+    await pickerOf(first).check();
+    await pickerOf(second).check();
+    await page.getByLabel("Tipo de factura").selectOption("C");
+    await page.getByLabel("Número de factura").fill(`00003-${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}`);
+    await page.getByRole("button", { name: "Marcar como facturadas" }).click();
+    await expect(page).toHaveURL(/\/admin\/facturacion\?guardada=facturadas&cantidad=2$/);
+    await expect(page.getByRole("status").filter({ hasText: "2 ventas marcadas como facturadas." })).toBeVisible();
+    await whenInteractive(page.getByRole("button", { name: "Marcar como facturadas" }));
+
+    // La lista se armó de nuevo con lo que falta: se elige otra venta y se vuelve a enviar con la sesión perdida.
+    await pickerOf(third).check();
+    await page.getByLabel("Tipo de factura").selectOption("E");
+    await context.clearCookies();
+    await page.getByRole("button", { name: "Marcar como facturadas" }).click();
+    await expectEndedLogin(page, BILLING_ENDED_URL);
+    await signInAgain(page);
+
+    await expect(page).toHaveURL(new RegExp(`${BILLING_PATH}$`));
+    await expect(DRAFT_NOTICE(page)).toBeVisible();
+    await expect(pickerOf(third)).toBeChecked();
+    await expect(page.getByLabel("Tipo de factura")).toHaveValue("E");
+    await expect(page.getByText(/ventas? marcadas? como facturadas?\./)).toHaveCount(0);
+  });
+
   test("the monotributo settings come back too", async ({ context, page }) => {
     // No se guarda nada: la base de los tests se comparte y otros tests cambian estos datos.
     await page.goto(SETTINGS_PATH);

@@ -10,7 +10,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getMissingConfig } from "./config";
 import { SESSION_ENDED_ERROR } from "./login-errors";
-import { LOGIN_PATH, PANEL_PATH, SETUP_PATH, safeNextPath } from "./redirect";
+import { LOGIN_PATH, PANEL_PATH, SETUP_PATH } from "./redirect";
+import { returnPath } from "./return-path";
 import { ADMIN_COOKIE, verifySessionToken } from "./session";
 
 const SERVER_ACTION_HEADER = "next-action";
@@ -122,13 +123,13 @@ function pathWithNext(pathname: string, next?: string, error?: string): string {
   return params.size > 0 ? `${pathname}?${params}` : pathname;
 }
 
-/** Adónde volver tras el login: la dirección pedida, sin el parámetro interno del router. */
+/** Adónde volver tras el login: la dirección pedida, sin el parámetro interno del router ni los avisos de un solo uso. */
 function destinationOf(request: NextRequest): string {
   const { pathname, searchParams } = request.nextUrl;
   const query = new URLSearchParams(searchParams);
   query.delete(ROUTER_QUERY);
   const search = query.size > 0 ? `?${query}` : "";
-  return safeNextPath(`${stripTransport(pathname)}${search}`);
+  return returnPath(`${stripTransport(pathname)}${search}`);
 }
 
 /**
