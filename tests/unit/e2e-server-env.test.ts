@@ -1,13 +1,16 @@
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { verifyPassword } from "@/admin/auth/password";
 import {
   ADMIN_TEST_OLD_PASSWORD_HASH,
   ADMIN_TEST_PASSWORD,
   ADMIN_TEST_PASSWORD_HASH,
+  SEED_E2E_PASSKEYS_COMMAND,
   adminServerEnv,
   demoServerEnv,
   securityServerEnv,
 } from "../helpers/admin-server";
+import { assertTestDatabase } from "../helpers/seed-e2e-passkeys";
 
 // Importar los helpers o las configuraciones de Playwright arma el entorno del
 // servidor y, en el proceso principal, borra la carpeta de la base de los e2e:
@@ -96,10 +99,26 @@ describe("environment of the e2e servers", () => {
     const security = await configOf("../../playwright.security.config");
 
     for (const command of [main.webServer?.command ?? "", demo.webServer?.command ?? ""]) {
-      expect(command).toMatch(/seed-e2e-passkeys\.ts && npm run start/);
+      expect(command).toMatch(/npm run e2e:seed-passkeys && npm run start/);
     }
-    expect(security.webServer?.command ?? "").not.toContain("seed-e2e-passkeys");
+    expect(security.webServer?.command ?? "").not.toContain("seed-passkeys");
     expect(security.webServer?.reuseExistingServer).toBe(false);
+  });
+
+  test("no server command goes through npx: a missing tool must fail, never be downloaded from the network", async () => {
+    // `npx tsx` baja tsx de internet si no está instalado; un script de npm usa el de `node_modules` o falla.
+    for (const [, config] of CONFIGS) {
+      expect((await configOf(config)).webServer?.command ?? "").not.toMatch(/\bnpx\b/);
+    }
+  });
+
+  test("the passkey seeding is an npm script that runs the local tsx", () => {
+    const { scripts } = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as {
+      scripts: Record<string, string>;
+    };
+
+    expect(scripts["e2e:seed-passkeys"]).toBe("tsx tests/helpers/seed-e2e-passkeys.ts");
+    expect(SEED_E2E_PASSKEYS_COMMAND).toBe("npm run e2e:seed-passkeys");
   });
 
   test("the security spec runs alone, one test after the other, only on its own server", async () => {
@@ -137,6 +156,10 @@ describe("environment of the e2e servers", () => {
     const security = await securityServerEnv();
 
     expect(new Set([main.PGLITE_DIR, demo.PGLITE_DIR, security.PGLITE_DIR]).size).toBe(3);
+    // El seed de las llaves de prueba solo carga en una carpeta temporal: la de cada servidor lo es.
+    for (const env of [main, demo]) {
+      expect(() => assertTestDatabase({ DATABASE_URL: env.DATABASE_URL, PGLITE_DIR: env.PGLITE_DIR })).not.toThrow();
+    }
     for (const env of [main, demo, security]) {
       expect(env.EXCHANGE_RATE_SOURCE).toBe("fixed");
       expect(env.ADMIN_SESSION_SECRET).toBe(main.ADMIN_SESSION_SECRET);

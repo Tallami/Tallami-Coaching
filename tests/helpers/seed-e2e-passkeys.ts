@@ -5,13 +5,19 @@
 // procesos a la vez en la misma carpeta). Así los tests entran con contraseña y
 // llave como Tallami, sin pasar cada uno por "registrar la primera llave".
 //
-// Solo para la base de un servidor de prueba: se niega con `DATABASE_URL` (una base
-// remota) y sin `PGLITE_DIR` (sería la base local de desarrollo, `.data/pglite`).
-// Repetirlo no duplica nada: una llave que ya está no se vuelve a guardar.
+// Solo para la base de un servidor de prueba. Las claves privadas de estas llaves salen de
+// un texto público (`webauthn.ts`): cualquier base que las tenga se abre con solo conocer
+// ese texto, así que el comando se niega con `DATABASE_URL` (una base remota), sin
+// `PGLITE_DIR` (sería la base local de desarrollo, `.data/pglite`) y con una carpeta que no
+// esté dentro de la carpeta temporal del sistema, que es donde viven todas las bases de los e2e
+// (`admin-server.ts`). Repetirlo no duplica nada: una llave que ya está no se vuelve a guardar.
 
+import os from "node:os";
+import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { findPasskeyByCredentialId, insertPasskey } from "../../src/admin/auth/passkeys";
 import { getDb, type Db } from "../../src/db/client";
+import { closeDb } from "../../src/db/close";
 import { getDatabaseUrl } from "../../src/db/config";
 import { SEEDED_SLOTS, testPasskey } from "./webauthn";
 
@@ -37,20 +43,26 @@ export async function seedE2ePasskeys(db: Db): Promise<number> {
   return added;
 }
 
+/** `child` está estrictamente dentro de `parent` (no es el mismo y no sale de él con `..`). */
+function isStrictlyInside(parent: string, child: string): boolean {
+  const relative = path.relative(path.resolve(parent), path.resolve(child));
+  return relative !== "" && relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
+}
+
 /** Tira si el entorno no es el de un servidor de prueba. */
 export function assertTestDatabase(env: { DATABASE_URL?: string; PGLITE_DIR?: string }): void {
   if (env.DATABASE_URL?.trim()) {
     throw new Error("Las llaves de prueba no se cargan con DATABASE_URL definida: son solo para la base de un servidor de prueba.");
   }
-  if (!env.PGLITE_DIR?.trim()) {
+  const folder = env.PGLITE_DIR?.trim();
+  if (!folder) {
     throw new Error("Falta PGLITE_DIR: las llaves de prueba van en la base de un servidor de prueba, nunca en la de desarrollo.");
   }
-}
-
-/** Cierra la base si el driver lo permite, para que los datos queden escritos antes de salir. */
-async function closeDb(db: Db): Promise<void> {
-  const client = (db as unknown as { $client?: { close?: () => Promise<void> } }).$client;
-  await client?.close?.();
+  if (!isStrictlyInside(os.tmpdir(), folder)) {
+    throw new Error(
+      `PGLITE_DIR (${folder}) no está dentro de la carpeta temporal del sistema (${os.tmpdir()}), donde viven las bases de los e2e: las llaves de prueba se abren con un texto público y no se cargan en ninguna otra base.`,
+    );
+  }
 }
 
 async function main(): Promise<void> {

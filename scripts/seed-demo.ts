@@ -30,6 +30,7 @@ import { DEMO_INTEREST_ID_BASE } from "../src/admin/demo-interest";
 import { todayInArgentina } from "../src/admin/dates";
 import { MONOTRIBUTO_SETTING_KEY } from "../src/admin/settings/read";
 import { getDb, type Db } from "../src/db/client";
+import { closeDb } from "../src/db/close";
 import { getDatabaseUrl } from "../src/db/config";
 import { customers, interestEvents, sales, settings } from "../src/db/schema";
 
@@ -165,12 +166,6 @@ export function describeClearResult(result: ClearResult): string {
   const names = keptCustomers.map(({ name }) => `«${name}»`).join(", ");
   const single = keptCustomers.length === 1;
   return `${removed} ${single ? "Quedó" : "Quedaron"} ${counted(keptCustomers.length, "alumno de ejemplo", "alumnos de ejemplo")} porque ${single ? "tiene" : "tienen"} ventas tuyas: ${names}. Pasá esas ventas a otro alumno (o cancelalas) y volvé a correr el comando para sacarlos.`;
-}
-
-/** Cierra la base si el driver lo permite, para que los datos queden escritos antes de salir. */
-async function closeDb(db: Db): Promise<void> {
-  const client = (db as unknown as { $client?: { close?: () => Promise<void> } }).$client;
-  await client?.close?.();
 }
 
 async function main(): Promise<void> {

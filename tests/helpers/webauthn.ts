@@ -9,8 +9,9 @@
 //   paralelo no comparten llave ni contador.
 // - El contador de firma tiene que subir en cada uso (el servidor rechaza uno que no
 //   sube). Chrome lo sube uno por cada firma; al cargar la llave en un autenticador
-//   nuevo se parte de `nextSignCount`, que sube también entre procesos y contra un
-//   servidor reutilizado de una corrida anterior.
+//   nuevo se parte de `nextSignCount`, que sube también entre procesos (un worker que
+//   se reinicia al reintentar un test) y contra un servidor reutilizado de una corrida
+//   anterior.
 //
 // Solo para tests. Este archivo no importa `@playwright/test` más que sus tipos: lo
 // carga también el seed, que corre con `tsx` fuera de Playwright.
@@ -25,8 +26,24 @@ export const SEEDED_SLOTS = 32;
 export const TEST_RP_ID = "localhost";
 /** El usuario de las llaves del panel (`USER_ID` en `src/admin/auth/ceremonies.ts`). */
 const USER_HANDLE = Buffer.from("tallami-admin");
-const SIGN_COUNT_EPOCH_MS = Date.UTC(2026, 0, 1);
-const SECOND_MS = 1000;
+
+/** Desde cuándo cuenta el reloj del contador de firma. */
+export const SIGN_COUNT_EPOCH_MS = Date.UTC(2026, 9, 1);
+/**
+ * Cada cuánto sube el reloj del contador: 10 ms. Tiene que andar más rápido que los ingresos
+ * de una misma llave (uno cada varios cientos de milisegundos, por el scrypt de la contraseña y
+ * la navegación): así un worker nuevo parte siempre por encima de lo que dejó el anterior. Con
+ * segundos no alcanzaba: 30 ingresos en 15 segundos dejaban el contador 15 por delante del reloj.
+ */
+export const SIGN_COUNT_TICK_MS = 10;
+/**
+ * El contador de Chrome (`signCount` de `WebAuthn.addCredential`) es un entero de 32 bits CON
+ * signo: 2147483648 ya no lo acepta (probado). Por eso el reloj da la vuelta antes de llegar
+ * ahí, y no a los 4294967296 de un uint32: con ticks de 10 ms eso es cada ~248 días. Una corrida que
+ * cruce esa vuelta, o un servidor de pruebas reutilizado de antes de ella, rechaza el contador
+ * (basta con reiniciar el servidor); el panel real no tiene este límite.
+ */
+export const SIGN_COUNT_LIMIT = 2 ** 31;
 
 export type TestPasskey = {
   /** El id de la credencial, en base64url (como lo guarda el panel). */
@@ -72,13 +89,20 @@ const lastSignCount = new Map<number, number>();
 
 /**
  * El contador con el que se carga la llave del slot `slot` en un autenticador:
- * `max(último + 1, segundos desde 2026-01-01)`, por proceso. Dentro del proceso sube
+ * `max(último + 1, ticks de 10 ms desde 2026-10-01)`, por proceso. Dentro del proceso sube
  * de a uno por carga; entre procesos (otro worker con el mismo slot, otra corrida
- * contra el mismo servidor) lo sube el reloj.
+ * contra el mismo servidor) lo sube el reloj. Tira si el slot se queda sin números
+ * (ver `SIGN_COUNT_LIMIT`) en lugar de dejar que falle Chrome sin explicación.
  */
 export function nextSignCount(slot: number, now: number = Date.now()): number {
-  const seconds = Math.floor((now - SIGN_COUNT_EPOCH_MS) / SECOND_MS);
-  const next = Math.max((lastSignCount.get(slot) ?? -1) + 1, seconds);
+  const ticks = Math.floor((now - SIGN_COUNT_EPOCH_MS) / SIGN_COUNT_TICK_MS);
+  const clock = ((ticks % SIGN_COUNT_LIMIT) + SIGN_COUNT_LIMIT) % SIGN_COUNT_LIMIT;
+  const next = Math.max((lastSignCount.get(slot) ?? -1) + 1, clock);
+  if (next >= SIGN_COUNT_LIMIT) {
+    throw new Error(
+      `El contador de firma de la llave de prueba ${slot} llegó al máximo que acepta Chrome (${SIGN_COUNT_LIMIT - 1}): reiniciá el servidor de pruebas y volvé a correr los tests.`,
+    );
+  }
   lastSignCount.set(slot, next);
   return next;
 }

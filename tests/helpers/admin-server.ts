@@ -49,9 +49,10 @@ export function e2eBaseUrl(port: number): string {
  * Carga las llaves de prueba (`tests/helpers/webauthn.ts`) en la base de un servidor
  * antes de arrancarlo. Va en el `webServer.command` de las configuraciones principal y
  * de datos de ejemplo, que entran al panel con ellas; la de seguridad empieza sin
- * ninguna. Con `npx`: el comando no corre dentro de npm y `tsx` no está en el PATH.
+ * ninguna. Es un script de npm (`e2e:seed-passkeys` en `package.json`) y no `npx tsx`: npm usa
+ * el `tsx` de `node_modules` y, si falta, falla; `npx` lo bajaría de internet.
  */
-export const SEED_E2E_PASSKEYS_COMMAND = "npx tsx tests/helpers/seed-e2e-passkeys.ts";
+export const SEED_E2E_PASSKEYS_COMMAND = "npm run e2e:seed-passkeys";
 
 /** Base PGlite de los e2e: una carpeta temporal que se borra al arrancar. */
 const E2E_PGLITE_DIR = path.join(os.tmpdir(), "tallami-coaching-e2e-pglite");

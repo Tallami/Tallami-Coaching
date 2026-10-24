@@ -17,6 +17,7 @@
     "test:e2e:main": "playwright test",
     "test:e2e:demo": "playwright test -c playwright.demo.config.ts",
     "test:e2e:security": "playwright test -c playwright.security.config.ts",
+    "e2e:seed-passkeys": "tsx tests/helpers/seed-e2e-passkeys.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed:demo": "tsx scripts/seed-demo.ts",
