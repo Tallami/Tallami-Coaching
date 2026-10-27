@@ -170,3 +170,12 @@ describe("the README on what to do when a notice was not him", () => {
     expect(guide).toMatch(/Se borraron las llaves[^\n]*base de datos/);
   });
 });
+
+describe("the README on the notice of a blocked connection", () => {
+  test("says it goes out at most once an hour, as the policy says", () => {
+    const alerts = sectionOf("Avisos por email (Resend)");
+
+    expect(alerts).toContain("uno por hora como mucho");
+    expect(alerts).not.toContain("uno cada 15 minutos");
+  });
+});

@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { after } from "next/server";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { getAlertConfig, getAlertStatus, maskEmail } from "@/admin/alerts/config";
-import { ENROLLMENT_CODE_MS } from "@/admin/auth/policy";
+import { ENROLLMENT_CODE_MS, LOGIN_BLOCKED_ALERT_WINDOW_MS } from "@/admin/auth/policy";
 import { LOGIN_WINDOW_MS } from "@/admin/auth/rate-limit";
 import { notifySecurityEvent } from "@/admin/alerts/notify";
 import { renderSecurityAlert, type AlertContext, type SecurityEvent } from "@/admin/alerts/render";
@@ -220,7 +220,8 @@ describe("renderSecurityAlert", () => {
 
     expect(text).not.toContain("desde una conexión");
     expect(text).toContain(`${LOGIN_WINDOW_MS / 60_000} minutos`);
-    expect(text).toContain("no se manda otro aviso de bloqueo");
+    expect(text).toContain("En la hora siguiente a este aviso no se manda otro aviso de bloqueo");
+    expect(LOGIN_BLOCKED_ALERT_WINDOW_MS).toBe(60 * 60_000);
   });
 
   test("the subjects are all different, so each kind of notice is told apart in the inbox", () => {

@@ -285,7 +285,7 @@ Si lo que perdiste es la contraseña, no las llaves: generá un hash nuevo con `
 
 ### Avisos por email (Resend)
 
-El panel te manda un email en cada ingreso y en cada cambio de seguridad: primera llave, llave agregada o borrada, código generado, todas las sesiones cerradas, intentos fallidos que bloquean una conexión (uno cada 15 minutos como mucho) y la recuperación de arriba. Dicen qué pasó, cuándo (hora de Argentina), desde qué dispositivo y de qué país, y qué hacer si no fuiste vos. Nunca llevan contraseñas, códigos ni enlaces para entrar. Si el email falla, o no está configurado, el ingreso funciona igual: el error queda en los logs de Vercel y nada más.
+El panel te manda un email en cada ingreso y en cada cambio de seguridad: primera llave, llave agregada o borrada, código generado, todas las sesiones cerradas, intentos fallidos que bloquean una conexión (uno por hora como mucho) y la recuperación de arriba. Dicen qué pasó, cuándo (hora de Argentina), desde qué dispositivo y de qué país, y qué hacer si no fuiste vos. Nunca llevan contraseñas, códigos ni enlaces para entrar. Si el email falla, o no está configurado, el ingreso funciona igual: el error queda en los logs de Vercel y nada más.
 
 1. Creá una cuenta en [resend.com](https://resend.com) con **el mismo email donde querés recibir los avisos**.
 2. Creá una clave de API desde la sección de claves de tu cuenta (la guía oficial [Manage API keys](https://resend.com/docs/dashboard/api-keys/introduction) lo explica).

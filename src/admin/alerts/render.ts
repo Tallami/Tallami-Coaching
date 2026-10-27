@@ -85,8 +85,8 @@ const EVENT_TEXT: Record<SecurityEvent, { subject: string; what: string }> = {
   },
   "login-blocked": {
     subject: "Ingreso bloqueado en el panel de Tallami",
-    // Se manda un solo aviso de bloqueo por ventana, sea de la conexión que sea (`blocked.ts`).
-    what: `Se bloquearon intentos de ingreso al panel: una conexión llegó al máximo de intentos fallidos (contraseña, llave o código) y queda bloqueada hasta que pasen ${minutes(LOGIN_WINDOW_MS)} minutos de sus intentos. En ese tiempo no se manda otro aviso de bloqueo, aunque otras conexiones también se bloqueen.`,
+    // Se manda un solo aviso de bloqueo por hora (`LOGIN_BLOCKED_ALERT_WINDOW_MS`), sea de la conexión que sea (`blocked.ts`).
+    what: `Se bloquearon intentos de ingreso al panel: una conexión llegó al máximo de intentos fallidos (contraseña, llave o código) y queda bloqueada hasta que pasen ${minutes(LOGIN_WINDOW_MS)} minutos de sus intentos. En la hora siguiente a este aviso no se manda otro aviso de bloqueo, aunque otras conexiones también se bloqueen.`,
   },
   "passkeys-reset": {
     subject: "Se borraron las llaves de acceso del panel de Tallami",

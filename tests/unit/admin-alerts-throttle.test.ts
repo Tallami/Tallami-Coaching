@@ -3,15 +3,18 @@ import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vi
 import { LOGIN_BLOCKED_ALERT_KEY, notifyIfJustBlocked } from "@/admin/alerts/blocked";
 import { notifySecurityEvent } from "@/admin/alerts/notify";
 import { claimAlertSlot } from "@/admin/alerts/throttle";
+import { LOGIN_BLOCKED_ALERT_WINDOW_MS } from "@/admin/auth/policy";
 import { LOGIN_MAX_FAILURES, LOGIN_WINDOW_MS } from "@/admin/auth/rate-limit";
 import type { Db } from "@/db/client";
 import { loginAttempts, settings } from "@/db/schema";
 import { createTestDb } from "../helpers/db";
 
-// El aviso de bloqueo sale como mucho una vez por ventana de intentos (15 minutos) en
+// El aviso de bloqueo sale como mucho una vez por hora (`LOGIN_BLOCKED_ALERT_WINDOW_MS`) en
 // total, sin importar cuántas conexiones se bloqueen: el tope por conexión solo decide
 // CUÁNDO una conexión llegó al límite; qué tan seguido se avisa lo decide `claimAlertSlot`,
-// con una sola escritura condicional en la base.
+// con una sola escritura condicional en la base. Es una hora y no los 15 minutos de la
+// ventana de intentos: con un ataque sostenido serían ~96 emails por día y el plan gratis de
+// Resend (100 por día) se agotaría, dejando sin enviar los avisos que sí importan.
 
 vi.mock("@/admin/alerts/notify", () => ({ notifySecurityEvent: vi.fn() }));
 
@@ -156,12 +159,29 @@ describe("notifyIfJustBlocked", () => {
     expect(notifySecurityEvent).toHaveBeenCalledOnce();
   });
 
-  test("after the window, a new block notifies again", async () => {
+  test("the window of the notice is one hour, longer than the 15 minutes of the failed attempts", () => {
+    expect(LOGIN_BLOCKED_ALERT_WINDOW_MS).toBe(60 * MINUTE_MS);
+    expect(LOGIN_BLOCKED_ALERT_WINDOW_MS).toBeGreaterThan(LOGIN_WINDOW_MS);
+  });
+
+  test("a block after the 15 minutes of the attempts but inside the hour adds no second notice", async () => {
     await seedFailures("conexion-a", LOGIN_MAX_FAILURES, START);
     await notifyIfJustBlocked(db, "conexion-a", START);
     await seedFailures("conexion-b", LOGIN_MAX_FAILURES, after(LOGIN_WINDOW_MS));
+    await seedFailures("conexion-c", LOGIN_MAX_FAILURES, after(LOGIN_BLOCKED_ALERT_WINDOW_MS - MINUTE_MS));
 
     await notifyIfJustBlocked(db, "conexion-b", after(LOGIN_WINDOW_MS));
+    await notifyIfJustBlocked(db, "conexion-c", after(LOGIN_BLOCKED_ALERT_WINDOW_MS - MINUTE_MS));
+
+    expect(vi.mocked(notifySecurityEvent).mock.calls).toEqual([["login-blocked"]]);
+  });
+
+  test("after the hour, a new block notifies again", async () => {
+    await seedFailures("conexion-a", LOGIN_MAX_FAILURES, START);
+    await notifyIfJustBlocked(db, "conexion-a", START);
+    await seedFailures("conexion-b", LOGIN_MAX_FAILURES, after(LOGIN_BLOCKED_ALERT_WINDOW_MS));
+
+    await notifyIfJustBlocked(db, "conexion-b", after(LOGIN_BLOCKED_ALERT_WINDOW_MS));
 
     expect(vi.mocked(notifySecurityEvent).mock.calls).toEqual([["login-blocked"], ["login-blocked"]]);
   });
