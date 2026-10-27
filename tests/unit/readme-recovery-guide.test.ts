@@ -105,3 +105,35 @@ describe("the security sections of the README", () => {
     }
   });
 });
+
+describe("the README on the address of the keys", () => {
+  /** El paso 5 de "Ponerlo en línea": las variables de Vercel. */
+  function variablesStep(): string {
+    const online = sectionOf("Ponerlo en línea");
+    return online.slice(online.indexOf("\n5. "), online.indexOf("\n6. "));
+  }
+
+  test("makes NEXT_PUBLIC_SITE_URL mandatory for the panel, equal to where the browser ends up after the www redirect", () => {
+    const step = variablesStep();
+
+    expect(step).toContain("`NEXT_PUBLIC_SITE_URL`");
+    expect(step).toMatch(/obligatoria/);
+    expect(step).toContain("`www`");
+    expect(step).toMatch(/redirecci[oó]n/);
+    expect(step).toContain("Las llaves solo funcionan en");
+  });
+
+  test("warns that adding a domain without the variable moves the keys at the next deploy, and how to recover", () => {
+    const step = variablesStep();
+
+    expect(step).toContain("dominio de producción");
+    expect(step).toMatch(/siguiente despliegue/);
+    expect(step).toContain("npm run admin:reset-passkeys");
+  });
+
+  test("does not name buttons of Vercel that the guide cannot vouch for", () => {
+    const step = variablesStep();
+
+    expect(step).not.toMatch(/«(Add|Domains?|Add Domain|Redirect)[^»]*»/i);
+  });
+});
