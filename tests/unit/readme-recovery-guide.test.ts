@@ -179,3 +179,41 @@ describe("the README on the notice of a blocked connection", () => {
     expect(alerts).not.toContain("uno cada 15 minutos");
   });
 });
+
+describe("the README on what it promises exactly", () => {
+  test("the recovery of what he was typing is only what he was saving, in that same tab", () => {
+    const login = sectionOf("Entrar con contraseña y llave de acceso");
+
+    expect(login).not.toContain("Lo que estabas escribiendo en un formulario se recupera");
+    expect(login).toMatch(/lo que estabas guardando se recupera/);
+    expect(login).toMatch(/en esa misma pestaña/);
+    expect(login).toMatch(/sin guardar[^.]*no se recupera/);
+  });
+
+  test("recovery step 2 tells him to check the postgres.<code> user, because the pooler servers are regional", () => {
+    const guide = sectionOf("Guía de recuperación");
+    const step = guide.slice(guide.indexOf("\n2. "), guide.indexOf("\n3. "));
+
+    expect(step).toContain("`postgres.");
+    expect(step).toMatch(/usuario/);
+    expect(step).toMatch(/regi[oó]n/);
+  });
+
+  test("in Git Bash the command is always run with the phrase piped in, never bare", () => {
+    const guide = sectionOf("Guía de recuperación");
+    const bashBlocks = [...guide.matchAll(/```bash\n([\s\S]*?)```/g)].map(([, block]) => block);
+    const runs = bashBlocks.flatMap((block) => block.split("\n")).filter((line) => line.includes("npm run admin:reset-passkeys"));
+
+    expect(runs.length).toBeGreaterThan(0);
+    for (const line of runs) expect(line.trim(), line).toMatch(/^echo "[^"]*" \| npm run admin:reset-passkeys/);
+    expect(guide).toContain(`echo "${RESET_CONFIRMATION}" | npm run admin:reset-passkeys`);
+  });
+
+  test("a local reset asks to close npm run dev first: the local database allows one program at a time", () => {
+    const guide = sectionOf("Guía de recuperación");
+    const local = guide.slice(guide.indexOf("Sin `DATABASE_URL`"));
+
+    expect(local).toContain("`npm run dev`");
+    expect(local).toMatch(/un solo programa|dos programas/);
+  });
+});

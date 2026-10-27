@@ -183,7 +183,7 @@ describe("ask", () => {
 });
 
 describe("describeTarget", () => {
-  test("a remote database is named by its server, never by its user or password", () => {
+  test("a remote database is named by its server and its user, never by its password", () => {
     const text = describeTarget({
       DATABASE_URL: "postgres://postgres.abcdef:UnaClaveSecreta123@aws-0-sa-east-1.pooler.supabase.com:6543/postgres",
     });
@@ -191,7 +191,33 @@ describe("describeTarget", () => {
     expect(text).toContain("aws-0-sa-east-1.pooler.supabase.com");
     expect(text).toContain("DATABASE_URL");
     expect(text).not.toContain("UnaClaveSecreta123");
-    expect(text).not.toContain("postgres.abcdef");
+    // Los servidores del pooler son de una región y los comparten muchos proyectos: lo que identifica el proyecto es el usuario (`postgres.<código>`).
+    expect(text).toBe(
+      "la base remota de DATABASE_URL (servidor aws-0-sa-east-1.pooler.supabase.com, usuario postgres.abcdef)",
+    );
+  });
+
+  test("the direct connection shows its plain user, and a user without a password shows too", () => {
+    expect(describeTarget({ DATABASE_URL: "postgres://postgres:Secreta987@db.abcdef.supabase.co:5432/postgres" })).toBe(
+      "la base remota de DATABASE_URL (servidor db.abcdef.supabase.co, usuario postgres)",
+    );
+    expect(describeTarget({ DATABASE_URL: "postgres://postgres.abcdef@aws-0-sa-east-1.pooler.supabase.com/postgres" })).toContain(
+      "usuario postgres.abcdef",
+    );
+  });
+
+  test("a user written with percent signs is shown as it reads, and still never the password", () => {
+    const text = describeTarget({ DATABASE_URL: "postgres://mi%20usuario:Clave%40Secreta@servidor.example.com/postgres" });
+
+    expect(text).toContain("usuario mi usuario");
+    expect(text).not.toContain("Clave");
+    expect(text).not.toContain("Secreta");
+  });
+
+  test("an address without a user names only the server", () => {
+    expect(describeTarget({ DATABASE_URL: "postgres://servidor.example.com:5432/postgres" })).toBe(
+      "la base remota de DATABASE_URL (servidor servidor.example.com)",
+    );
   });
 
   test("a DATABASE_URL that cannot be read does not leak its text either", () => {

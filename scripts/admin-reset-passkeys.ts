@@ -48,22 +48,38 @@ export function isConfirmed(answer: string): boolean {
   return answer.trim() === RESET_CONFIRMATION;
 }
 
-/** El servidor de una `DATABASE_URL`, o `null` si no se puede leer. Nunca el usuario ni la contraseña. */
-function hostOf(databaseUrl: string): string | null {
+/** Un texto de la URL con los `%` deshechos (`mi%20usuario` → `mi usuario`); tal cual si no se puede. */
+function decoded(text: string): string {
   try {
-    return new URL(databaseUrl).hostname || null;
+    return decodeURIComponent(text);
   } catch {
-    return null;
+    return text;
   }
 }
 
-/** Sobre qué base va a actuar el comando, dicho para una persona. Nunca lleva la contraseña de la base. */
+/**
+ * Lo único de una `DATABASE_URL` que se muestra: el servidor y el usuario, cada uno o `null` si
+ * falta o la URL no se puede leer. NUNCA la contraseña. En Supabase el servidor de un pooler es de
+ * una región y lo comparten muchos proyectos; lo que identifica el proyecto es el usuario
+ * (`postgres.<código del proyecto>`).
+ */
+function visiblePartsOf(databaseUrl: string): { host: string | null; user: string | null } {
+  try {
+    const { hostname, username } = new URL(databaseUrl);
+    return { host: hostname || null, user: username ? decoded(username) : null };
+  } catch {
+    return { host: null, user: null };
+  }
+}
+
+/** Sobre qué base va a actuar el comando, dicho para una persona: servidor y usuario, nunca la contraseña de la base. */
 export function describeTarget(env: { DATABASE_URL?: string; PGLITE_DIR?: string }): string {
   const url = env.DATABASE_URL?.trim();
   if (url) {
-    const host = hostOf(url);
-    return host
-      ? `la base remota de DATABASE_URL (servidor ${host})`
+    const { host, user } = visiblePartsOf(url);
+    const shown = [host ? `servidor ${host}` : null, user ? `usuario ${user}` : null].filter(Boolean);
+    return shown.length > 0
+      ? `la base remota de DATABASE_URL (${shown.join(", ")})`
       : "la base remota de DATABASE_URL";
   }
   return `la base local (PGlite), en la carpeta ${getPgliteDir(env)}`;

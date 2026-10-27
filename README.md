@@ -221,7 +221,7 @@ Para entrar al panel hacen falta dos cosas: la contraseña y una **llave de acce
 2. Si ya hay una llave registrada, tocás «Usar mi llave» y el dispositivo te pide la huella, la cara o el PIN. Listo: estás adentro. Entre la contraseña y la llave tenés 5 minutos; si se pasa, el panel te lo dice y volvés a empezar.
 3. Si todavía no hay ninguna llave (la primera vez, o después de la recuperación), aparece una pantalla que dice «Registrá tu primera llave»: ponele un nombre (por ejemplo Celular, PC o Notebook) y tocá «Registrar mi llave». Hasta registrarla no ves nada del panel.
 
-Una sesión se cierra sola a los 30 minutos sin usarla (volver a entrar lleva unos segundos) y, por más que la uses, a las 8 horas. Lo que estabas escribiendo en un formulario se recupera al volver a entrar.
+Una sesión se cierra sola a los 30 minutos sin usarla (volver a entrar lleva unos segundos) y, por más que la uses, a las 8 horas. Si se cierra justo cuando guardás un formulario, lo que estabas guardando se recupera al volver a entrar, en esa misma pestaña (queda en la memoria de la pestaña: si la cerrás, se pierde). Lo que escribiste sin guardar no se recupera.
 
 **La PC de escritorio (Windows 10): activá el PIN de Windows Hello.** Tu PC no necesita huella, cámara ni Bluetooth: alcanza con el PIN de Windows Hello, que es la llave de esa PC. Si todavía no lo tenés, activalo antes de registrar la llave. La guía oficial de Microsoft, [Configure Windows Hello](https://support.microsoft.com/en-us/windows/security/configure-windows-hello) (está en inglés y aplica a Windows 10 y 11), explica cómo crearlo desde la configuración de tu cuenta de Windows.
 
@@ -252,19 +252,24 @@ En Configuración → Seguridad ves las llaves (nombre, cuándo se creó y cuán
    Remove-Item Env:DATABASE_URL
    ```
 
-   En Git Bash:
+   En Git Bash el comando no puede preguntar (Node no ve esa terminal como interactiva y se queda esperando), así que la frase se le manda con una tubería. Para ver primero sobre qué base va a actuar, sin borrar nada, mandale una frase cualquiera:
 
    ```bash
    read -r -s -p "Cadena de conexión: " DATABASE_URL; export DATABASE_URL
-   npm run admin:reset-passkeys
+   echo "NO" | npm run admin:reset-passkeys
+   ```
+
+2. El comando te dice sobre qué base va a actuar (nunca muestra la contraseña). Fijate que diga «base remota de DATABASE_URL» y que el usuario sea `postgres.` seguido del código de tu proyecto de Supabase, el mismo que lleva la cadena que copiaste de **Connect**. El servidor solo no alcanza: los del pooler (`aws-0-…pooler.supabase.com`) son de una región, no de tu proyecto, y los comparten muchos proyectos. Con la conexión directa el usuario es solo `postgres` y el código del proyecto va en el servidor. Si dice «base local», no cargaste la cadena y borraría las llaves de la base de tu compu, no las de la web: cancelá.
+3. Escribí `BORRAR LLAVES` y Enter. Cualquier otra cosa cancela y no se borra nada. En PowerShell escribila cuando el comando pregunte (también se puede mandar sin que pregunte: `"BORRAR LLAVES" | npm run admin:reset-passkeys`). En Git Bash, que no puede preguntar, mandala con la tubería y después borrá la variable:
+
+   ```bash
+   echo "BORRAR LLAVES" | npm run admin:reset-passkeys
    unset DATABASE_URL
    ```
 
-2. El comando te dice sobre qué base va a actuar. Fijate que diga «base remota de DATABASE_URL» con el servidor de tu proyecto de Supabase (nunca muestra la contraseña). Si dice «base local», no cargaste la cadena y borraría las llaves de la base de tu compu, no las de la web: cancelá.
-3. Escribí `BORRAR LLAVES` y Enter. Cualquier otra cosa cancela y no se borra nada. (También se puede mandar la frase sin que pregunte: en PowerShell `"BORRAR LLAVES" | npm run admin:reset-passkeys`, en Git Bash `echo "BORRAR LLAVES" | npm run admin:reset-passkeys`.)
 4. Entrá a `/admin` con la contraseña y registrá una llave nueva **enseguida**: hasta que la registres, quien conozca la contraseña podría registrar la suya. (El panel manda un aviso por email cuando se registra la primera llave.)
 
-El comando también manda el aviso por email «se borraron las llaves», pero solo si en esa misma terminal cargaste `RESEND_API_KEY` y `ADMIN_ALERT_EMAIL` igual que `DATABASE_URL`: no lee ningún archivo `.env`. Si no están, borra igual y te avisa que no mandó el email. Sin `DATABASE_URL`, el comando actúa sobre la base local de tu compu (PGlite), por si necesitás lo mismo en desarrollo.
+El comando también manda el aviso por email «se borraron las llaves», pero solo si en esa misma terminal cargaste `RESEND_API_KEY` y `ADMIN_ALERT_EMAIL` igual que `DATABASE_URL`: no lee ningún archivo `.env`. Si no están, borra igual y te avisa que no mandó el email. Sin `DATABASE_URL`, el comando actúa sobre la base local de tu compu (PGlite), por si necesitás lo mismo en desarrollo; cerrá antes `npm run dev`, porque la base local no admite dos programas a la vez.
 
 Si lo que perdiste es la contraseña, no las llaves: generá un hash nuevo con `npm run admin:password`, reemplazá `ADMIN_PASSWORD_HASH` en Vercel y volvé a desplegar (eso cierra todas las sesiones).
 
