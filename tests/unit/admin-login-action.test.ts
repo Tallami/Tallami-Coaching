@@ -4,7 +4,7 @@ import { loginIpHash } from "@/admin/auth/login-ip";
 import { PENDING_COOKIE } from "@/admin/auth/pending-logins";
 import { LOGIN_MAX_FAILURES } from "@/admin/auth/rate-limit";
 import { ADMIN_COOKIE, hashIp } from "@/admin/auth/session";
-import { createSession } from "@/admin/auth/sessions";
+import { createSession, purgeExpiredAuthRecords } from "@/admin/auth/sessions";
 import { getDb, type Db } from "@/db/client";
 import { adminPasskeys, adminPendingLogins, adminSessions, loginAttempts } from "@/db/schema";
 import { interestIpHash } from "@/admin/interest/ip-key";
@@ -27,6 +27,11 @@ vi.mock("@/db/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/db/client")>()),
   getDb: vi.fn(),
 }));
+// La limpieza de registros viejos es la de verdad, salvo en el test que la hace fallar.
+vi.mock("@/admin/auth/sessions", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/admin/auth/sessions")>();
+  return { ...actual, purgeExpiredAuthRecords: vi.fn(actual.purgeExpiredAuthRecords) };
+});
 // Los avisos por email tienen sus tests (`admin-alerts*.test.ts`); acá no hay pedido de Next donde programarlos.
 vi.mock("@/admin/alerts/notify", () => ({ notifySecurityEvent: vi.fn() }));
 
@@ -180,6 +185,27 @@ describe("loginAction", () => {
 
       const ids = (await db.select({ id: adminSessions.id }).from(adminSessions)).map((row) => row.id);
       expect(ids).not.toContain(oldId);
+    });
+
+    test("is opened even when the cleanup fails: a right password is not turned into unavailable, and only the error name is logged", async () => {
+      const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.mocked(purgeExpiredAuthRecords).mockRejectedValueOnce(
+        new TypeError("no se pudo borrar en postgres://usuario:clave-secreta@host/db"),
+      );
+
+      try {
+        expect(await login("203.0.113.27", ADMIN_TEST_PASSWORD, CHROME_WINDOWS)).toBe(IN);
+
+        expect(await db.select().from(adminPendingLogins)).toHaveLength(1);
+        expect(cookieJar.set).toHaveBeenCalledOnce();
+        expect(logged).toHaveBeenCalledOnce();
+        const output = JSON.stringify(logged.mock.calls);
+        expect(output).toContain("TypeError");
+        expect(output).not.toContain("postgres://");
+        expect(output).not.toContain("clave-secreta");
+      } finally {
+        logged.mockRestore();
+      }
     });
   });
 

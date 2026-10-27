@@ -20,7 +20,7 @@ import {
 import { loginPath, loginStepPath, safeNextPath } from "@/admin/auth/redirect";
 import { getClientIp, shouldUseSecureCookie } from "@/admin/auth/request";
 import { purgeExpiredAuthRecords } from "@/admin/auth/sessions";
-import { getDb } from "@/db/client";
+import { getDb, type Db } from "@/db/client";
 
 /** Tope del largo de la contraseña: scrypt cuesta lo mismo, pero no hay por qué procesar un texto enorme. */
 const MAX_PASSWORD_LENGTH = 1024;
@@ -29,6 +29,21 @@ const passwordSchema = z.string().min(1).max(MAX_PASSWORD_LENGTH);
 /** Vuelve al formulario con un aviso, conservando a dónde se quería ir. */
 function backToLogin(error: LoginErrorCode, next: string): never {
   redirect(loginPath({ next, error }));
+}
+
+/**
+ * Borra los registros viejos de sesiones, ingresos y códigos. Es una limpieza que se hace de
+ * pasada: si falla, una contraseña correcta no puede pasar a "no disponible", así que el fallo
+ * se anota y el ingreso sigue. Se anota solo el nombre del error: el mensaje podría traer la
+ * conexión a la base.
+ */
+async function purgeOldRecords(db: Db): Promise<void> {
+  try {
+    await purgeExpiredAuthRecords(db);
+  } catch (error) {
+    const reason = error instanceof Error ? error.name : typeof error;
+    console.error(`Panel: no se pudieron borrar los registros viejos del ingreso. ${reason}`);
+  }
 }
 
 /**
@@ -50,7 +65,7 @@ async function startSecondStep(
   if (result === "invalid") await notifyIfJustBlocked(db, ipHash);
   if (result !== "ok") return { error: result };
 
-  await purgeExpiredAuthRecords(db);
+  await purgeOldRecords(db);
   // Con al menos una llave registrada, la contraseña sola nunca lleva a registrar otra.
   const mode: PendingMode = (await countPasskeys(db)) > 0 ? "passkey" : "first-key";
   const pendingId = await createPendingLogin(db, {
