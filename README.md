@@ -85,7 +85,7 @@ El panel privado de Tallami vive en `/admin` (solo en español, fuera de los idi
 2. Local: copiá las líneas de `.env.local` a un archivo `.env.local`. El hash lleva `$` y Next.js los expande como variables, por eso el script los imprime escritos `\$`: copiá esas líneas, no las de Vercel.
 3. En Vercel (Project Settings → Environment Variables): pegá los valores de la sección "En Vercel", tal cual. Agregá también `DATABASE_URL` (Supabase, pooler de transacciones); en Vercel el panel no usa la base local. Volvé a desplegar.
 4. Abrí `/admin`. Si falta algo, te lleva a `/admin/setup`, que dice qué variable falta (solo el nombre, nunca el valor).
-5. Entrá con la contraseña. Como todavía no hay ninguna llave, el panel te pide registrar la primera en ese mismo dispositivo: seguí "Entrar con contraseña y llave de acceso", más abajo.
+5. Entrá con la contraseña. Como todavía no hay ninguna llave, el panel te pide registrar la primera en ese mismo dispositivo, **enseguida**: hasta que lo hagas, quien conozca la contraseña podría registrar la suya. Seguí "Entrar con contraseña y llave de acceso", más abajo.
 
 Localmente entrá por `http://localhost:3000/admin`, no por la IP de tu red: la cookie de sesión lleva `Secure` en cualquier dirección que no sea `localhost`, y el navegador no la guarda sobre http. Las llaves de acceso también quedan atadas a la dirección donde se crean.
 
@@ -201,7 +201,7 @@ Para que el panel funcione en internet (en Vercel) la base no puede ser la local
 1. Corré `npm run db:migrate` (paso 3) *antes* de desplegar: la migración `0004_admin_login_security` crea las tablas de las sesiones, las llaves, los ingresos a medio camino y los códigos. Sin ella, el ingreso del panel nuevo falla.
 2. Desplegá.
 3. Contá con volver a entrar una vez: las cookies de sesión de antes dejan de valer (ahora cada sesión se guarda en la base).
-4. Entrá con la contraseña y registrá la primera llave. Hacelo con la dirección definitiva de la web y con `NEXT_PUBLIC_SITE_URL` ya definida (paso 5 de arriba; ver "La dirección de la web"): si después cambia, las llaves dejan de servir.
+4. Entrá con la contraseña y registrá la primera llave **enseguida** (hasta que lo hagas, quien conozca la contraseña podría registrar la suya). Hacelo con la dirección definitiva de la web y con `NEXT_PUBLIC_SITE_URL` ya definida (paso 5 de arriba; ver "La dirección de la web"): si después cambia, las llaves dejan de servir.
 
 Tres protecciones más, que se hacen en los paneles de Supabase y Vercel:
 
@@ -267,6 +267,14 @@ En Configuración → Seguridad ves las llaves (nombre, cuándo se creó y cuán
 El comando también manda el aviso por email «se borraron las llaves», pero solo si en esa misma terminal cargaste `RESEND_API_KEY` y `ADMIN_ALERT_EMAIL` igual que `DATABASE_URL`: no lee ningún archivo `.env`. Si no están, borra igual y te avisa que no mandó el email. Sin `DATABASE_URL`, el comando actúa sobre la base local de tu compu (PGlite), por si necesitás lo mismo en desarrollo.
 
 Si lo que perdiste es la contraseña, no las llaves: generá un hash nuevo con `npm run admin:password`, reemplazá `ADMIN_PASSWORD_HASH` en Vercel y volvé a desplegar (eso cierra todas las sesiones).
+
+**Te llegó un aviso por email de algo que no hiciste.** Qué conviene hacer depende del aviso (cada email lo dice al final):
+
+- **Primera llave** que no registraste: no tenés ninguna llave con la que entrar, así que no hay nada que cerrar desde el panel. Primero cambiá la contraseña (`npm run admin:password`, reemplazá `ADMIN_PASSWORD_HASH` en Vercel) y volvé a desplegar, así quien la conocía ya no puede entrar; después corré `npm run admin:reset-passkeys` y registrá la tuya **enseguida**. Si hacés la recuperación antes de cambiar la contraseña, quien la sabe puede registrar otra llave.
+- **Llave agregada** que no agregaste: entrá, borrá esa llave en Configuración → Seguridad (sus sesiones se cierran en el acto) y cambiá la contraseña.
+- **Se borraron las llaves** sin que corrieras el comando: alguien tiene las credenciales de la base de datos. Cambiá la contraseña de la base en Supabase y actualizá `DATABASE_URL` en Vercel, cambiá también la del panel, volvé a desplegar y registrá tu llave **enseguida**.
+- **Se cerraron todas las sesiones** y no fuiste vos: entrá, revisá las llaves en Configuración → Seguridad y cambiá la contraseña.
+- **Cualquier otro aviso** (ingreso, llave borrada, código generado, ingreso bloqueado): entrá, cerrá todas las sesiones y cambiá la contraseña.
 
 **La dirección de la web.** Las llaves quedan atadas a la dirección donde se crearon. En producción esa dirección es la de `NEXT_PUBLIC_SITE_URL`, que para el panel es obligatoria: tiene que ser exactamente la dirección donde termina el navegador al abrir la web (después de la redirección entre `www` y la raíz, si la hay). Si no la definiste, la dirección es el dominio de producción del proyecto en Vercel (`algo.vercel.app`), que cambia al agregarle un dominio propio. Por eso:
 

@@ -29,7 +29,23 @@ const API_KEY = "re_clave_de_prueba_muy_secreta";
 const TO = "tomas@example.com";
 const TEST_SENDER = "Panel de Tallami <onboarding@resend.dev>";
 const AT = new Date("2026-10-21T03:30:00.000Z");
-const WARNING = "Si no fuiste vos: entrá y cerrá todas las sesiones, y cambiá la contraseña";
+const GENERAL_ADVICE = "Si no fuiste vos: entrá y cerrá todas las sesiones, y cambiá la contraseña.";
+/** Qué dice cada aviso que hay que hacer si no fue Tallami: donde "entrar" no sirve o no alcanza, otro consejo. */
+const ADVICE: Record<SecurityEvent, string> = {
+  login: GENERAL_ADVICE,
+  // Una primera llave que él no registró: no tiene ninguna llave con la que entrar, y recuperar antes de cambiar la contraseña deja registrar de nuevo al otro.
+  "first-passkey":
+    "Si no fuiste vos: cambiá la contraseña y volvé a desplegar, después corré la recuperación de llaves y registrá la tuya enseguida.",
+  "passkey-added": "Si no fuiste vos: entrá, borrá esa llave y cambiá la contraseña.",
+  "passkey-removed": GENERAL_ADVICE,
+  "code-generated": GENERAL_ADVICE,
+  // Las sesiones ya se cerraron: lo que falta es mirar las llaves.
+  "sessions-closed": "Si no fuiste vos: entrá, revisá las llaves en Configuración → Seguridad y cambiá la contraseña.",
+  "login-blocked": GENERAL_ADVICE,
+  // Borrar las llaves exige las credenciales de la base: hay que cambiarlas, y recién después registrar la llave propia.
+  "passkeys-reset":
+    "Si no fuiste vos: alguien llegó a la base de datos. Cambiá la contraseña del panel y la de la base, volvé a desplegar y registrá tu llave enseguida.",
+};
 const CONTEXT: AlertContext = { device: "Chrome en Windows", country: "AR" };
 
 const EVENTS: SecurityEvent[] = [
@@ -140,8 +156,31 @@ describe("renderSecurityAlert", () => {
 
     expect(subject.length).toBeGreaterThan(10);
     expect(subject).not.toMatch(/[\r\n]/);
-    expect(text).toContain(WARNING);
-    expect(html).toContain(WARNING);
+    expect(text).toContain(ADVICE[event]);
+    expect(html).toContain(ADVICE[event]);
+    // Un solo consejo por aviso: el general no se suma al propio de cada evento.
+    expect(text.match(/Si no fuiste vos:/g)).toHaveLength(1);
+  });
+
+  test("a first key he did not register is not told to sign in: he has no key to do it with, and recovering before changing the password lets the intruder register again", () => {
+    const { text, html } = renderSecurityAlert("first-passkey", CONTEXT, AT);
+    const advice = text.slice(text.indexOf("Si no fuiste vos:"));
+
+    expect(advice).not.toContain("entrá");
+    expect(advice).not.toContain("cerrá todas las sesiones");
+    // El orden importa: contraseña, desplegar, recuperar y registrar la propia.
+    const steps = ["cambiá la contraseña", "volvé a desplegar", "recuperación de llaves", "registrá la tuya enseguida"];
+    const positions = steps.map((step) => advice.indexOf(step));
+    expect(positions.every((position) => position >= 0)).toBe(true);
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+    expect(steps.every((step) => html.includes(step))).toBe(true);
+  });
+
+  test("a key added that he did not add is deleted after signing in, not left to the general advice", () => {
+    const { text } = renderSecurityAlert("passkey-added", CONTEXT, AT);
+
+    expect(text).toContain("entrá, borrá esa llave");
+    expect(text).not.toContain("cerrá todas las sesiones");
   });
 
   test("each event says what happened in its own words", () => {

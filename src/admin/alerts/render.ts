@@ -1,7 +1,7 @@
 // El texto de cada aviso de seguridad: asunto, texto plano y un HTML mínimo. Es una
 // función pura: la hora y los datos del pedido los pone quien llama. Cada aviso dice
 // qué pasó, cuándo (hora de Argentina), desde qué dispositivo y de qué país, y qué
-// hacer si no fue Tallami. Nunca lleva contraseñas, códigos ni enlaces para entrar.
+// hacer si no fue Tallami (según el aviso). Nunca lleva contraseñas, códigos ni enlaces para entrar.
 
 import { ENROLLMENT_CODE_MS } from "../auth/policy";
 import { LOGIN_WINDOW_MS } from "../auth/rate-limit";
@@ -28,8 +28,26 @@ export type AlertContext = {
 
 export type RenderedAlert = { subject: string; text: string; html: string };
 
-/** Qué hacer si no fue Tallami. Es la misma frase en todos los avisos. */
-const IF_NOT_YOU = "Si no fuiste vos: entrá y cerrá todas las sesiones, y cambiá la contraseña.";
+/** Qué hacer si no fue Tallami. Vale para los avisos en los que entrar al panel todavía es posible y sirve. */
+const GENERAL_IF_NOT_YOU = "Si no fuiste vos: entrá y cerrá todas las sesiones, y cambiá la contraseña.";
+
+/**
+ * Los avisos donde la frase general no sirve, cada uno con la suya:
+ *
+ * - `first-passkey`: si no la registró él, no tiene ninguna llave con la que entrar; y correr la
+ *   recuperación antes de cambiar la contraseña deja registrar de nuevo a quien ya la sabe.
+ * - `passkey-added`: entrar y borrar esa llave cierra las sesiones que se abrieron con ella.
+ * - `sessions-closed`: las sesiones ya están cerradas; falta mirar las llaves.
+ * - `passkeys-reset`: borrar las llaves exige las credenciales de la base de datos.
+ */
+const IF_NOT_YOU_BY_EVENT: Partial<Record<SecurityEvent, string>> = {
+  "first-passkey":
+    "Si no fuiste vos: cambiá la contraseña y volvé a desplegar, después corré la recuperación de llaves y registrá la tuya enseguida.",
+  "passkey-added": "Si no fuiste vos: entrá, borrá esa llave y cambiá la contraseña.",
+  "sessions-closed": "Si no fuiste vos: entrá, revisá las llaves en Configuración → Seguridad y cambiá la contraseña.",
+  "passkeys-reset":
+    "Si no fuiste vos: alguien llegó a la base de datos. Cambiá la contraseña del panel y la de la base, volvé a desplegar y registrá tu llave enseguida.",
+};
 
 const SIGNATURE = "Aviso automático del panel de Tallami Coaching.";
 
@@ -122,6 +140,7 @@ function escapeHtml(text: string): string {
  */
 export function renderSecurityAlert(event: SecurityEvent, context: AlertContext, now: Date): RenderedAlert {
   const { subject, what } = EVENT_TEXT[event];
+  const ifNotYou = IF_NOT_YOU_BY_EVENT[event] ?? GENERAL_IF_NOT_YOU;
   const details: Array<[label: string, value: string]> = [
     ["Cuándo", `${formatArgentinaTime(now)} (hora de Argentina)`],
     ["Dispositivo", singleLine(context.device)],
@@ -134,7 +153,7 @@ export function renderSecurityAlert(event: SecurityEvent, context: AlertContext,
     "",
     ...details.map(([label, value]) => `${label}: ${value}`),
     "",
-    IF_NOT_YOU,
+    ifNotYou,
     "",
     SIGNATURE,
   ].join("\n");
@@ -145,7 +164,7 @@ export function renderSecurityAlert(event: SecurityEvent, context: AlertContext,
     ...details.map(
       ([label, value]) => `<p style="margin:0 0 4px">${escapeHtml(label)}: <strong>${escapeHtml(value)}</strong></p>`,
     ),
-    `<p style="margin:16px 0">${escapeHtml(IF_NOT_YOU)}</p>`,
+    `<p style="margin:16px 0">${escapeHtml(ifNotYou)}</p>`,
     `<p style="margin:0;color:#666666;font-size:14px">${escapeHtml(SIGNATURE)}</p>`,
     "</div>",
   ].join("\n");

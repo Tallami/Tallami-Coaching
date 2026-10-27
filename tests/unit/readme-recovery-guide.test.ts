@@ -137,3 +137,36 @@ describe("the README on the address of the keys", () => {
     expect(step).not.toMatch(/«(Add|Domains?|Add Domain|Redirect)[^»]*»/i);
   });
 });
+
+describe("the README on what to do when a notice was not him", () => {
+  test("both first-key steps of the deploy say to register the key right away", () => {
+    const ready = sectionOf("Dejarlo listo");
+    const firstKey = ready.slice(ready.indexOf("\n5. "));
+    const online = sectionOf("Ponerlo en línea");
+    const upgrade = online.slice(online.indexOf("Si ya tenías el panel en línea"));
+    const upgradeFirstKey = upgrade.slice(upgrade.indexOf("\n4. "), upgrade.indexOf("\n\n", upgrade.indexOf("\n4. ") + 1));
+
+    expect(firstKey).toMatch(/registrar la primera en ese mismo dispositivo[^\n]*enseguida|enseguida[^\n]*primera/);
+    expect(upgradeFirstKey).toContain("enseguida");
+  });
+
+  test("tells him what to do for a first key he did not register: password, deploy, then the recovery, then his own key", () => {
+    const guide = sectionOf("Guía de recuperación");
+    const bullet = guide.split("\n").find((line) => /Primera llave/.test(line) && /no registraste/.test(line));
+
+    expect(bullet, "falta el consejo de la primera llave").toBeDefined();
+    const steps = ["cambiá la contraseña", "volvé a desplegar", "npm run admin:reset-passkeys", "enseguida"];
+    const positions = steps.map((step) => bullet!.indexOf(step));
+    expect(positions.every((position) => position >= 0)).toBe(true);
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+    // Sin ninguna llave no hay con qué entrar: no se le manda a "entrar y cerrar sesiones".
+    expect(bullet).not.toContain("cerrá todas las sesiones");
+  });
+
+  test("tells him to delete a key he did not add, and to change the database credentials when the keys were wiped", () => {
+    const guide = sectionOf("Guía de recuperación");
+
+    expect(guide).toMatch(/Llave agregada[^\n]*entrá, borrá esa llave[^\n]*cambiá la contraseña/);
+    expect(guide).toMatch(/Se borraron las llaves[^\n]*base de datos/);
+  });
+});
