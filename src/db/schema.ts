@@ -270,7 +270,7 @@ export const adminSessions = pgTable(
   "admin_sessions",
   {
     id: text("id").primaryKey(),
-    /** La llave con la que se ingresó, o `null` si fue solo con la contraseña. */
+    /** La llave con la que se ingresó, o `null` si esa llave se borró después (`on delete set null`): con una llave registrada, una sesión sin llave se cierra. */
     passkeyId: uuid("passkey_id").references(() => adminPasskeys.id, { onDelete: "set null" }),
     /** Descripción corta del navegador y el sistema ("Chrome en Windows"). */
     device: text("device").notNull(),

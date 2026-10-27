@@ -5,7 +5,7 @@
 //
 // - En producción es el origen del sitio público (`NEXT_PUBLIC_SITE_URL`, o el
 //   dominio de producción de Vercel): `https://tallami.com` → rpID `tallami.com`.
-// - Para los servidores de los tests (puertos 3100 y 3101), `ADMIN_WEBAUTHN_ORIGIN`
+// - Para los servidores de los tests (puertos 3100, 3101 y 3102), `ADMIN_WEBAUTHN_ORIGIN`
 //   fija otro origen. En producción de Vercel se ignora con un aviso en el log,
 //   igual que `EXCHANGE_RATE_SOURCE`: una variable de prueba olvidada ahí movería
 //   las llaves a `localhost`. Se mira `VERCEL_ENV` y no `NODE_ENV` porque los e2e

@@ -6,7 +6,7 @@
 
 **Architecture:** Las sesiones pasan de "JWT y nada más" a una fila en la base por sesión; la cookie sigue siendo un JWT firmado y ahora lleva el id de la sesión (`sid`). El `proxy` verifica solo la firma (sin base); `requireAdmin()` verifica además la fila (abierta, no vencida, menos de 30 min sin uso). El ingreso tiene dos pasos: la contraseña crea un "ingreso a medio camino" (fila de 5 minutos atada a su propia cookie) y la llave (WebAuthn con SimpleWebAuthn) lo convierte en sesión. Las acciones delicadas piden "confirmación reciente" con la llave.
 
-**Tech Stack:** Next.js 16.4 (App Router, `src/proxy.ts`, Server Actions, `after()`), TypeScript, Drizzle 0.45 + PGlite/postgres.js, `jose`, `@simplewebauthn/server` + `@simplewebauthn/browser` (13.x), `resend`, Vitest, Playwright (autenticador virtual de Chrome por CDP).
+**Tech Stack:** Next.js 16.4 (App Router, `src/proxy.ts`, Server Actions, `after()`), TypeScript, Drizzle 0.45 + PGlite/postgres.js, `jose`, `@simplewebauthn/server` + `@simplewebauthn/browser` (14.x), `resend`, Vitest, Playwright (autenticador virtual de Chrome por CDP).
 
 **Spec:** `docs/superpowers/specs/2026-10-21-admin-login-security-design.md` (leerlo entero antes de cada tarea).
 

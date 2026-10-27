@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ENROLLMENT_CODE_MS } from "@/admin/auth/policy";
 import { dateToArgentinaLocal } from "@/admin/dates";
 import { Notice } from "@/admin/ui/notice";
 import { useHydrated } from "@/admin/ui/use-hydrated";
@@ -20,6 +21,9 @@ interface ShownCode {
 }
 
 const MESSAGE_ID = "enrollment-code-message";
+const MINUTE_MS = 60_000;
+/** Cuánto dura el código, en minutos enteros, para decirlo en pantalla: sale de la política, no de una copia del número. */
+const CODE_MINUTES = Math.round(ENROLLMENT_CODE_MS / MINUTE_MS);
 
 /** La hora a la que vence, en hora de Argentina: "14:40". */
 function expiryTime(expiresAt: Date): string {
@@ -77,7 +81,7 @@ export function EnrollmentCode({ origin }: EnrollmentCodeProps) {
               {shown.code}
             </p>
             <p className="text-[0.9375rem] leading-snug font-bold">
-              Usalo antes de 10 minutos y no cierres sesión en este dispositivo hasta usarlo.
+              Usalo antes de {CODE_MINUTES} minutos y no cierres sesión en este dispositivo hasta usarlo.
             </p>
             <p className="text-[0.9375rem] leading-snug text-ink-2">
               Vence a las {expiryTime(shown.expiresAt)}. Es de un solo uso y no vuelve a mostrarse.
