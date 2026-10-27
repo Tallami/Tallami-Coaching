@@ -6,7 +6,7 @@ import { redeemEnrollmentCode } from "@/admin/auth/enrollment-codes";
 import type { LoginCodeRedeemed, LoginStepFailure, LoginStepSuccess } from "@/admin/auth/login-errors";
 import { beginLoginStep, finishLoginStep, redeemLoginCode } from "@/admin/auth/login-steps";
 import { passkeyNameSchema } from "@/admin/auth/passkey-name";
-import { insertPasskey, listPasskeys } from "@/admin/auth/passkeys";
+import { findPasskeyByCredentialId, insertPasskey, listPasskeys } from "@/admin/auth/passkeys";
 import { setPendingChallenge } from "@/admin/auth/pending-logins";
 
 // El código para registrar la llave de otro dispositivo (la PC sin Bluetooth, por
@@ -47,7 +47,8 @@ export async function beginCodePasskeyAction(): Promise<
 /**
  * Verifica el registro y guarda la llave con el nombre `name` (de 1 a 40 caracteres)
  * junto a las que ya había; si sale bien, la sesión queda abierta con esa llave. Exige
- * un ingreso de tipo `code`.
+ * un ingreso de tipo `code`. Si esa llave ya estaba registrada, es `expired`: no se guarda
+ * nada y hay que volver a empezar.
  */
 export async function finishCodePasskeyAction(
   response: unknown,
@@ -61,6 +62,12 @@ export async function finishCodePasskeyAction(
     passkeyName: parsedName.data,
     verify: (_db, challenge) => verifyRegistration(response, challenge),
     async commit(db, data) {
+      // El navegador ya evita repetir un dispositivo (`excludeCredentials`); esto cubre un pedido armado a mano.
+      // Es volver a empezar como en los demás caminos (otra pestaña ya registró algo): sin tirar, con el ingreso gastado.
+      if ((await findPasskeyByCredentialId(db, data.credentialId)) !== null) {
+        console.warn("Llave de acceso: registro rechazado. Esa llave ya estaba registrada.");
+        return null;
+      }
       const passkey = await insertPasskey(db, { ...data, name: parsedName.data }, { onlyIfNone: false });
       return passkey?.id ?? null;
     },

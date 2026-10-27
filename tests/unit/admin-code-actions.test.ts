@@ -453,16 +453,24 @@ describe("finishCodePasskeyAction", () => {
     expect(await finishCodePasskeyAction(answer, "x".repeat(40))).toMatchObject({ ok: true });
   });
 
-  test("the key of a device that is already registered is refused and nothing is saved", async () => {
+  test("the key of a device that is already registered ends the login as expired, like the other paths, instead of breaking", async () => {
     const { passkey, device } = await registeredDevice("Celular");
     const { code } = await freshCode(passkey);
-    await pendingLogin("passkey");
+    const pendingId = await pendingLogin("passkey");
     expect(await redeemCodeAction(code)).toEqual({ ok: true });
     const begun = await beginCodePasskeyAction();
     if (!begun.ok) throw new Error(begun.error);
+    const sessionsBefore = await sessionRows();
 
-    await expect(finishCodePasskeyAction(device.register(begun.options), "Otra vez")).rejects.toThrow();
+    const result = await finishCodePasskeyAction(device.register(begun.options), "Otra vez");
 
+    expect(result).toEqual(EXPIRED);
+    // No se guardó nada ni se abrió ninguna sesión, y la repetición no cuenta como intento fallido.
     expect(await countPasskeys(db)).toBe(1);
+    expect(await sessionRows()).toEqual(sessionsBefore);
+    expect(cookieSets(ADMIN_COOKIE)).toHaveLength(0);
+    expect(await failedAttempts()).toBe(0);
+    // El ingreso se gastó (hay que volver a empezar) y no se puede reusar.
+    expect(await consumePendingLogin(db, pendingId)).toBe(false);
   });
 });
