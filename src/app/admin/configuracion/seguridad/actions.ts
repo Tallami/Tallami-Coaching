@@ -1,7 +1,6 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { z } from "zod";
 import { notifySecurityEvent } from "@/admin/alerts/notify";
 import {
   authenticationOptions,
@@ -11,6 +10,7 @@ import {
   verifyRegistration,
 } from "@/admin/auth/ceremonies";
 import { formatEnrollmentCode, generateEnrollmentCode } from "@/admin/auth/enrollment-codes";
+import { passkeyNameSchema } from "@/admin/auth/passkey-name";
 import {
   deletePasskeyUnlessLast,
   findPasskeyByCredentialId,
@@ -19,7 +19,7 @@ import {
   recordPasskeyUse,
   renamePasskey,
 } from "@/admin/auth/passkeys";
-import { ENROLLMENT_CODE_MS, PASSKEY_NAME_MAX_LENGTH } from "@/admin/auth/policy";
+import { ENROLLMENT_CODE_MS } from "@/admin/auth/policy";
 import { LOGIN_PATH } from "@/admin/auth/redirect";
 import { getAdminSession, requireAdmin } from "@/admin/auth/require-admin";
 import { ADMIN_COOKIE, SESSION_COOKIE_PATH } from "@/admin/auth/session";
@@ -51,7 +51,6 @@ import { getDb } from "@/db/client";
 // hace solo (`withReauth`, en `src/admin/security/with-reauth.ts`).
 
 const REAUTH_REQUIRED: ReauthRequired = { ok: false, error: "reauth-required" };
-const nameSchema = z.string().trim().min(1).max(PASSKEY_NAME_MAX_LENGTH);
 
 /** Borra la cookie de la sesión de este navegador (la sesión misma se cierra en la base). */
 async function clearSessionCookie(): Promise<void> {
@@ -118,7 +117,7 @@ export async function finishAddPasskeyAction(response: unknown, name: string): P
   await requireAdmin();
   const session = await getAdminSession();
   if (!hasRecentReauth(session)) return REAUTH_REQUIRED;
-  const parsedName = nameSchema.safeParse(name);
+  const parsedName = passkeyNameSchema.safeParse(name);
   if (!parsedName.success) return { ok: false, error: "invalid-name" };
 
   const db = await getDb();
@@ -142,7 +141,7 @@ export async function renamePasskeyAction(id: string, name: string): Promise<Ren
   await requireAdmin();
   const session = await getAdminSession();
   if (!hasRecentReauth(session)) return REAUTH_REQUIRED;
-  const parsedName = nameSchema.safeParse(name);
+  const parsedName = passkeyNameSchema.safeParse(name);
   if (!parsedName.success) return { ok: false, error: "invalid-name" };
 
   const renamed = await renamePasskey(await getDb(), id, parsedName.data);

@@ -1,14 +1,13 @@
 "use server";
 
 import type { PublicKeyCredentialCreationOptionsJSON } from "@simplewebauthn/server";
-import { z } from "zod";
 import { registrationOptions, verifyRegistration } from "@/admin/auth/ceremonies";
 import { redeemEnrollmentCode } from "@/admin/auth/enrollment-codes";
 import type { LoginCodeRedeemed, LoginStepFailure, LoginStepSuccess } from "@/admin/auth/login-errors";
 import { beginLoginStep, finishLoginStep, redeemLoginCode } from "@/admin/auth/login-steps";
+import { passkeyNameSchema } from "@/admin/auth/passkey-name";
 import { insertPasskey, listPasskeys } from "@/admin/auth/passkeys";
 import { setPendingChallenge } from "@/admin/auth/pending-logins";
-import { PASSKEY_NAME_MAX_LENGTH } from "@/admin/auth/policy";
 
 // El código para registrar la llave de otro dispositivo (la PC sin Bluetooth, por
 // ejemplo): después de la contraseña, "Tengo un código" lo canjea y el dispositivo
@@ -19,7 +18,6 @@ import { PASSKEY_NAME_MAX_LENGTH } from "@/admin/auth/policy";
 
 /** Un código es de 10 caracteres: más largo que esto no puede ser uno, y no hace falta procesarlo. */
 const MAX_CODE_LENGTH = 64;
-const nameSchema = z.string().trim().min(1).max(PASSKEY_NAME_MAX_LENGTH);
 
 /**
  * Canjea el código tal como lo tecleó la persona (con o sin guion, en cualquier caso)
@@ -56,7 +54,7 @@ export async function finishCodePasskeyAction(
   name: string,
 ): Promise<LoginStepSuccess | LoginStepFailure> {
   // El formulario ya lo valida: un nombre inválido solo llega armando el pedido a mano.
-  const parsedName = nameSchema.safeParse(name);
+  const parsedName = passkeyNameSchema.safeParse(name);
   if (!parsedName.success) return { ok: false, error: "failed" };
 
   return finishLoginStep("code", {

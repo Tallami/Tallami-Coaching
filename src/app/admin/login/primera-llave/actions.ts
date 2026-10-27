@@ -1,13 +1,12 @@
 "use server";
 
 import type { PublicKeyCredentialCreationOptionsJSON } from "@simplewebauthn/server";
-import { z } from "zod";
 import { registrationOptions, verifyRegistration } from "@/admin/auth/ceremonies";
 import type { LoginStepFailure, LoginStepSuccess } from "@/admin/auth/login-errors";
 import { beginLoginStep, finishLoginStep } from "@/admin/auth/login-steps";
+import { passkeyNameSchema } from "@/admin/auth/passkey-name";
 import { countPasskeys, insertPasskey } from "@/admin/auth/passkeys";
 import { setPendingChallenge } from "@/admin/auth/pending-logins";
-import { PASSKEY_NAME_MAX_LENGTH } from "@/admin/auth/policy";
 
 // El segundo paso cuando todavía no hay ninguna llave: registrar la primera en este
 // dispositivo. Solo existe mientras no haya ninguna: el ingreso a medio camino es de
@@ -15,8 +14,6 @@ import { PASSKEY_NAME_MAX_LENGTH } from "@/admin/auth/policy";
 // guardarla se vuelve a comprobar en la base, de forma atómica (`onlyIfNone`). Las
 // dos acciones son puertas del panel (sin `requireAdmin()`; ver
 // `src/admin/auth/login-steps.ts`).
-
-const nameSchema = z.string().trim().min(1).max(PASSKEY_NAME_MAX_LENGTH);
 
 /** Las opciones para crear la llave en el navegador, con su desafío guardado en el ingreso a medio camino. */
 export async function beginFirstPasskeyAction(): Promise<
@@ -41,7 +38,7 @@ export async function finishFirstPasskeyAction(
   name: string,
 ): Promise<LoginStepSuccess | LoginStepFailure> {
   // El formulario ya lo valida: un nombre inválido solo llega armando el pedido a mano.
-  const parsedName = nameSchema.safeParse(name);
+  const parsedName = passkeyNameSchema.safeParse(name);
   if (!parsedName.success) return { ok: false, error: "failed" };
 
   return finishLoginStep("first-key", {
