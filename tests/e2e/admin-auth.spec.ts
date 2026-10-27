@@ -24,7 +24,7 @@ const PENDING_COOKIE = "tallami_admin_pending";
 /** Una llave que el panel no tiene registrada (los servidores registran los slots 0 a 31). */
 const UNKNOWN_SLOT = 99;
 const CANCELLED_MESSAGE =
-  "Cancelaste o tu dispositivo no tiene una llave para este panel. Probá de nuevo, o usá tu celular con el código QR.";
+  "Cancelaste o tu dispositivo no tiene una llave para este panel. Probá de nuevo, usá tu celular con el código QR o tocá «Tengo un código».";
 const LOCKED_AFTER = 5;
 /** Lo máximo que dura una sesión (y su cookie): 8 horas. */
 const SESSION_SECONDS = 8 * 60 * 60;

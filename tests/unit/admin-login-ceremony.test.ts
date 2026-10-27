@@ -39,7 +39,7 @@ describe("runCeremony", () => {
     expect(outcome).toEqual({
       kind: "message",
       message:
-        "Cancelaste o tu dispositivo no tiene una llave para este panel. Probá de nuevo, o usá tu celular con el código QR.",
+        "Cancelaste o tu dispositivo no tiene una llave para este panel. Probá de nuevo, usá tu celular con el código QR o tocá «Tengo un código».",
     });
     expect(steps.finish).not.toHaveBeenCalled();
   });

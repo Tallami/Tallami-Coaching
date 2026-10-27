@@ -8,7 +8,7 @@ import { describeWebAuthnError } from "@/components/admin/webauthn-errors";
 const ORIGIN = "https://tallami.com";
 
 const CANCELLED =
-  "Cancelaste o tu dispositivo no tiene una llave para este panel. Probá de nuevo, o usá tu celular con el código QR.";
+  "Cancelaste o tu dispositivo no tiene una llave para este panel. Probá de nuevo, usá tu celular con el código QR o tocá «Tengo un código».";
 const ALREADY_REGISTERED = "Este dispositivo ya tiene una llave registrada.";
 const GENERIC = "No se pudo usar la llave. Probá de nuevo.";
 
