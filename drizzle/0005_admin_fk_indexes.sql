@@ -1,0 +1,2 @@
+CREATE INDEX "admin_enrollment_codes_created_by_session_idx" ON "admin_enrollment_codes" USING btree ("created_by_session");--> statement-breakpoint
+CREATE INDEX "admin_sessions_passkey_id_idx" ON "admin_sessions" USING btree ("passkey_id");

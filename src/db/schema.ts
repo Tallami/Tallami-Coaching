@@ -289,6 +289,8 @@ export const adminSessions = pgTable(
       "admin_sessions_challenge_purpose_valid",
       sql`${t.challengePurpose} is null or ${oneOf(t.challengePurpose, ["reauth", "register"])}`,
     ),
+    // Borrar una llave (`on delete set null`) busca las sesiones que se abrieron con ella.
+    index("admin_sessions_passkey_id_idx").on(t.passkeyId),
   ],
 ).enableRLS();
 
@@ -321,16 +323,21 @@ export const adminPendingLogins = pgTable(
  * Un código de un solo uso para registrar una llave en otro dispositivo. Se
  * guarda solo su hash; nace en una sesión abierta y se borra con ella.
  */
-export const adminEnrollmentCodes = pgTable("admin_enrollment_codes", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  codeHash: text("code_hash").notNull().unique(),
-  createdBySession: text("created_by_session")
-    .notNull()
-    .references(() => adminSessions.id, { onDelete: "cascade" }),
-  createdAt: timestamptz("created_at").notNull().defaultNow(),
-  expiresAt: timestamptz("expires_at").notNull(),
-  usedAt: timestamptz("used_at"),
-}).enableRLS();
+export const adminEnrollmentCodes = pgTable(
+  "admin_enrollment_codes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    codeHash: text("code_hash").notNull().unique(),
+    createdBySession: text("created_by_session")
+      .notNull()
+      .references(() => adminSessions.id, { onDelete: "cascade" }),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+    expiresAt: timestamptz("expires_at").notNull(),
+    usedAt: timestamptz("used_at"),
+  },
+  // Cerrar o borrar una sesión (`on delete cascade`) busca los códigos que generó.
+  (t) => [index("admin_enrollment_codes_created_by_session_idx").on(t.createdBySession)],
+).enableRLS();
 
 export type Customer = typeof customers.$inferSelect;
 export type NewCustomer = typeof customers.$inferInsert;

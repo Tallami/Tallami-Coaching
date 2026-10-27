@@ -198,7 +198,7 @@ Para que el panel funcione en internet (en Vercel) la base no puede ser la local
 
 **Si ya tenías el panel en línea, de antes de las llaves de acceso,** actualizalo en este orden:
 
-1. Corré `npm run db:migrate` (paso 3) *antes* de desplegar: la migración `0004_admin_login_security` crea las tablas de las sesiones, las llaves, los ingresos a medio camino y los códigos. Sin ella, el ingreso del panel nuevo falla.
+1. Corré `npm run db:migrate` (paso 3) *antes* de desplegar: la migración `0004_admin_login_security` crea las tablas de las sesiones, las llaves, los ingresos a medio camino y los códigos, y la `0005_admin_fk_indexes` les suma dos índices (para que borrar una llave o una sesión no recorra la tabla entera). Sin la primera, el ingreso del panel nuevo falla; el comando aplica las dos juntas.
 2. Desplegá.
 3. Contá con volver a entrar una vez: las cookies de sesión de antes dejan de valer (ahora cada sesión se guarda en la base).
 4. Entrá con la contraseña y registrá la primera llave **enseguida** (hasta que lo hagas, quien conozca la contraseña podría registrar la suya). Hacelo con la dirección definitiva de la web y con `NEXT_PUBLIC_SITE_URL` ya definida (paso 5 de arriba; ver "La dirección de la web"): si después cambia, las llaves dejan de servir.

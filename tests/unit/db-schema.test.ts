@@ -1,7 +1,9 @@
-import { count, eq, getTableName } from "drizzle-orm";
+import { count, eq, getTableName, is, sql } from "drizzle-orm";
+import { PgTable, getTableConfig } from "drizzle-orm/pg-core";
 import { beforeAll, describe, expect, test } from "vitest";
 import { suggestedPriceUsd, type SaleItem } from "@/admin/catalog";
 import type { Db } from "@/db/client";
+import * as schema from "@/db/schema";
 import {
   customers,
   exchangeRates,
@@ -203,6 +205,50 @@ describe("database schema", () => {
     );
 
     expect(constraint).toBe("sales_customer_id_customers_id_fk");
+  });
+
+  test("the columns the foreign keys of the login security point from are indexed, in the schema and in the database", async () => {
+    // Borrar una llave (`on delete set null`) y cerrar o limpiar sesiones (`on delete cascade`) buscan en estas
+    // dos columnas: sin un índice, cada borrado recorre la tabla entera.
+    const indexed = await db.execute(
+      sql`select indexname, indexdef from pg_indexes
+          where schemaname = 'public' and tablename in ('admin_sessions', 'admin_enrollment_codes')`,
+    );
+    const definitions = Object.fromEntries(
+      (indexed as unknown as { rows: Array<{ indexname: string; indexdef: string }> }).rows.map((row) => [
+        row.indexname,
+        row.indexdef,
+      ]),
+    );
+
+    expect(definitions["admin_sessions_passkey_id_idx"]).toMatch(/ON public\.admin_sessions .*\(passkey_id\)/);
+    expect(definitions["admin_enrollment_codes_created_by_session_idx"]).toMatch(
+      /ON public\.admin_enrollment_codes .*\(created_by_session\)/,
+    );
+  });
+
+  test("every foreign key column of the schema leads an index, so a new reference cannot skip it", () => {
+    const tables: PgTable[] = [];
+    for (const value of Object.values(schema)) {
+      if (is(value, PgTable)) tables.push(value);
+    }
+    const unindexed: string[] = [];
+
+    for (const table of tables) {
+      const config = getTableConfig(table);
+      const leadingColumns = new Set(
+        config.indexes.map((index) => {
+          const first = index.config.columns[0];
+          return "name" in first ? first.name : "";
+        }),
+      );
+      for (const foreignKey of config.foreignKeys) {
+        const column = foreignKey.reference().columns[0].name;
+        if (!leadingColumns.has(column)) unindexed.push(`${getTableName(table)}.${column}`);
+      }
+    }
+
+    expect(unindexed).toEqual([]);
   });
 
   test("suggested prices come from the site catalog", () => {

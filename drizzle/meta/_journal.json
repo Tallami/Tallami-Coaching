@@ -36,6 +36,13 @@
       "when": 1792607885430,
       "tag": "0004_admin_login_security",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793116821877,
+      "tag": "0005_admin_fk_indexes",
+      "breakpoints": true
     }
   ]
 }

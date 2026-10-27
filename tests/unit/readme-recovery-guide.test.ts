@@ -217,3 +217,16 @@ describe("the README on what it promises exactly", () => {
     expect(local).toMatch(/un solo programa|dos programas/);
   });
 });
+
+describe("the README on the migrations of the login security", () => {
+  test("the deploy step tells to run the migrations before deploying, and names both of them", () => {
+    const online = sectionOf("Ponerlo en línea");
+    const upgrade = online.slice(online.indexOf("Si ya tenías el panel en línea"));
+    const step = upgrade.slice(upgrade.indexOf("\n1. "), upgrade.indexOf("\n2. "));
+
+    expect(step).toContain("`npm run db:migrate`");
+    expect(step).toContain("`0004_admin_login_security`");
+    expect(step).toContain("`0005_admin_fk_indexes`");
+    expect(step).toMatch(/\*antes\* de desplegar/);
+  });
+});
