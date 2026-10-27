@@ -7,7 +7,7 @@ import { Field } from "@/admin/ui/field";
 import { Notice } from "@/admin/ui/notice";
 import { useHydrated } from "@/admin/ui/use-hydrated";
 import { beginAddPasskeyAction, finishAddPasskeyAction } from "@/app/admin/configuracion/seguridad/actions";
-import { describeWebAuthnError } from "@/components/admin/webauthn-errors";
+import { describeWebAuthnError, originMismatchMessage } from "@/components/admin/webauthn-errors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { INVALID_NAME_MESSAGE } from "./messages";
@@ -49,6 +49,10 @@ export function AddPasskey({ defaultName, origin }: AddPasskeyProps) {
     setNameError(undefined);
     setAddedName(null);
     void perform(async () => {
+      // Desde otra dirección que la configurada la llave no serviría: ni se le pide nada al servidor.
+      const mismatch = originMismatchMessage(origin);
+      if (mismatch !== null) return mismatch;
+
       const begun = await confirmed(() => beginAddPasskeyAction());
       if (!begun.ok) return ADD_FAILED_MESSAGE;
 

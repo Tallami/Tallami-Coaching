@@ -5,10 +5,11 @@
 //
 // Lo que haga el navegador puede fallar sin que el servidor se entere (Tallami
 // cancela, el dispositivo no tiene la llave, la dirección no es la configurada):
-// en ese caso no se llama a `finish`, así que no cuenta como intento fallido.
+// en ese caso no se llama a `finish`, así que no cuenta como intento fallido. Una
+// pestaña en otra dirección que la configurada ni siquiera llega a `begin`.
 
 import type { LoginStepFailure, LoginStepSuccess } from "@/admin/auth/login-errors";
-import { describeWebAuthnError } from "./webauthn-errors";
+import { describeWebAuthnError, originMismatchMessage } from "./webauthn-errors";
 
 /** El aviso cuando el servidor no contesta (sin red, base caída): no dice nada de la llave. */
 export const UNAVAILABLE_MESSAGE = "No pudimos verificar el ingreso. Probá de nuevo en unos minutos.";
@@ -39,6 +40,10 @@ function outcomeOf(failure: LoginStepFailure): CeremonyOutcome {
 
 /** Corre la ceremonia entera y dice cómo terminó. Nunca tira. `origin` es el de las llaves, para los avisos. */
 export async function runCeremony<Options>(ceremony: Ceremony<Options>, origin: string): Promise<CeremonyOutcome> {
+  // Desde otra dirección el servidor rechazaría la llave y cada intento contaría como fallo: ni se lo pide.
+  const mismatch = originMismatchMessage(origin);
+  if (mismatch !== null) return { kind: "message", message: mismatch };
+
   try {
     const begun = await ceremony.begin();
     if (!begun.ok) return outcomeOf(begun);

@@ -11,6 +11,7 @@ import { useHydrated } from "@/admin/ui/use-hydrated";
 import { FirstPasskey } from "@/components/admin/first-passkey";
 import { UNAVAILABLE_MESSAGE } from "@/components/admin/login-ceremony";
 import { LoginCard } from "@/components/admin/login-card";
+import { originMismatchMessage } from "@/components/admin/webauthn-errors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -80,6 +81,7 @@ export function EnrollmentCodeStep({
   return (
     <CodeEntry
       redeem={redeem}
+      origin={origin}
       restartHref={restartHref}
       expiredHref={expiredHref}
       blockedHref={blockedHref}
@@ -91,6 +93,8 @@ export function EnrollmentCodeStep({
 
 interface CodeEntryProps {
   redeem: EnrollmentCodeActions["redeem"];
+  /** El origen configurado de las llaves: en otra dirección el código no se canjea (se gastaría y la llave no se podría registrar). */
+  origin: string;
   restartHref: string;
   expiredHref: string;
   blockedHref: string;
@@ -99,7 +103,7 @@ interface CodeEntryProps {
 }
 
 /** El campo del código. Lo escrito se borra al canjearlo: el código no queda en pantalla ni en el estado. */
-function CodeEntry({ redeem, restartHref, expiredHref, blockedHref, onRedeemed, onBack }: CodeEntryProps) {
+function CodeEntry({ redeem, origin, restartHref, expiredHref, blockedHref, onRedeemed, onBack }: CodeEntryProps) {
   const router = useRouter();
   const hydrated = useHydrated();
   const [code, setCode] = useState("");
@@ -115,6 +119,12 @@ function CodeEntry({ redeem, restartHref, expiredHref, blockedHref, onRedeemed, 
       return;
     }
     setFieldError(undefined);
+    // Canjearlo en otra dirección gastaría el código y el ingreso (la cookie no viaja entre dominios) sin poder registrar la llave.
+    const mismatch = originMismatchMessage(origin);
+    if (mismatch !== null) {
+      setMessage(mismatch);
+      return;
+    }
     setMessage(null);
     setBusy(true);
     try {

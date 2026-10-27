@@ -9,6 +9,25 @@ const CANCELLED =
 const ALREADY_REGISTERED = "Este dispositivo ya tiene una llave registrada.";
 const GENERIC = "No se pudo usar la llave. Probá de nuevo.";
 
+/** El aviso de que las llaves solo valen en `origin`: el mismo para el `SecurityError` del navegador y para la guarda de la pestaña. */
+function wrongOriginMessage(origin: string): string {
+  return `Las llaves solo funcionan en ${origin}.`;
+}
+
+/**
+ * El aviso si esta pestaña no está en `origin` (el origen configurado de las llaves,
+ * `getWebAuthnConfig().origin`), o `null` si está ahí. Se mira ANTES de pedirle nada al
+ * servidor. El navegador no alcanza para detectarlo: en `www.tallami.com`, con el sitio
+ * configurado en `https://tallami.com`, acepta el dominio de la llave (es el padre),
+ * no tira `SecurityError` y es el servidor el que rechaza el origen, con lo que cada
+ * intento contaría para el bloqueo. Sin navegador (el servidor al renderizar) no hay
+ * pestaña que comparar: `null`.
+ */
+export function originMismatchMessage(origin: string): string | null {
+  if (typeof window === "undefined") return null;
+  return window.location.origin === origin ? null : wrongOriginMessage(origin);
+}
+
 function nameOf(error: unknown): string | null {
   if (typeof error !== "object" || error === null || !("name" in error)) return null;
   return typeof error.name === "string" ? error.name : null;
@@ -26,7 +45,7 @@ export function describeWebAuthnError(error: unknown, origin: string): string {
     case "NotAllowedError":
       return CANCELLED;
     case "SecurityError":
-      return `Las llaves solo funcionan en ${origin}.`;
+      return wrongOriginMessage(origin);
     // Al registrar: el dispositivo ya tiene una de las llaves del panel.
     case "InvalidStateError":
       return ALREADY_REGISTERED;
