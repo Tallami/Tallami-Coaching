@@ -43,6 +43,13 @@
       "when": 1793116821877,
       "tag": "0005_admin_fk_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793225783833,
+      "tag": "0006_student_portal",
+      "breakpoints": true
     }
   ]
 }

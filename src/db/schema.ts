@@ -33,6 +33,8 @@ import {
   primaryKey,
   text,
   timestamp,
+  unique,
+  uniqueIndex,
   uuid,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
@@ -48,6 +50,8 @@ import {
   SALE_ITEMS,
   SALE_STATUSES,
 } from "@/admin/catalog";
+import { DELIVERY_KINDS, DELIVERY_TITLE_MAX_LENGTH, PORTAL_PROVIDERS } from "@/portal/policy";
+import { bytea } from "./bytea";
 
 /**
  * `columna in ('a', 'b')` con los valores de una lista cerrada del catálogo.
@@ -337,6 +341,140 @@ export const adminEnrollmentCodes = pgTable(
   },
   // Cerrar o borrar una sesión (`on delete cascade`) busca los códigos que generó.
   (t) => [index("admin_enrollment_codes_created_by_session_idx").on(t.createdBySession)],
+).enableRLS();
+
+// Portal del alumno (`src/portal/`): cuentas con Discord o Google, sus sesiones,
+// las invitaciones que las vinculan a un alumno del panel y lo que Tallami le
+// entrega a cada compra. Los tiempos y los límites viven en `src/portal/policy.ts`.
+
+/**
+ * La cuenta de un alumno en el portal: una identidad (proveedor + id del usuario en
+ * ese proveedor) y nada más que el nombre para mostrar y el email si el proveedor
+ * lo da verificado. `customerId` la vincula a un alumno del panel (como mucho uno
+ * por cuenta y una cuenta por alumno); si el alumno se borra, la cuenta sigue, sin
+ * vínculo. Es `null` hasta que el alumno usa su invitación.
+ */
+export const portalAccounts = pgTable(
+  "portal_accounts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    provider: text("provider").notNull(),
+    providerUserId: text("provider_user_id").notNull(),
+    displayName: text("display_name").notNull(),
+    email: text("email"),
+    customerId: uuid("customer_id").references(() => customers.id, { onDelete: "set null" }),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+    lastLoginAt: timestamptz("last_login_at").notNull().defaultNow(),
+  },
+  (t) => [
+    check("portal_accounts_provider_valid", oneOf(t.provider, PORTAL_PROVIDERS)),
+    unique("portal_accounts_identity_unique").on(t.provider, t.providerUserId),
+    // Un índice único (y no el `unique` de la columna): vale como restricción de una cuenta
+    // por alumno y es además el índice de la clave foránea, que se busca al borrar un
+    // alumno (`on delete set null`).
+    uniqueIndex("portal_accounts_customer_id_unique").on(t.customerId),
+  ],
+).enableRLS();
+
+/**
+ * Una sesión del alumno. El `id` es el SHA-256 (hexadecimal) del token que lleva la
+ * cookie: el token en claro no está en ningún lado de la base, así que quien lea
+ * esta tabla no puede entrar como nadie. La sesión vale mientras no esté cerrada
+ * (`revokedAt`) ni vencida (`expiresAt`).
+ */
+export const portalSessions = pgTable(
+  "portal_sessions",
+  {
+    id: text("id").primaryKey(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => portalAccounts.id, { onDelete: "cascade" }),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+    expiresAt: timestamptz("expires_at").notNull(),
+    revokedAt: timestamptz("revoked_at"),
+  },
+  // Borrar una cuenta (`on delete cascade`) busca sus sesiones.
+  (t) => [index("portal_sessions_account_id_idx").on(t.accountId)],
+).enableRLS();
+
+/**
+ * Una invitación al portal para un alumno del panel, de un solo uso. Se guarda solo
+ * el hash del link (`tokenHash`); `usedByAccountId` dice qué cuenta la usó, y queda
+ * en `null` si esa cuenta se borra.
+ */
+export const portalInvites = pgTable(
+  "portal_invites",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tokenHash: text("token_hash").notNull().unique(),
+    customerId: uuid("customer_id")
+      .notNull()
+      .references(() => customers.id, { onDelete: "cascade" }),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+    expiresAt: timestamptz("expires_at").notNull(),
+    usedAt: timestamptz("used_at"),
+    usedByAccountId: uuid("used_by_account_id").references(() => portalAccounts.id, { onDelete: "set null" }),
+  },
+  (t) => [
+    // Borrar un alumno o una cuenta (`on delete cascade` / `set null`) busca sus invitaciones.
+    index("portal_invites_customer_id_idx").on(t.customerId),
+    index("portal_invites_used_by_account_id_idx").on(t.usedByAccountId),
+  ],
+).enableRLS();
+
+/**
+ * Los bytes de un PDF entregado, en una tabla aparte para que listar las entregas
+ * nunca los lea. Detrás de una interfaz de almacenamiento (`src/portal/`), para
+ * poder pasarlos a un almacenamiento de archivos más adelante.
+ */
+export const deliveryFiles = pgTable("delivery_files", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  contentType: text("content_type").notNull(),
+  size: integer("size").notNull(),
+  bytes: bytea("bytes").notNull(),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+}).enableRLS();
+
+/**
+ * Algo que Tallami le entrega a un alumno por una venta: un video de YouTube (se
+ * guarda el id del video), un PDF (`fileId`) o un link `https://`. Cada entrega
+ * lleva exactamente el campo de su tipo y ninguno de los otros.
+ */
+export const deliveries = pgTable(
+  "deliveries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    saleId: uuid("sale_id")
+      .notNull()
+      .references(() => sales.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    title: text("title").notNull(),
+    youtubeVideoId: text("youtube_video_id"),
+    url: text("url"),
+    fileId: uuid("file_id").references(() => deliveryFiles.id, { onDelete: "cascade" }),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    check("deliveries_kind_valid", oneOf(t.kind, DELIVERY_KINDS)),
+    check(
+      "deliveries_title_length",
+      sql`char_length(${t.title}) between 1 and ${sql.raw(String(DELIVERY_TITLE_MAX_LENGTH))}`,
+    ),
+    // Postgres revisa las restricciones por orden alfabético de nombre: la de la lista de
+    // tipos (`..._kind_valid`) va antes que esta, así un tipo desconocido se informa como tal.
+    check(
+      "deliveries_one_field_per_kind",
+      sql`(
+        (${t.kind} = 'youtube' and ${t.youtubeVideoId} is not null and ${t.url} is null and ${t.fileId} is null)
+        or (${t.kind} = 'link' and ${t.url} is not null and ${t.youtubeVideoId} is null and ${t.fileId} is null)
+        or (${t.kind} = 'pdf' and ${t.fileId} is not null and ${t.youtubeVideoId} is null and ${t.url} is null)
+      )`,
+    ),
+    // El link va a un `href`: un `javascript:` o un `http:` no puede llegar hasta ahí.
+    check("deliveries_url_is_https", sql`${t.url} is null or ${t.url} like 'https://%'`),
+    index("deliveries_sale_id_idx").on(t.saleId),
+    index("deliveries_file_id_idx").on(t.fileId),
+  ],
 ).enableRLS();
 
 export type Customer = typeof customers.$inferSelect;

@@ -23,6 +23,15 @@ const LOGIN_SECURITY_TABLES = [
   "admin_enrollment_codes",
 ];
 
+/** Las tablas del portal del alumno: cuentas, sesiones, invitaciones, entregas y archivos. */
+const PORTAL_TABLES = [
+  "portal_accounts",
+  "portal_sessions",
+  "portal_invites",
+  "deliveries",
+  "delivery_files",
+];
+
 /** Las tablas que exporta el schema de Drizzle. */
 function schemaTables(): PgTable[] {
   const tables: PgTable[] = [];
@@ -68,6 +77,12 @@ describe("row level security", () => {
     expect(names).toEqual(
       expect.arrayContaining(LOGIN_SECURITY_TABLES),
     );
+  });
+
+  test("the five tables of the student portal are in the schema", () => {
+    const names = schemaTables().map(getTableName);
+
+    expect(names).toEqual(expect.arrayContaining(PORTAL_TABLES));
   });
 
   test("every table of the schema declares row level security, so a new table cannot skip it", () => {
@@ -128,6 +143,33 @@ describe("row level security at work", () => {
       sql`insert into admin_enrollment_codes (code_hash, created_by_session, expires_at)
           values ('codigo-rls', 'sesion-rls', now() + interval '10 minutes')`,
     );
+    // Y una en cada tabla del portal del alumno, por lo mismo.
+    await db.execute(
+      sql`insert into portal_accounts (id, provider, provider_user_id, display_name)
+          values ('11111111-1111-4111-8111-111111111111', 'discord', 'usuario-rls', 'Alumno del portal')`,
+    );
+    await db.execute(
+      sql`insert into portal_sessions (id, account_id, expires_at)
+          values ('hash-sesion-portal-rls', '11111111-1111-4111-8111-111111111111', now() + interval '30 days')`,
+    );
+    await db.execute(
+      sql`insert into portal_invites (token_hash, customer_id, expires_at)
+          select 'hash-invitacion-rls', id, now() + interval '14 days' from customers limit 1`,
+    );
+    await db.execute(
+      sql`insert into sales (customer_id, item, currency, amount_minor, ars_per_unit, ars_per_usd, rate_source,
+                             amount_ars_minor, amount_usd_minor, payment_method, status)
+          select id, 'lesson', 'USD', 4000, 1500, 1500, 'manual', 6000000, 4000, 'transfer', 'pending'
+          from customers limit 1`,
+    );
+    await db.execute(
+      sql`insert into delivery_files (id, content_type, size, bytes)
+          values ('22222222-2222-4222-8222-222222222222', 'application/pdf', 5, '\\x255044462d')`,
+    );
+    await db.execute(
+      sql`insert into deliveries (sale_id, kind, title, file_id)
+          select id, 'pdf', 'Plan de juego', '22222222-2222-4222-8222-222222222222' from sales limit 1`,
+    );
   });
 
   async function asApiRole<T>(run: () => Promise<T>): Promise<T> {
@@ -172,6 +214,14 @@ describe("row level security at work", () => {
 
   test("the owner sees the rows of the login security tables that the Data API role will not", async () => {
     for (const name of LOGIN_SECURITY_TABLES) {
+      const result = await db.execute(sql`select count(*)::int as total from ${sql.identifier(name)}`);
+
+      expect(Number(rowsOf(result)[0].total), name).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  test("the owner sees the rows of the student portal tables that the Data API role will not", async () => {
+    for (const name of PORTAL_TABLES) {
       const result = await db.execute(sql`select count(*)::int as total from ${sql.identifier(name)}`);
 
       expect(Number(rowsOf(result)[0].total), name).toBeGreaterThanOrEqual(1);

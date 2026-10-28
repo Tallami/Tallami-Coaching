@@ -1,0 +1,242 @@
+import { createHash, randomBytes } from "node:crypto";
+import { eq } from "drizzle-orm";
+import { beforeAll, beforeEach, describe, expect, test } from "vitest";
+import type { Db } from "@/db/client";
+import { portalAccounts, portalSessions } from "@/db/schema";
+import { PORTAL_SESSION_MS } from "@/portal/policy";
+import {
+  PORTAL_COOKIE,
+  createPortalSession,
+  portalCookieOptions,
+  readPortalSession,
+  revokeAccountSessions,
+  revokePortalSession,
+} from "@/portal/sessions";
+import { createTestDb } from "../helpers/db";
+import { insertTestAccount } from "../helpers/portal";
+
+const MINUTE_MS = 60_000;
+const DAY_MS = 24 * 60 * MINUTE_MS;
+
+/** Las 10:00 de un día cualquiera: todas las horas de los tests parten de acá. */
+const START = new Date("2026-10-28T10:00:00.000Z");
+
+function after(ms: number, base: Date = START): Date {
+  return new Date(base.getTime() + ms);
+}
+
+function sha256Hex(text: string): string {
+  return createHash("sha256").update(text).digest("hex");
+}
+
+let db: Db;
+let accountId: string;
+
+beforeAll(async () => {
+  db = await createTestDb();
+});
+
+beforeEach(async () => {
+  await db.delete(portalAccounts); // las cuentas arrastran sus sesiones (on delete cascade)
+  accountId = await insertTestAccount(db);
+});
+
+describe("createPortalSession", () => {
+  test("returns a random url-safe token of 32 bytes, different every time", async () => {
+    const tokens = await Promise.all([
+      createPortalSession(db, accountId, START),
+      createPortalSession(db, accountId, START),
+      createPortalSession(db, accountId, START),
+    ]);
+
+    for (const token of tokens) expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(new Set(tokens).size).toBe(3);
+  });
+
+  test("keeps only the SHA-256 of the token: the token itself is nowhere in the database", async () => {
+    const token = await createPortalSession(db, accountId, START);
+
+    const rows = await db.select().from(portalSessions);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe(sha256Hex(token));
+    expect(rows[0].id).toMatch(/^[0-9a-f]{64}$/);
+    expect(JSON.stringify(rows)).not.toContain(token);
+  });
+
+  test("stores the account, the creation hour and the expiry 30 days later, still open", async () => {
+    await createPortalSession(db, accountId, START);
+
+    const [row] = await db.select().from(portalSessions);
+
+    expect(row.accountId).toBe(accountId);
+    expect(row.createdAt).toEqual(START);
+    expect(row.expiresAt).toEqual(after(PORTAL_SESSION_MS));
+    expect(row.revokedAt).toBeNull();
+  });
+});
+
+describe("readPortalSession", () => {
+  test("returns the account of an open session, and nothing else", async () => {
+    const token = await createPortalSession(db, accountId, START);
+
+    expect(await readPortalSession(db, token, after(MINUTE_MS))).toEqual({ accountId });
+  });
+
+  test("is valid at 29 days 23:59 and null from the 30 days on", async () => {
+    const token = await createPortalSession(db, accountId, START);
+
+    expect(await readPortalSession(db, token, after(30 * DAY_MS - MINUTE_MS))).toEqual({ accountId });
+    expect(await readPortalSession(db, token, after(30 * DAY_MS - 1))).toEqual({ accountId });
+    expect(await readPortalSession(db, token, after(30 * DAY_MS))).toBeNull();
+    expect(await readPortalSession(db, token, after(31 * DAY_MS))).toBeNull();
+  });
+
+  test("a session does not get longer by being used", async () => {
+    const token = await createPortalSession(db, accountId, START);
+
+    expect(await readPortalSession(db, token, after(20 * DAY_MS))).not.toBeNull();
+    expect(await readPortalSession(db, token, after(30 * DAY_MS))).toBeNull();
+  });
+
+  test("is null without a token, with text that is not a token and with a token that was never issued", async () => {
+    await createPortalSession(db, accountId, START);
+
+    expect(await readPortalSession(db, undefined, START)).toBeNull();
+    expect(await readPortalSession(db, "", START)).toBeNull();
+    expect(await readPortalSession(db, "no es un token", START)).toBeNull();
+    expect(await readPortalSession(db, randomBytes(32).toString("base64url"), START)).toBeNull();
+  });
+
+  test("the stored id is not a token: having the database row is not having the session", async () => {
+    const token = await createPortalSession(db, accountId, START);
+    const [row] = await db.select().from(portalSessions);
+
+    expect(row.id).not.toBe(token);
+    expect(await readPortalSession(db, row.id, START)).toBeNull();
+  });
+
+  test("uses the current hour when none is given", async () => {
+    const token = await createPortalSession(db, accountId);
+
+    expect(await readPortalSession(db, token)).toEqual({ accountId });
+  });
+
+  test("a session of another account never answers for this one", async () => {
+    const otherAccountId = await insertTestAccount(db);
+    const otherToken = await createPortalSession(db, otherAccountId, START);
+
+    expect(await readPortalSession(db, otherToken, START)).toEqual({ accountId: otherAccountId });
+  });
+});
+
+describe("revokePortalSession", () => {
+  test("closes the session: it reads as null afterwards", async () => {
+    const token = await createPortalSession(db, accountId, START);
+
+    await revokePortalSession(db, token, after(MINUTE_MS));
+
+    expect(await readPortalSession(db, token, after(2 * MINUTE_MS))).toBeNull();
+  });
+
+  test("keeps the first closing hour when it is closed again", async () => {
+    const token = await createPortalSession(db, accountId, START);
+
+    await revokePortalSession(db, token, after(MINUTE_MS));
+    await revokePortalSession(db, token, after(5 * MINUTE_MS));
+
+    const [row] = await db.select().from(portalSessions);
+    expect(row.revokedAt).toEqual(after(MINUTE_MS));
+  });
+
+  test("closes only that session, not the other sessions of the account", async () => {
+    const closed = await createPortalSession(db, accountId, START);
+    const kept = await createPortalSession(db, accountId, START);
+
+    await revokePortalSession(db, closed, START);
+
+    expect(await readPortalSession(db, closed, START)).toBeNull();
+    expect(await readPortalSession(db, kept, START)).toEqual({ accountId });
+  });
+
+  test("does nothing, and does not fail, with a token that does not exist or is not a token", async () => {
+    const token = await createPortalSession(db, accountId, START);
+
+    await revokePortalSession(db, randomBytes(32).toString("base64url"), START);
+    await revokePortalSession(db, "no es un token", START);
+
+    expect(await readPortalSession(db, token, START)).toEqual({ accountId });
+  });
+});
+
+describe("revokeAccountSessions", () => {
+  test("closes every open session of the account", async () => {
+    const tokens = await Promise.all([
+      createPortalSession(db, accountId, START),
+      createPortalSession(db, accountId, START),
+      createPortalSession(db, accountId, START),
+    ]);
+
+    await revokeAccountSessions(db, accountId, after(MINUTE_MS));
+
+    for (const token of tokens) {
+      expect(await readPortalSession(db, token, after(2 * MINUTE_MS))).toBeNull();
+    }
+  });
+
+  test("leaves the sessions of other accounts alone", async () => {
+    const otherAccountId = await insertTestAccount(db);
+    await createPortalSession(db, accountId, START);
+    const otherToken = await createPortalSession(db, otherAccountId, START);
+
+    await revokeAccountSessions(db, accountId, START);
+
+    expect(await readPortalSession(db, otherToken, START)).toEqual({ accountId: otherAccountId });
+  });
+
+  test("keeps the first closing hour of a session that was already closed", async () => {
+    const token = await createPortalSession(db, accountId, START);
+    await revokePortalSession(db, token, after(MINUTE_MS));
+
+    await revokeAccountSessions(db, accountId, after(9 * MINUTE_MS));
+
+    const [row] = await db.select().from(portalSessions).where(eq(portalSessions.accountId, accountId));
+    expect(row.revokedAt).toEqual(after(MINUTE_MS));
+  });
+
+  test("does nothing for an account without sessions", async () => {
+    await expect(revokeAccountSessions(db, accountId, START)).resolves.toBeUndefined();
+  });
+});
+
+describe("the account and its sessions", () => {
+  test("deleting the account deletes its sessions", async () => {
+    const token = await createPortalSession(db, accountId, START);
+
+    await db.delete(portalAccounts).where(eq(portalAccounts.id, accountId));
+
+    expect(await db.select().from(portalSessions)).toHaveLength(0);
+    expect(await readPortalSession(db, token, START)).toBeNull();
+  });
+});
+
+describe("the session cookie", () => {
+  test("is called tallami_alumno", () => {
+    expect(PORTAL_COOKIE).toBe("tallami_alumno");
+  });
+
+  test("is httpOnly, SameSite=Lax, for the whole site, and lasts 30 days", () => {
+    expect(portalCookieOptions(true)).toEqual({
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 30 * 24 * 60 * 60,
+    });
+  });
+
+  test("is Secure unless the caller says it is plain http on localhost", () => {
+    expect(portalCookieOptions(true).secure).toBe(true);
+    expect(portalCookieOptions(false).secure).toBe(false);
+  });
+});
