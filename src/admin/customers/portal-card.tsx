@@ -1,0 +1,320 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { formatMoment } from "@/admin/dates";
+import { Field } from "@/admin/ui/field";
+import { Notice } from "@/admin/ui/notice";
+import { useHydrated } from "@/admin/ui/use-hydrated";
+import {
+  createPortalInviteAction,
+  deletePortalAccountAction,
+  unlinkPortalAccountAction,
+  type PortalAccountChangeResult,
+} from "@/app/admin/alumnos/[id]/portal-actions";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import type { PortalProvider } from "@/portal/config";
+import { PORTAL_INVITE_MS } from "@/portal/policy";
+
+/** Lo único que el panel muestra de la cuenta vinculada: con qué ingresa y cómo se llama. */
+export interface PortalCardAccount {
+  provider: PortalProvider;
+  displayName: string;
+}
+
+interface PortalCardProps {
+  customerId: string;
+  /** La cuenta vinculada a este alumno, o `null` si todavía no tiene. */
+  account: PortalCardAccount | null;
+}
+
+interface ShownInvite {
+  url: string;
+  expiresAt: Date;
+}
+
+/** Los dos cambios que piden confirmación. */
+type Change = "unlink" | "delete";
+
+/** De dónde es la cuenta, para decir "cuenta de Discord" ("cuenta de prueba" es la del proveedor falso de los tests). */
+const PROVIDER_NAMES: Record<PortalProvider, string> = {
+  discord: "Discord",
+  google: "Google",
+  test: "prueba",
+};
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** Cuánto dura la invitación, en días enteros, para decirlo en pantalla: sale de la política, no de una copia del número. */
+const INVITE_DAYS = Math.round(PORTAL_INVITE_MS / DAY_MS);
+
+const UNAVAILABLE_MESSAGE = "No pudimos completarlo. Probá de nuevo en unos minutos.";
+const NOT_FOUND_MESSAGE = "No encontramos a ese alumno. Puede que lo hayan borrado: volvé a la lista de alumnos.";
+const ALREADY_LINKED_MESSAGE =
+  "Este alumno ya tiene una cuenta vinculada. Si querés invitar a otra, desvinculá primero esta.";
+const COPY_FAILED_MESSAGE = "No pudimos copiarlo. Seleccioná el link y copialo a mano.";
+const MESSAGE_ID = "portal-card-message";
+
+/** Qué se pregunta, qué dicen los botones y qué acción corre cada cambio. */
+const CHANGES: Record<
+  Change,
+  {
+    question: (account: string) => string;
+    yes: string;
+    no: string;
+    run: (customerId: string) => Promise<PortalAccountChangeResult>;
+  }
+> = {
+  unlink: {
+    question: (account) =>
+      `¿Desvincular la ${account}? Se cierran sus sesiones y deja de ver las compras de este alumno. La cuenta sigue existiendo y podés invitarlo de nuevo.`,
+    yes: "Sí, desvincular",
+    no: "No, dejarla vinculada",
+    run: unlinkPortalAccountAction,
+  },
+  delete: {
+    question: (account) =>
+      `¿Borrar la ${account} del portal? Se borran la cuenta y sus sesiones. Las ventas y las entregas siguen en el panel.`,
+    yes: "Sí, borrar la cuenta",
+    no: "No, conservarla",
+    run: deletePortalAccountAction,
+  },
+};
+
+/** El link de la invitación, a la vista una sola vez, con su vencimiento y el botón para copiarlo. */
+function InviteLink({ invite }: { invite: ShownInvite }) {
+  const hydrated = useHydrated();
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(invite.url);
+      setCopyState("copied");
+    } catch {
+      setCopyState("failed");
+    }
+  }
+
+  return (
+    <div data-testid="portal-invite" className="mt-4 flex flex-col gap-3 border-2 border-ink bg-paper px-4 py-4">
+      <Field
+        id="portal-invite-url"
+        label="Link de invitación"
+        hint={`Vence el ${formatMoment(invite.expiresAt)}. Se ve una sola vez: si lo perdés, generá otro.`}
+      >
+        {(control) => (
+          <Input
+            {...control}
+            readOnly
+            value={invite.url}
+            onFocus={(event) => event.currentTarget.select()}
+            className="font-mono text-[0.875rem]"
+          />
+        )}
+      </Field>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="button" size="sm" disabled={!hydrated} onClick={() => void copyLink()}>
+          Copiar link
+        </Button>
+        <span role="status" className="text-[0.9375rem] font-bold text-ink-2">
+          {copyState === "copied" ? "Link copiado." : copyState === "failed" ? COPY_FAILED_MESSAGE : ""}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+interface ConfirmChangeProps {
+  change: Change;
+  /** La cuenta como se nombra en la pregunta ("cuenta de Discord «Ana»"). */
+  accountName: string;
+  busy: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+/** La pregunta antes de desvincular o borrar. Se abre con el foco en la opción segura ("No"). */
+function ConfirmChange({ change, accountName, busy, onConfirm, onCancel }: ConfirmChangeProps) {
+  const keepButton = useRef<HTMLButtonElement>(null);
+  const text = CHANGES[change];
+
+  useEffect(() => {
+    keepButton.current?.focus();
+  }, []);
+
+  return (
+    <div className="mt-4 flex flex-col gap-3">
+      <Notice tone="info">{text.question(accountName)}</Notice>
+      <div className="flex flex-wrap gap-3">
+        <Button type="button" size="sm" disabled={busy} onClick={onConfirm}>
+          {busy ? "Un momento…" : text.yes}
+        </Button>
+        <Button ref={keepButton} type="button" size="sm" variant="ink-outline" disabled={busy} onClick={onCancel}>
+          {text.no}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * La tarjeta "Portal del alumno" de la ficha: si el alumno ya tiene una cuenta vinculada (con
+ * qué proveedor y qué nombre) y los botones para invitarlo, desvincularla o borrarla. El
+ * link de la invitación se ve una sola vez, acá: en la base queda solo su hash. Desvincular
+ * y borrar piden confirmación, con la opción segura enfocada.
+ */
+export function PortalCard({ customerId, account }: PortalCardProps) {
+  const router = useRouter();
+  const hydrated = useHydrated();
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [invite, setInvite] = useState<ShownInvite | null>(null);
+  const [confirming, setConfirming] = useState<Change | null>(null);
+  const triggers = useRef<Record<Change, HTMLButtonElement | null>>({ unlink: null, delete: null });
+  const previousConfirming = useRef<Change | null>(null);
+
+  // Al cerrar la pregunta, el foco vuelve al botón que la abrió (al abrirla, lo lleva la propia pregunta).
+  useEffect(() => {
+    if (confirming === null && previousConfirming.current !== null) triggers.current[previousConfirming.current]?.focus();
+    previousConfirming.current = confirming;
+  }, [confirming]);
+
+  // Si mientras tanto el alumno se vinculó (abrió el link en otro lado), el link ya no tiene sentido.
+  const shownInvite = account ? null : invite;
+
+  /** Corre la tarea de un botón; la tarea devuelve el aviso de error a mostrar, o `null` si salió bien. */
+  async function perform(task: () => Promise<string | null>) {
+    setBusy(true);
+    setMessage(null);
+    try {
+      setMessage(await task());
+    } catch {
+      setMessage(UNAVAILABLE_MESSAGE);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function generateInvite() {
+    void perform(async () => {
+      const result = await createPortalInviteAction(customerId);
+      if (result.ok) {
+        setInvite({ url: result.url, expiresAt: new Date(result.expiresAt) });
+        return null;
+      }
+      setInvite(null);
+      router.refresh();
+      return result.error === "already-linked" ? ALREADY_LINKED_MESSAGE : NOT_FOUND_MESSAGE;
+    });
+  }
+
+  function confirmChange(change: Change) {
+    void perform(async () => {
+      const result = await CHANGES[change].run(customerId);
+      setConfirming(null);
+      router.refresh();
+      return result.ok ? null : NOT_FOUND_MESSAGE;
+    });
+  }
+
+  function ask(change: Change) {
+    setMessage(null);
+    setConfirming(change);
+  }
+
+  const headingId = "portal-card-heading";
+  const describedBy = message ? MESSAGE_ID : undefined;
+  return (
+    <section
+      aria-labelledby={headingId}
+      className="mb-6 border-2 border-ink border-l-[6px] border-l-zone bg-white px-5 py-4"
+    >
+      <h2 id={headingId} className="text-[1.25rem] leading-tight font-extrabold [font-stretch:75%]">
+        Portal del alumno
+      </h2>
+
+      {account ? (
+        <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
+          <Badge variant="ok">Vinculado</Badge>
+          <span>
+            Cuenta de {PROVIDER_NAMES[account.provider]}: <span className="font-bold break-words">{account.displayName}</span>
+          </span>
+        </p>
+      ) : (
+        <>
+          <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <Badge variant="neutral">Sin vincular</Badge>
+            <span>Todavía no tiene una cuenta en el portal.</span>
+          </p>
+          <p className="mt-2 text-[0.9375rem] leading-snug text-ink-2">
+            Generá un link de un solo uso y mandáselo por donde hables con él. Al abrirlo entra con Discord o Google y
+            queda vinculado. Vence a los {INVITE_DAYS} días; si generás otro, el anterior deja de valer.
+          </p>
+        </>
+      )}
+
+      {shownInvite ? <InviteLink key={shownInvite.url} invite={shownInvite} /> : null}
+
+      {message ? (
+        <Notice tone="error" id={MESSAGE_ID} className="mt-4">
+          {message}
+        </Notice>
+      ) : null}
+
+      <div className="mt-4 flex flex-wrap gap-3">
+        {account ? (
+          <>
+            <Button
+              ref={(element) => {
+                triggers.current.unlink = element;
+              }}
+              type="button"
+              size="sm"
+              variant="ink-outline"
+              disabled={!hydrated || busy || confirming !== null}
+              aria-describedby={describedBy}
+              onClick={() => ask("unlink")}
+            >
+              Desvincular
+            </Button>
+            <Button
+              ref={(element) => {
+                triggers.current.delete = element;
+              }}
+              type="button"
+              size="sm"
+              variant="ink-outline"
+              disabled={!hydrated || busy || confirming !== null}
+              aria-describedby={describedBy}
+              onClick={() => ask("delete")}
+            >
+              Borrar cuenta del portal
+            </Button>
+          </>
+        ) : (
+          <Button
+            type="button"
+            size="sm"
+            variant={shownInvite ? "ink-outline" : "gold"}
+            disabled={!hydrated || busy}
+            aria-describedby={describedBy}
+            onClick={generateInvite}
+          >
+            {busy ? "Generando…" : shownInvite ? "Generar otro link" : "Invitar al portal"}
+          </Button>
+        )}
+      </div>
+
+      {account && confirming ? (
+        <ConfirmChange
+          change={confirming}
+          accountName={`cuenta de ${PROVIDER_NAMES[account.provider]} «${account.displayName}»`}
+          busy={busy}
+          onConfirm={() => confirmChange(confirming)}
+          onCancel={() => setConfirming(null)}
+        />
+      ) : null}
+    </section>
+  );
+}

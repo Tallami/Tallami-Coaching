@@ -428,6 +428,7 @@ describe("the files of src/app/admin", () => {
         "alumnos/page.tsx",
         "alumnos/actions.ts",
         "alumnos/[id]/page.tsx",
+        "alumnos/[id]/portal-actions.ts",
         "alumnos/nuevo/page.tsx",
         "configuracion/page.tsx",
         "configuracion/actions.ts",

@@ -2,13 +2,16 @@ import { eq } from "drizzle-orm";
 import { NextRequest, type NextResponse } from "next/server";
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import type { Db } from "@/db/client";
-import { portalAccounts, portalSessions } from "@/db/schema";
+import { customers, portalAccounts, portalInvites, portalSessions } from "@/db/schema";
+import { SITE_URL } from "@/lib/site-url";
+import { accountForCustomer } from "@/portal/accounts";
+import { createInvite, redeemInvite } from "@/portal/invites";
 import { handleCallback, handleLogout, handleSignInStart, type PortalAuthDeps } from "@/portal/oauth/endpoints";
 import { FLOW_COOKIE, readFlowCookie } from "@/portal/oauth/flow";
 import { PORTAL_OAUTH_FLOW_MS, PORTAL_SESSION_MS } from "@/portal/policy";
 import { PORTAL_COOKIE, createPortalSession, readPortalSession, revokePortalSession } from "@/portal/sessions";
 import { createTestDb } from "../helpers/db";
-import { insertTestAccount } from "../helpers/portal";
+import { insertTestAccount, insertTestCustomer } from "../helpers/portal";
 
 const SECRET = "secreto-del-portal-de-prueba-de-mas-de-32-caracteres";
 const ISSUER = "http://localhost:3199";
@@ -16,6 +19,8 @@ const ORIGIN = "http://localhost:3100";
 const PROFILE = { sub: "alumno-1", name: "Alumno Uno", email: "alumno-1@example.com" };
 const INVITE = "i".repeat(43);
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** Lo que manda el navegador cuando el ingreso empieza con un clic en la página del portal. */
+const FROM_PORTAL = { "sec-fetch-site": "same-origin" };
 
 let db: Db;
 
@@ -40,6 +45,7 @@ beforeEach(async () => {
   vi.spyOn(console, "warn").mockImplementation(() => {});
   vi.spyOn(console, "error").mockImplementation(() => {});
   await db.delete(portalAccounts); // las cuentas arrastran sus sesiones (on delete cascade)
+  await db.delete(customers); // los alumnos arrastran sus invitaciones (on delete cascade)
 });
 
 afterEach(() => {
@@ -70,10 +76,13 @@ function request(url: string, init: { method?: string; headers?: Record<string, 
   return new NextRequest(url, { ...init, headers: { host: new URL(url).host, ...init.headers } });
 }
 
-/** Empieza un ingreso con el proveedor de prueba y devuelve la cookie del flujo y el `state` que viajó al proveedor. */
-async function begin(query = "?locale=es", now?: Date) {
+/**
+ * Empieza un ingreso con el proveedor de prueba y devuelve la cookie del flujo y el `state` que viajó al proveedor.
+ * `headers` son los del pedido: una invitación solo vale si el ingreso empieza en la página del portal (`FROM_PORTAL`).
+ */
+async function begin(query = "?locale=es", now?: Date, headers: Record<string, string> = {}) {
   const response = await handleSignInStart(
-    request(`${ORIGIN}/api/portal/auth/test${query}`),
+    request(`${ORIGIN}/api/portal/auth/test${query}`, { headers }),
     "test",
     now ? { now: () => now } : {},
   );
@@ -81,10 +90,20 @@ async function begin(query = "?locale=es", now?: Date) {
   return { response, location, cookie: response.cookies.get(FLOW_COOKIE)?.value ?? "", state: location.searchParams.get("state") ?? "" };
 }
 
-function callbackRequest(params: Record<string, string>, cookie?: string, provider = "test"): NextRequest {
+/** La vuelta del proveedor. `session` es la cookie `tallami_alumno` que el navegador ya tenía, si tenía. */
+function callbackRequest(
+  params: Record<string, string>,
+  cookie?: string,
+  provider = "test",
+  session?: string,
+): NextRequest {
   const url = new URL(`${ORIGIN}/api/portal/auth/${provider}/callback`);
   for (const [name, value] of Object.entries(params)) url.searchParams.set(name, value);
-  return request(url.toString(), { headers: cookie === undefined ? {} : { cookie: `${FLOW_COOKIE}=${cookie}` } });
+  const cookies = [
+    cookie === undefined ? null : `${FLOW_COOKIE}=${cookie}`,
+    session === undefined ? null : `${PORTAL_COOKIE}=${session}`,
+  ].filter((part) => part !== null);
+  return request(url.toString(), { headers: cookies.length > 0 ? { cookie: cookies.join("; ") } : {} });
 }
 
 function expectFlowCookieCleared(response: NextResponse): void {
@@ -142,14 +161,125 @@ describe("GET /api/portal/auth/[provider]", () => {
   });
 
   test("keeps the language and a well-formed invite in the flow; anything else becomes Spanish and no invite", async () => {
-    const good = await begin(`?locale=pt&invitacion=${INVITE}`);
+    const good = await begin(`?locale=pt&invitacion=${INVITE}`, undefined, FROM_PORTAL);
     expect(readFlowCookie(good.cookie, "test")).toMatchObject({ locale: "pt", inviteToken: INVITE });
 
-    const bad = await begin("?locale=fr&invitacion=corta");
+    const bad = await begin("?locale=fr&invitacion=corta", undefined, FROM_PORTAL);
     expect(readFlowCookie(bad.cookie, "test")).toMatchObject({ locale: "es", inviteToken: null });
 
-    const none = await begin("");
+    const none = await begin("", undefined, FROM_PORTAL);
     expect(readFlowCookie(none.cookie, "test")).toMatchObject({ locale: "es", inviteToken: null });
+  });
+});
+
+describe("the invite of the address counts only when the sign-in starts on the portal itself", () => {
+  /** El ingreso con una invitación bien formada; devuelve lo que quedó en la cookie del flujo. */
+  async function startedWith(headers: Record<string, string>) {
+    const started = await begin(`?locale=pt&invitacion=${INVITE}`, undefined, headers);
+    expect(started.response.status).toBe(302);
+    return readFlowCookie(started.cookie, "test");
+  }
+
+  test("a click on the portal page (Sec-Fetch-Site: same-origin) keeps the invite", async () => {
+    expect(await startedWith(FROM_PORTAL)).toMatchObject({ locale: "pt", inviteToken: INVITE });
+  });
+
+  test.each(["cross-site", "same-site", "none"])(
+    "Sec-Fetch-Site: %s drops the invite, but the sign-in goes on in its language",
+    async (site) => {
+      const flow = await startedWith({ "sec-fetch-site": site });
+
+      expect(flow).toMatchObject({ locale: "pt", inviteToken: null });
+    },
+  );
+
+  test("without Sec-Fetch-Site, a Referer of this same origin keeps the invite", async () => {
+    expect(await startedWith({ referer: `${ORIGIN}/es/portal?invitacion=${INVITE}` })).toMatchObject({
+      inviteToken: INVITE,
+    });
+  });
+
+  test("without Sec-Fetch-Site, no Referer, one of another origin or one that is not an address drops the invite", async () => {
+    const cases: Record<string, string>[] = [
+      {},
+      { referer: "https://evil.example/es/portal" },
+      { referer: "http://localhost.evil.example:3100/es/portal" },
+      { referer: "https://localhost:3100/es/portal" },
+      { referer: "no es una dirección" },
+      { referer: "" },
+    ];
+    for (const headers of cases) {
+      expect(await startedWith(headers), JSON.stringify(headers)).toMatchObject({ inviteToken: null });
+    }
+  });
+
+  test("Sec-Fetch-Site decides over the Referer: a cross-site request with a forged same-origin Referer drops the invite", async () => {
+    const flow = await startedWith({ "sec-fetch-site": "cross-site", referer: `${ORIGIN}/es/portal` });
+
+    expect(flow).toMatchObject({ inviteToken: null });
+  });
+});
+
+describe("Discord and Google start only on the public address of the site", () => {
+  beforeEach(() => {
+    vi.stubEnv("DISCORD_CLIENT_ID", "id-de-discord");
+    vi.stubEnv("DISCORD_CLIENT_SECRET", "secreto-de-discord");
+    vi.stubEnv("GOOGLE_CLIENT_ID", "id-de-google");
+    vi.stubEnv("GOOGLE_CLIENT_SECRET", "secreto-de-google");
+  });
+
+  test.each(["discord", "google"])(
+    "%s on another host: a redirect to the same path and query on the public address, without the flow cookie",
+    async (provider) => {
+      const query = `?locale=pt&invitacion=${INVITE}`;
+
+      const response = await handleSignInStart(
+        request(`${ORIGIN}/api/portal/auth/${provider}${query}`, { headers: FROM_PORTAL }),
+        provider,
+      );
+
+      expect(response.status).toBe(302);
+      expect(response.headers.get("location")).toBe(`${SITE_URL}/api/portal/auth/${provider}${query}`);
+      expect(response.headers.get("cache-control")).toContain("no-store");
+      expect(response.cookies.get(FLOW_COOKIE)).toBeUndefined();
+    },
+  );
+
+  test("on a host that only looks like the public one, it redirects too", async () => {
+    const site = new URL(SITE_URL);
+    const lookalike = `${site.protocol}//${site.hostname}.evil.example${site.port ? `:${site.port}` : ""}`;
+
+    const response = await handleSignInStart(request(`${lookalike}/api/portal/auth/discord?locale=es`), "discord");
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe(`${SITE_URL}/api/portal/auth/discord?locale=es`);
+    expect(response.cookies.get(FLOW_COOKIE)).toBeUndefined();
+  });
+
+  test("on the public address it starts the sign-in: the flow cookie, and the provider coming back to the public address", async () => {
+    const response = await handleSignInStart(request(`${SITE_URL}/api/portal/auth/google?locale=en`), "google");
+
+    expect(response.status).toBe(302);
+    const location = new URL(response.headers.get("location") ?? "");
+    expect(location.origin).toBe("https://accounts.google.com");
+    expect(location.searchParams.get("redirect_uri")).toBe(`${SITE_URL}/api/portal/auth/google/callback`);
+    expect(response.cookies.get(FLOW_COOKIE)?.value).toBeTruthy();
+    expect(readFlowCookie(response.cookies.get(FLOW_COOKIE)?.value, "google")).toMatchObject({ locale: "en" });
+  });
+
+  test("the test provider keeps the host of the request", async () => {
+    const response = await handleSignInStart(request(`${ORIGIN}/api/portal/auth/test?locale=es`), "test");
+
+    expect(new URL(response.headers.get("location") ?? "").searchParams.get("redirect_uri")).toBe(
+      `${ORIGIN}/api/portal/auth/test/callback`,
+    );
+    expect(response.cookies.get(FLOW_COOKIE)?.value).toBeTruthy();
+  });
+
+  test("an unknown provider is still a 404 on another host (no redirect for what does not exist)", async () => {
+    const response = await handleSignInStart(request(`${ORIGIN}/api/portal/auth/nada`), "nada");
+
+    expect(response.status).toBe(404);
   });
 });
 
@@ -371,8 +501,234 @@ describe("GET /api/portal/auth/[provider]/callback", () => {
     expect(logged).not.toContain("detalle interno");
   });
 
-  // La Tarea 3 (invitaciones) completa este test cuando agrega `redeemInvite` en la vuelta.
-  test.todo("redeems the invite of the flow for the account before opening the session (Task 3: redeemInvite)");
+});
+
+describe("signing in again in a browser that already has a student session", () => {
+  test("closes the previous session of the browser when the new one opens, and only that one", async () => {
+    const otherAccount = await insertTestAccount(db);
+    const previous = await createPortalSession(db, otherAccount);
+    const bystander = await createPortalSession(db, otherAccount);
+    const { cookie, state } = await begin();
+
+    const response = await handleCallback(callbackRequest({ code: "codigo", state }, cookie, "test", previous), "test", deps());
+
+    expect(response.status).toBe(303);
+    expect(await readPortalSession(db, previous)).toBeNull();
+    expect(await readPortalSession(db, bystander)).not.toBeNull();
+    expect(await readPortalSession(db, response.cookies.get(PORTAL_COOKIE)?.value)).not.toBeNull();
+  });
+
+  test("the same account signing in again also closes the session it had in that browser", async () => {
+    const first = await begin();
+    const firstResponse = await handleCallback(callbackRequest({ code: "uno", state: first.state }, first.cookie), "test", deps());
+    const oldSession = firstResponse.cookies.get(PORTAL_COOKIE)?.value ?? "";
+    const second = await begin();
+
+    const secondResponse = await handleCallback(
+      callbackRequest({ code: "dos", state: second.state }, second.cookie, "test", oldSession),
+      "test",
+      deps(),
+    );
+
+    expect(await readPortalSession(db, oldSession)).toBeNull();
+    expect(await readPortalSession(db, secondResponse.cookies.get(PORTAL_COOKIE)?.value)).not.toBeNull();
+  });
+
+  test("does not touch the sessions of other browsers of the same account", async () => {
+    const first = await begin();
+    const firstResponse = await handleCallback(callbackRequest({ code: "uno", state: first.state }, first.cookie), "test", deps());
+    const otherBrowser = firstResponse.cookies.get(PORTAL_COOKIE)?.value ?? "";
+    const second = await begin();
+
+    await handleCallback(callbackRequest({ code: "dos", state: second.state }, second.cookie), "test", deps());
+
+    expect(await readPortalSession(db, otherBrowser)).not.toBeNull();
+  });
+
+  test("a sign-in that fails leaves the previous session open", async () => {
+    const previous = await createPortalSession(db, await insertTestAccount(db));
+    const { cookie } = await begin();
+
+    const response = await handleCallback(
+      callbackRequest({ code: "codigo", state: "x".repeat(43) }, cookie, "test", previous),
+      "test",
+      deps(),
+    );
+
+    expect(response.headers.get("location")).toBe("/es/portal?ingreso=fallido");
+    expect(await readPortalSession(db, previous)).not.toBeNull();
+  });
+
+  test("a cookie with something that is not a session is ignored", async () => {
+    const { cookie, state } = await begin();
+
+    const response = await handleCallback(
+      callbackRequest({ code: "codigo", state }, cookie, "test", "no-es-una-sesion"),
+      "test",
+      deps(),
+    );
+
+    expect(response.headers.get("location")).toBe("/es/portal");
+    expect(await readPortalSession(db, response.cookies.get(PORTAL_COOKIE)?.value)).not.toBeNull();
+  });
+});
+
+describe("the invite of the sign-in", () => {
+  /** Ingresa con el proveedor de prueba, empezando desde la página del portal con `invite`, y devuelve la respuesta de la vuelta. */
+  async function signInWithInvite(invite: string, { locale = "es", profile = PROFILE as unknown } = {}) {
+    const { cookie, state } = await begin(`?locale=${locale}&invitacion=${invite}`, undefined, FROM_PORTAL);
+    return handleCallback(callbackRequest({ code: "codigo", state }, cookie), "test", deps({ fetch: providerFetch({ profile }) }));
+  }
+
+  async function onlyInvite() {
+    const [invite] = await db.select().from(portalInvites);
+    return invite;
+  }
+
+  test("redeems it for the account of the identity before opening the session, and tells the portal", async () => {
+    const customerId = await insertTestCustomer(db);
+    const invite = await createInvite(db, customerId);
+
+    const response = await signInWithInvite(invite, { locale: "pt" });
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("/pt/portal?invitacion=vinculada");
+    const account = await accountForCustomer(db, customerId);
+    expect(account).toMatchObject({ provider: "test", displayName: "Alumno Uno" });
+    expect(await readPortalSession(db, response.cookies.get(PORTAL_COOKIE)?.value)).toEqual({ accountId: account?.id });
+    expect(response.cookies.get(PORTAL_COOKIE)).toBeDefined();
+    expectFlowCookieCleared(response);
+    expect(await onlyInvite()).toMatchObject({ usedByAccountId: account?.id });
+    expect((await onlyInvite()).usedAt).not.toBeNull();
+  });
+
+  const INVALID_INVITES: [string, (customerId: string) => Promise<string>][] = [
+    ["one nobody created", async () => "n".repeat(43)],
+    [
+      "one that was already used",
+      async (customerId) => {
+        const used = await createInvite(db, customerId);
+        await redeemInvite(db, used, await insertTestAccount(db));
+        return used;
+      },
+    ],
+    ["one that expired", (customerId) => createInvite(db, customerId, new Date(Date.now() - 15 * DAY_MS))],
+  ];
+
+  test.each(INVALID_INVITES)("%s: the student still signs in and the portal is told it is invalid", async (_label, prepare) => {
+    const invite = await prepare(await insertTestCustomer(db));
+
+    const response = await signInWithInvite(invite);
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("/es/portal?invitacion=invalida");
+    expect(await readPortalSession(db, response.cookies.get(PORTAL_COOKIE)?.value)).not.toBeNull();
+    const [account] = await db.select().from(portalAccounts).where(eq(portalAccounts.providerUserId, PROFILE.sub));
+    expect(account.customerId).toBeNull();
+  });
+
+  test("a student that already has an account: nothing is overwritten, the portal is told it is taken and the invite stays unused", async () => {
+    const customerId = await insertTestCustomer(db);
+    const owner = await insertTestAccount(db, { customerId });
+    const invite = await createInvite(db, customerId);
+
+    const response = await signInWithInvite(invite);
+
+    expect(response.headers.get("location")).toBe("/es/portal?invitacion=ocupada");
+    expect(response.cookies.get(PORTAL_COOKIE)).toBeDefined();
+    expect((await accountForCustomer(db, customerId))?.id).toBe(owner);
+    expect(await onlyInvite()).toMatchObject({ usedAt: null, usedByAccountId: null });
+  });
+
+  test("an account that is already linked to another student: nothing is overwritten, the portal is told it is taken", async () => {
+    const otherCustomer = await insertTestCustomer(db, "Otro alumno");
+    const customerId = await insertTestCustomer(db);
+    const { cookie, state } = await begin();
+    // La cuenta de esta identidad ya existe y es de otro alumno.
+    await handleCallback(callbackRequest({ code: "codigo", state }, cookie), "test", deps());
+    const [account] = await db.select().from(portalAccounts);
+    await db.update(portalAccounts).set({ customerId: otherCustomer }).where(eq(portalAccounts.id, account.id));
+    const invite = await createInvite(db, customerId);
+
+    const response = await signInWithInvite(invite);
+
+    expect(response.headers.get("location")).toBe("/es/portal?invitacion=ocupada");
+    expect((await accountForCustomer(db, otherCustomer))?.id).toBe(account.id);
+    expect(await accountForCustomer(db, customerId)).toBeNull();
+    expect(await onlyInvite()).toMatchObject({ usedAt: null });
+  });
+
+  test("opening the same invite a second time, with another account, is invalid", async () => {
+    const customerId = await insertTestCustomer(db);
+    const invite = await createInvite(db, customerId);
+
+    const first = await signInWithInvite(invite);
+    const second = await signInWithInvite(invite, { profile: { sub: "alumno-2", name: "Alumno Dos" } });
+
+    expect(first.headers.get("location")).toBe("/es/portal?invitacion=vinculada");
+    expect(second.headers.get("location")).toBe("/es/portal?invitacion=invalida");
+    const [linked] = await db.select().from(portalAccounts).where(eq(portalAccounts.customerId, customerId));
+    expect(linked.providerUserId).toBe("alumno-1");
+  });
+
+  test("an invite from a link that was not clicked on the portal is not redeemed: the sign-in goes on without it", async () => {
+    const customerId = await insertTestCustomer(db);
+    const invite = await createInvite(db, customerId);
+    const { cookie, state } = await begin(`?locale=es&invitacion=${invite}`, undefined, { "sec-fetch-site": "cross-site" });
+
+    const response = await handleCallback(callbackRequest({ code: "codigo", state }, cookie), "test", deps());
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("/es/portal");
+    expect(response.cookies.get(PORTAL_COOKIE)).toBeDefined();
+    expect(await accountForCustomer(db, customerId)).toBeNull();
+    expect(await onlyInvite()).toMatchObject({ usedAt: null });
+  });
+
+  test("a sign-in that fails does not redeem the invite", async () => {
+    const customerId = await insertTestCustomer(db);
+    const invite = await createInvite(db, customerId);
+    const { cookie } = await begin(`?locale=es&invitacion=${invite}`, undefined, FROM_PORTAL);
+
+    const response = await handleCallback(callbackRequest({ code: "codigo", state: "x".repeat(43) }, cookie), "test", deps());
+
+    await expectFailure(response);
+    expect(await onlyInvite()).toMatchObject({ usedAt: null });
+    expect(await db.select().from(portalAccounts)).toEqual([]);
+  });
+
+  test("if the database fails while redeeming, the sign-in fails with no session, and only the name of the error is logged", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const invite = await createInvite(db, await insertTestCustomer(db));
+    const brokenRedeem = new Proxy(db, {
+      get(target, property, receiver) {
+        if (property === "transaction") {
+          return () => {
+            throw new Error("detalle interno de la base");
+          };
+        }
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    const { cookie, state } = await begin(`?locale=es&invitacion=${invite}`, undefined, FROM_PORTAL);
+
+    const response = await handleCallback(callbackRequest({ code: "codigo", state }, cookie), "test", {
+      ...deps(),
+      getDb: async () => brokenRedeem,
+    });
+
+    await expectFailure(response);
+    expect(error.mock.calls.flat().map(String).join("\n")).not.toContain("detalle interno");
+    expect(await onlyInvite()).toMatchObject({ usedAt: null });
+  });
+
+  test("without an invite the portal address carries no query", async () => {
+    const { cookie, state } = await begin();
+
+    const response = await handleCallback(callbackRequest({ code: "codigo", state }, cookie), "test", deps());
+
+    expect(response.headers.get("location")).toBe("/es/portal");
+  });
 });
 
 describe("POST /api/portal/auth/logout", () => {

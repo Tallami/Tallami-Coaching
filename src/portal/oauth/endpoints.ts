@@ -5,12 +5,19 @@
 //
 //   GET  /api/portal/auth/[provider]?locale=es&invitacion=…
 //        404 si el proveedor no existe o no está habilitado, o si el portal no está
-//        configurado; si no, la cookie del ingreso y 302 a la autorización del proveedor.
+//        configurado. Discord y Google solo empiezan en la dirección pública del sitio
+//        (`canonicalSignInUrl`): en otra, 302 a la misma ruta allá, sin cookie. Si no, la
+//        cookie del ingreso y 302 a la autorización del proveedor. La invitación del link
+//        solo viaja en la cookie si el ingreso empezó en el propio sitio (`Sec-Fetch-Site:
+//        same-origin`, o sin ese encabezado un `Referer` del mismo origen): un link de otro
+//        sitio no puede hacer que la cuenta de otro alumno consuma una invitación.
 //   GET  /api/portal/auth/[provider]/callback?code=…&state=… (o ?error=…)
 //        Borra la cookie del ingreso SIEMPRE. Si la cookie vale para ese proveedor, el
-//        `state` coincide y el proveedor da la identidad: cuenta, sesión, cookie
-//        `tallami_alumno` y 303 a `/{idioma}/portal`. Cualquier falla: 303 a
-//        `/{idioma}/portal?ingreso=fallido`, sin sesión (nunca un 500).
+//        `state` coincide y el proveedor da la identidad: cuenta, canje de la invitación
+//        (si trajo una), sesión nueva (cierra la anterior de ese navegador), cookie
+//        `tallami_alumno` y 303 a `/{idioma}/portal`, con `?invitacion=vinculada|invalida|ocupada`
+//        si hubo invitación. Cualquier falla: 303 a `/{idioma}/portal?ingreso=fallido`, sin
+//        sesión (nunca un 500).
 //   POST /api/portal/auth/logout?locale=es
 //        Cierra la sesión en la base, borra la cookie y 303 a `/{idioma}/portal`. Solo
 //        POST: a un GET Next le contesta 405.
@@ -25,6 +32,7 @@ import type { Db } from "@/db/client";
 import { routing, type Locale } from "@/i18n/routing";
 import { upsertAccountFromIdentity } from "../accounts";
 import { isPortalConfigured, type PortalProvider } from "../config";
+import { inviteOutcome, redeemInvite, type InviteOutcome } from "../invites";
 import { PORTAL_PROVIDERS } from "../policy";
 import {
   PORTAL_COOKIE,
@@ -44,7 +52,7 @@ import {
   startFlow,
   type FlowData,
 } from "./flow";
-import { getProviderClient, redirectUriFor } from "./providers";
+import { canonicalSignInUrl, getProviderClient, redirectUriFor } from "./providers";
 
 export interface PortalAuthDeps {
   getDb: () => Promise<Db>;
@@ -90,8 +98,23 @@ function emptyResponse(status: 403 | 404): NextResponse {
 }
 
 /**
+ * ¿El ingreso empezó en el propio sitio (con un clic en la página del portal)? Se mira
+ * `Sec-Fetch-Site`, que el navegador pone y la página no puede cambiar: vale solo
+ * `same-origin`. Sin ese encabezado (un navegador viejo), un `Referer` del mismo
+ * origen. Un link de otro sitio, una dirección escrita a mano (`none`) o un pedido sin
+ * ninguna de las dos pistas no cuentan.
+ */
+function startedOnThisSite(request: NextRequest): boolean {
+  const site = request.headers.get("sec-fetch-site");
+  if (site !== null) return site === "same-origin";
+  const referer = request.headers.get("referer");
+  return referer !== null && URL.canParse(referer) && new URL(referer).origin === request.nextUrl.origin;
+}
+
+/**
  * `GET /api/portal/auth/[provider]`: empieza el ingreso. `locale` que no es del sitio
- * pasa a `es`; una invitación con otra forma se descarta.
+ * pasa a `es`; una invitación con otra forma, o que no viene de la página del portal, se
+ * descarta (el ingreso sigue, sin invitación).
  */
 export function handleSignInStart(
   request: NextRequest,
@@ -101,11 +124,15 @@ export function handleSignInStart(
   const provider = asProvider(providerParam);
   if (!provider || !getProviderClient(provider) || !isPortalConfigured()) return emptyResponse(404);
 
+  // La cookie del ingreso tiene que quedar donde vuelve el proveedor: en la dirección pública.
+  const canonical = canonicalSignInUrl(provider, request.nextUrl);
+  if (canonical) return redirectTo(canonical, 302);
+
   const { origin, searchParams } = request.nextUrl;
   const { authorizationUrl, cookieValue } = startFlow({
     provider,
     locale: portalLocale(searchParams.get("locale")),
-    inviteToken: inviteTokenFrom(searchParams.get("invitacion")),
+    inviteToken: startedOnThisSite(request) ? inviteTokenFrom(searchParams.get("invitacion")) : null,
     redirectUri: redirectUriFor(provider, origin),
     now: now?.(),
   });
@@ -127,10 +154,18 @@ async function purgeQuietly(db: Db, now: Date): Promise<void> {
   }
 }
 
+/** Un ingreso que salió bien: el token de la sesión nueva y, si el alumno llegó con una invitación, qué pasó con ella. */
+interface SignedIn {
+  token: string;
+  invite: InviteOutcome | null;
+}
+
 /**
  * Lo que pasa cuando la cookie del ingreso ya se verificó: la vuelta trae el `state`
- * del ingreso y un código, el proveedor da la identidad y la base abre la sesión.
- * Devuelve el token de la sesión nueva, o `null` ante cualquier falla.
+ * del ingreso y un código, el proveedor da la identidad y la base abre la sesión. Si el
+ * ingreso trajo una invitación se canjea para esa cuenta antes de abrir la sesión, y al
+ * abrirla se cierra la que el navegador tenía. Devuelve el ingreso, o `null` ante
+ * cualquier falla.
  */
 async function completeSignIn(
   request: NextRequest,
@@ -138,7 +173,7 @@ async function completeSignIn(
   flow: FlowData,
   deps: PortalAuthDeps,
   now: Date,
-): Promise<string | null> {
+): Promise<SignedIn | null> {
   const { origin, searchParams } = request.nextUrl;
   // El alumno canceló (`access_denied`) o el proveedor falló: no hay código que cambiar.
   if (searchParams.has("error")) return null;
@@ -154,16 +189,25 @@ async function completeSignIn(
   try {
     const db = await deps.getDb();
     const account = await upsertAccountFromIdentity(db, identity, now);
-    // Punto de enganche de la Tarea 3 (invitaciones): si `flow.inviteToken` no es `null`,
-    // canjearla acá para `account.id` (`redeemInvite`), antes de abrir la sesión, y llevar
-    // el resultado al portal (`?invitacion=vinculada|invalida|ocupada`).
+    // Una invitación que no sirve (o está ocupada) no impide entrar: el portal avisa qué pasó.
+    const invite = flow.inviteToken
+      ? inviteOutcome(await redeemInvite(db, flow.inviteToken, account.id, now))
+      : null;
     const token = await createPortalSession(db, account.id, now);
+    // La sesión que el navegador tenía (otra persona en la misma computadora, o la misma de nuevo) ya no vale.
+    await revokePortalSession(db, request.cookies.get(PORTAL_COOKIE)?.value, now);
     await purgeQuietly(db, now);
-    return token;
+    return { token, invite };
   } catch (error) {
     console.error(`Portal: no se pudo abrir la sesión del alumno. ${errorName(error)}`);
     return null;
   }
+}
+
+/** A dónde vuelve el alumno: el portal, con el resultado de la invitación o con el aviso de que el ingreso falló. */
+function portalPathAfterSignIn(locale: Locale, signedIn: SignedIn | null): string {
+  if (!signedIn) return portalPath(locale, SIGN_IN_FAILED_QUERY);
+  return portalPath(locale, signedIn.invite ? { invitacion: signedIn.invite } : {});
 }
 
 /** `GET /api/portal/auth/[provider]/callback`: la vuelta del proveedor. Nunca tira. */
@@ -178,10 +222,10 @@ export async function handleCallback(
   const flow = provider ? readFlowCookie(request.cookies.get(FLOW_COOKIE)?.value, provider, now) : null;
   // Sin una cookie que valga no se sabe el idioma: el de siempre.
   const locale = flow?.locale ?? routing.defaultLocale;
-  const token = provider && flow ? await completeSignIn(request, provider, flow, deps, now) : null;
+  const signedIn = provider && flow ? await completeSignIn(request, provider, flow, deps, now) : null;
 
-  const response = redirectTo(token ? portalPath(locale) : portalPath(locale, SIGN_IN_FAILED_QUERY), 303);
-  if (token) response.cookies.set(PORTAL_COOKIE, token, portalCookieOptions(secure));
+  const response = redirectTo(portalPathAfterSignIn(locale, signedIn), 303);
+  if (signedIn) response.cookies.set(PORTAL_COOKIE, signedIn.token, portalCookieOptions(secure));
   // De un solo uso: se borra salga bien o mal.
   response.cookies.set(FLOW_COOKIE, "", { ...flowCookieOptions(secure), maxAge: 0 });
   return response;

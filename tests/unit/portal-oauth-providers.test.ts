@@ -4,6 +4,7 @@ import {
   DISCORD_OAUTH,
   GOOGLE_OAUTH,
   MAX_DISPLAY_NAME_LENGTH,
+  canonicalSignInUrl,
   getProviderClient,
   profileToIdentity,
   redirectUriFor,
@@ -35,13 +36,19 @@ function without(profile: Record<string, unknown>, key: string): Record<string, 
 }
 
 describe("the endpoints and scopes of each provider", () => {
-  test("Discord: the OAuth2 endpoints of its documentation and the scopes identify email", () => {
+  test("Discord: the OAuth2 endpoints of its documentation, on the explicit API version 10, and the scopes identify email", () => {
     expect(DISCORD_OAUTH).toEqual({
       authorizationUrl: "https://discord.com/oauth2/authorize",
-      tokenUrl: "https://discord.com/api/oauth2/token",
-      userinfoUrl: "https://discord.com/api/users/@me",
+      tokenUrl: "https://discord.com/api/v10/oauth2/token",
+      userinfoUrl: "https://discord.com/api/v10/users/@me",
       scopes: ["identify", "email"],
     });
+  });
+
+  test("Discord: no endpoint relies on the default API version (a request without one goes to the deprecated v6)", () => {
+    for (const url of [DISCORD_OAUTH.tokenUrl, DISCORD_OAUTH.userinfoUrl]) {
+      expect(new URL(url).pathname, url).toMatch(/^\/api\/v\d+\//);
+    }
   });
 
   test("Google: the endpoints of its OpenID Connect discovery document and the scopes openid email profile", () => {
@@ -115,6 +122,40 @@ describe("redirectUriFor", () => {
 
   test("the test provider comes back to the server that started the sign-in (the e2e one runs on its own port)", () => {
     expect(redirectUriFor("test", "http://localhost:3100")).toBe("http://localhost:3100/api/portal/auth/test/callback");
+  });
+});
+
+describe("canonicalSignInUrl", () => {
+  const SITE = new URL(SITE_URL);
+  const LOOKALIKE = `${SITE.protocol}//${SITE.hostname}.evil.example${SITE.port ? `:${SITE.port}` : ""}`;
+
+  test("Discord and Google: nothing to do on the public address of the site", () => {
+    for (const provider of ["discord", "google"] as const) {
+      expect(canonicalSignInUrl(provider, new URL(`${SITE_URL}/api/portal/auth/${provider}?locale=es`)), provider).toBeNull();
+    }
+  });
+
+  test("Discord and Google: on any other origin, the same path and query on the public address", () => {
+    const query = "?locale=pt&invitacion=abc";
+    const other = ["http://otro-host.example", "https://www.otro-host.example:8443", LOOKALIKE];
+    for (const provider of ["discord", "google"] as const) {
+      for (const origin of other) {
+        expect(canonicalSignInUrl(provider, new URL(`${origin}/api/portal/auth/${provider}${query}`)), origin).toBe(
+          `${SITE_URL}/api/portal/auth/${provider}${query}`,
+        );
+      }
+    }
+  });
+
+  test("the path cannot take the redirect to another site", () => {
+    // `//evil.example` al principio de la ruta sería una dirección sin protocolo si se sumara mal.
+    const url = new URL("http://otro-host.example//evil.example/x?y=1");
+
+    expect(canonicalSignInUrl("discord", url)).toBe(`${SITE_URL}//evil.example/x?y=1`);
+  });
+
+  test("the test provider stays wherever the request came from", () => {
+    expect(canonicalSignInUrl("test", new URL("http://localhost:3100/api/portal/auth/test"))).toBeNull();
   });
 });
 

@@ -4,10 +4,12 @@
 //
 // - Discord (docs.discord.com/developers/topics/oauth2 y /resources/user): autoriza en
 //   `https://discord.com/oauth2/authorize`, da el token en
-//   `https://discord.com/api/oauth2/token` (form-urlencoded, con `code_verifier` de
-//   PKCE) y el perfil en `GET /users/@me`. Con `identify` llegan `id`, `username` y
-//   `global_name` (el nombre para mostrar, o `null`); con `email` llegan `email` y
-//   `verified`.
+//   `https://discord.com/api/v10/oauth2/token` (form-urlencoded, con `code_verifier` de
+//   PKCE) y el perfil en `GET https://discord.com/api/v10/users/@me`. Con `identify`
+//   llegan `id`, `username` y `global_name` (el nombre para mostrar, o `null`); con
+//   `email` llegan `email` y `verified`. La versión va siempre explícita: sin ella,
+//   Discord contesta con la predeterminada, la v6, que está deprecada (tabla de
+//   versiones de docs.discord.com/developers/reference; la v10 es la más nueva).
 // - Google (su documento de descubrimiento de OpenID Connect,
 //   accounts.google.com/.well-known/openid-configuration): autoriza en
 //   `https://accounts.google.com/o/oauth2/v2/auth` (PKCE S256), da el token en
@@ -42,8 +44,8 @@ export interface ProviderClient extends OAuthEndpoints {
 
 export const DISCORD_OAUTH: OAuthEndpoints = {
   authorizationUrl: "https://discord.com/oauth2/authorize",
-  tokenUrl: "https://discord.com/api/oauth2/token",
-  userinfoUrl: "https://discord.com/api/users/@me",
+  tokenUrl: "https://discord.com/api/v10/oauth2/token",
+  userinfoUrl: "https://discord.com/api/v10/users/@me",
   scopes: ["identify", "email"],
 };
 
@@ -130,6 +132,22 @@ export function getProviderClient(provider: PortalProvider): ProviderClient | nu
 export function redirectUriFor(provider: PortalProvider, requestOrigin: string): string {
   const origin = provider === "test" ? requestOrigin : SITE_URL;
   return `${origin}/api/portal/auth/${provider}/callback`;
+}
+
+/**
+ * Discord y Google vuelven a `SITE_URL`, y la cookie del ingreso tiene que estar en ese
+ * mismo sitio: un ingreso que empieza en otra dirección (el `www`, una vista previa de
+ * Vercel) dejaría la cookie ahí y la vuelta no la encontraría. Si el pedido llegó a un
+ * origen que no es el público, devuelve la misma ruta y consulta en `SITE_URL`, para
+ * mandar al navegador ahí antes de empezar. `null` si no hace falta: ya está en el
+ * origen público, o es el proveedor de prueba (que vuelve al servidor que empezó).
+ *
+ * La dirección se arma sumando textos (`SITE_URL` + ruta): una ruta como `//otro.com`
+ * queda dentro de este sitio, nunca se vuelve una dirección sin protocolo.
+ */
+export function canonicalSignInUrl(provider: PortalProvider, requestUrl: URL): string | null {
+  if (provider === "test" || requestUrl.origin === new URL(SITE_URL).origin) return null;
+  return `${SITE_URL}${requestUrl.pathname}${requestUrl.search}`;
 }
 
 type Profile = Record<string, unknown>;
