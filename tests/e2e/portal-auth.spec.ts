@@ -1,62 +1,28 @@
-import { randomUUID } from "node:crypto";
-import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { ADMIN_COOKIE, expect, loginAndReadSessionCookie, test } from "../helpers/admin";
+import {
+  FLOW_COOKIE,
+  STUDENT_COOKIE,
+  URL_SAFE_32_BYTES,
+  callbackUrlFrom,
+  cookieNamed,
+  signIn,
+  startSignIn,
+  type SignInOptions,
+} from "../helpers/portal-e2e";
 
 // El ingreso de los alumnos con el proveedor de prueba: el servidor OAuth falso de
 // `tests/helpers/mock-oauth-server.mjs` (puerto 3110), que vuelve enseguida con un
 // código. Todavía no hay página del portal (la arma la Tarea 5): los tests miran
 // a dónde vuelve el ingreso y qué cookies quedan, no lo que muestra la página.
 
-const STUDENT_COOKIE = "tallami_alumno";
-const FLOW_COOKIE = "tallami_alumno_oauth";
 const FAILED = "ingreso=fallido";
 const THIRTY_DAYS_SECONDS = 30 * 24 * 60 * 60;
-const URL_SAFE_32_BYTES = /^[A-Za-z0-9_-]{43}$/;
 
-/** Un alumno nuevo del proveedor de prueba por test: los tests corren en paralelo sobre la misma base. */
-function uniqueStudent(): string {
-  return `alumno-${randomUUID().slice(0, 8)}`;
-}
-
-interface SignInOptions {
-  locale?: string;
-  student?: string;
-  /** El alumno dice que no en el proveedor (`error=access_denied`). */
-  deny?: boolean;
-}
-
-/**
- * Empieza el ingreso con el proveedor de prueba desde `request` (que guarda la
- * cookie del flujo) y devuelve la dirección de autorización, con el alumno elegido.
- */
-async function startSignIn(
-  request: APIRequestContext,
-  { locale = "es", student = uniqueStudent(), deny = false }: SignInOptions = {},
-): Promise<URL> {
-  const response = await request.get(`/api/portal/auth/test?locale=${locale}`, { maxRedirects: 0 });
-  expect(response.status()).toBe(302);
-  const authorize = new URL(response.headers().location);
-  authorize.searchParams.set("login_hint", student);
-  if (deny) authorize.searchParams.set("deny", "1");
-  return authorize;
-}
-
-/** Pasa por el proveedor de prueba y devuelve la dirección de vuelta a la que manda, sin seguirla. */
-async function callbackUrlFrom(request: APIRequestContext, authorize: URL): Promise<string> {
-  const response = await request.get(authorize.toString(), { maxRedirects: 0 });
-  expect(response.status()).toBe(302);
-  return response.headers().location;
-}
-
-async function cookieNamed(context: BrowserContext, name: string) {
-  return (await context.cookies()).find((cookie) => cookie.name === name);
-}
-
-/** Entra con el proveedor de prueba en el navegador de `page`, como un alumno de verdad. */
+/** Entra con el proveedor de prueba en el navegador de `page` y espera estar de vuelta en el portal, sin avisos. */
 async function signInInBrowser(page: Page, options: SignInOptions = {}): Promise<void> {
-  const authorize = await startSignIn(page.request, options);
-  await page.goto(authorize.toString());
-  await expect(page).toHaveURL(new RegExp(`/${options.locale ?? "es"}/portal$`));
+  const landed = await signIn(page, options);
+  expect(landed.pathname + landed.search).toBe(`/${options.locale ?? "es"}/portal`);
 }
 
 test.describe("students sign in with the test provider", () => {

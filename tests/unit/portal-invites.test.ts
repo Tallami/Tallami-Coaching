@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
+import type { PGlite } from "@electric-sql/pglite";
 import { eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/pglite";
 import { beforeAll, beforeEach, describe, expect, test } from "vitest";
 import type { Db } from "@/db/client";
+import * as schema from "@/db/schema";
 import { customers, portalAccounts, portalInvites } from "@/db/schema";
 import { SITE_URL } from "@/lib/site-url";
 import { accountForCustomer } from "@/portal/accounts";
@@ -89,6 +92,27 @@ describe("createInvite", () => {
     const rows = await db.select().from(portalInvites).where(eq(portalInvites.customerId, customerId));
     expect(rows).toHaveLength(2);
     expect(rows.filter((row) => row.usedAt !== null)).toHaveLength(1);
+  });
+
+  test("locks the student row with FOR NO KEY UPDATE: invite against invite still queue up, and it does not collide with the FOR KEY SHARE a concurrent redeem takes through its foreign keys", async () => {
+    // Un FOR UPDATE choca con el FOR KEY SHARE que Postgres toma sobre la fila del alumno cuando otra
+    // transacción escribe una fila que la referencia (canjear una invitación vincula la cuenta): quien
+    // crea la invitación esperaría a quien canjea y quien canjea a quien crea (interbloqueo). FOR NO KEY
+    // UPDATE sigue chocando consigo mismo (dos invitaciones a la vez se turnan) y deja pasar al otro.
+    const queries: string[] = [];
+    const logged = drizzle({
+      client: (db as unknown as { $client: PGlite }).$client,
+      schema,
+      logger: { logQuery: (query) => void queries.push(query) },
+    });
+    const customerId = await insertTestCustomer(db);
+
+    await createInvite(logged, customerId, START);
+
+    const locks = queries.filter((query) => /\bfor\b[a-z ]*\bupdate\b/i.test(query));
+    expect(locks).toHaveLength(1);
+    expect(locks[0]).toMatch(/from "customers"/);
+    expect(locks[0]).toMatch(/ for no key update$/i);
   });
 
   test("fails for a student that does not exist, without leaving anything behind", async () => {

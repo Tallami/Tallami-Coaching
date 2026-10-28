@@ -22,7 +22,6 @@ vi.mock("@/db/client", () => ({ getDb: vi.fn() }));
 const NO_SESSION = "NEXT_REDIRECT /admin/login";
 const SOME_ID = "8f4f3f64-7c5c-4a43-9d4c-3f6a3a2f1b10";
 const UNKNOWN_ID = "00000000-0000-4000-8000-000000000000";
-const LINK_PREFIX = `${SITE_URL}/es/portal?invitacion=`;
 const URL_SAFE_32_BYTES = /^[A-Za-z0-9_-]{43}$/;
 
 let db: Db;
@@ -48,10 +47,11 @@ function withSession(): void {
   vi.mocked(getDb).mockResolvedValue(db);
 }
 
-/** El token de un link de invitación, comprobando que sea el del portal del sitio. */
-function tokenOf(url: string): string {
-  expect(url.startsWith(LINK_PREFIX), url).toBe(true);
-  const token = url.slice(LINK_PREFIX.length);
+/** El token de un link de invitación, comprobando que sea el del portal del sitio en ese idioma. */
+function tokenOf(url: string, locale = "es"): string {
+  const prefix = `${SITE_URL}/${locale}/portal?invitacion=`;
+  expect(url.startsWith(prefix), url).toBe(true);
+  const token = url.slice(prefix.length);
   expect(token).toMatch(URL_SAFE_32_BYTES);
   return token;
 }
@@ -65,7 +65,7 @@ describe("without a session nothing reads or writes", () => {
     withoutSession();
     const { createPortalInviteAction } = await actions();
 
-    await expect(createPortalInviteAction(SOME_ID)).rejects.toThrow(NO_SESSION);
+    await expect(createPortalInviteAction(SOME_ID, "es")).rejects.toThrow(NO_SESSION);
     expect(getDb).not.toHaveBeenCalled();
   });
 
@@ -95,7 +95,7 @@ describe("without a session nothing reads or writes", () => {
 
     await expect(unlinkPortalAccountAction(customerId)).rejects.toThrow(NO_SESSION);
     await expect(deletePortalAccountAction(customerId)).rejects.toThrow(NO_SESSION);
-    await expect(createPortalInviteAction(customerId)).rejects.toThrow(NO_SESSION);
+    await expect(createPortalInviteAction(customerId, "es")).rejects.toThrow(NO_SESSION);
 
     expect((await accountForCustomer(db, customerId))?.id).toBe(accountId);
     expect(await readPortalSession(db, token)).not.toBeNull();
@@ -110,7 +110,7 @@ describe("createPortalInviteAction", () => {
     const { createPortalInviteAction } = await actions();
     const before = Date.now();
 
-    const result = await createPortalInviteAction(customerId);
+    const result = await createPortalInviteAction(customerId, "es");
 
     const after = Date.now();
     expect(requireAdmin).toHaveBeenCalledOnce();
@@ -129,7 +129,7 @@ describe("createPortalInviteAction", () => {
     withSession();
     const customerId = await insertTestCustomer(db);
     const { createPortalInviteAction } = await actions();
-    const result = await createPortalInviteAction(customerId);
+    const result = await createPortalInviteAction(customerId, "es");
     if (!result.ok) throw new Error("se esperaba una invitación");
     const token = tokenOf(result.url);
 
@@ -141,13 +141,42 @@ describe("createPortalInviteAction", () => {
     withSession();
     const customerId = await insertTestCustomer(db);
     const { createPortalInviteAction } = await actions();
-    const first = await createPortalInviteAction(customerId);
-    const second = await createPortalInviteAction(customerId);
+    const first = await createPortalInviteAction(customerId, "es");
+    const second = await createPortalInviteAction(customerId, "es");
     if (!first.ok || !second.ok) throw new Error("se esperaban dos invitaciones");
 
     expect(await redeemInvite(db, tokenOf(first.url), await insertTestAccount(db))).toBe("invalid");
     expect(await redeemInvite(db, tokenOf(second.url), await insertTestAccount(db))).toBe("linked");
   });
+
+  test.each(["pt", "en"])("the link opens the portal in the language chosen (%s), and it works once", async (locale) => {
+    withSession();
+    const customerId = await insertTestCustomer(db);
+    const { createPortalInviteAction } = await actions();
+
+    const result = await createPortalInviteAction(customerId, locale);
+
+    if (!result.ok) throw new Error("se esperaba una invitación");
+    const token = tokenOf(result.url, locale);
+    expect(await redeemInvite(db, token, await insertTestAccount(db))).toBe("linked");
+  });
+
+  test.each(["fr", "", "ES", "pt ", "//evil.example", "es/../admin", "https://evil.example"])(
+    "a language that is not of the site (%j) is refused before reading anything: no invite, no database",
+    async (locale) => {
+      withSession();
+      const customerId = await insertTestCustomer(db);
+      vi.mocked(getDb).mockClear();
+      const { createPortalInviteAction } = await actions();
+
+      const result = await createPortalInviteAction(customerId, locale);
+
+      expect(requireAdmin).toHaveBeenCalledOnce();
+      expect(result).toEqual({ ok: false, error: "invalid-language" });
+      expect(getDb).not.toHaveBeenCalled();
+      expect(await db.select().from(portalInvites)).toEqual([]);
+    },
+  );
 
   test("a student that already has an account is not invited again", async () => {
     withSession();
@@ -155,7 +184,7 @@ describe("createPortalInviteAction", () => {
     await insertTestAccount(db, { customerId });
     const { createPortalInviteAction } = await actions();
 
-    const result = await createPortalInviteAction(customerId);
+    const result = await createPortalInviteAction(customerId, "es");
 
     expect(result).toEqual({ ok: false, error: "already-linked" });
     expect(await db.select().from(portalInvites)).toEqual([]);
@@ -165,7 +194,7 @@ describe("createPortalInviteAction", () => {
     withSession();
     const { createPortalInviteAction } = await actions();
 
-    expect(await createPortalInviteAction(UNKNOWN_ID)).toEqual({ ok: false, error: "not-found" });
+    expect(await createPortalInviteAction(UNKNOWN_ID, "es")).toEqual({ ok: false, error: "not-found" });
     expect(await db.select().from(portalInvites)).toEqual([]);
   });
 
@@ -173,7 +202,7 @@ describe("createPortalInviteAction", () => {
     withSession();
     const { createPortalInviteAction } = await actions();
 
-    expect(await createPortalInviteAction("x'; drop table customers; --")).toEqual({ ok: false, error: "not-found" });
+    expect(await createPortalInviteAction("x'; drop table customers; --", "es")).toEqual({ ok: false, error: "not-found" });
     expect(getDb).not.toHaveBeenCalled();
   });
 
@@ -184,7 +213,7 @@ describe("createPortalInviteAction", () => {
     const anaToken = await createInvite(db, ana);
     const { createPortalInviteAction } = await actions();
 
-    await createPortalInviteAction(beto);
+    await createPortalInviteAction(beto, "es");
 
     expect(await redeemInvite(db, anaToken, await insertTestAccount(db))).toBe("linked");
   });
@@ -233,7 +262,7 @@ describe("unlinkPortalAccountAction", () => {
 
     await unlinkPortalAccountAction(customerId);
 
-    expect((await createPortalInviteAction(customerId)).ok).toBe(true);
+    expect((await createPortalInviteAction(customerId, "es")).ok).toBe(true);
     const token = await createInvite(db, await insertTestCustomer(db, "Otro alumno"));
     expect(await redeemInvite(db, token, accountId)).toBe("linked");
   });
@@ -244,6 +273,19 @@ describe("unlinkPortalAccountAction", () => {
     const { unlinkPortalAccountAction } = await actions();
 
     expect(await unlinkPortalAccountAction(customerId)).toEqual({ ok: true });
+  });
+
+  test("a student that does not exist (deleted in another tab) answers not-found, and no account is touched", async () => {
+    withSession();
+    const customerId = await insertTestCustomer(db);
+    const accountId = await insertTestAccount(db, { customerId });
+    const token = await createPortalSession(db, accountId);
+    const { unlinkPortalAccountAction } = await actions();
+
+    expect(await unlinkPortalAccountAction(UNKNOWN_ID)).toEqual({ ok: false, error: "not-found" });
+
+    expect((await accountForCustomer(db, customerId))?.id).toBe(accountId);
+    expect(await readPortalSession(db, token)).not.toBeNull();
   });
 
   test("an id that is not a uuid never reaches the database", async () => {
@@ -294,6 +336,17 @@ describe("deletePortalAccountAction", () => {
     const { deletePortalAccountAction } = await actions();
 
     expect(await deletePortalAccountAction(customerId)).toEqual({ ok: true });
+  });
+
+  test("a student that does not exist (deleted in another tab) answers not-found, and no account is touched", async () => {
+    withSession();
+    const customerId = await insertTestCustomer(db);
+    const accountId = await insertTestAccount(db, { customerId });
+    const { deletePortalAccountAction } = await actions();
+
+    expect(await deletePortalAccountAction(UNKNOWN_ID)).toEqual({ ok: false, error: "not-found" });
+
+    expect((await accountForCustomer(db, customerId))?.id).toBe(accountId);
   });
 
   test("an id that is not a uuid never reaches the database", async () => {

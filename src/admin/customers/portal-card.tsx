@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { DEFAULT_INVITE_LANGUAGE, INVITE_LANGUAGES } from "@/admin/customers/invite-languages";
 import { formatMoment } from "@/admin/dates";
 import { Field } from "@/admin/ui/field";
 import { Notice } from "@/admin/ui/notice";
@@ -15,6 +16,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import type { Locale } from "@/i18n/routing";
 import type { PortalProvider } from "@/portal/config";
 import { PORTAL_INVITE_MS } from "@/portal/policy";
 
@@ -33,6 +36,8 @@ interface PortalCardProps {
 interface ShownInvite {
   url: string;
   expiresAt: Date;
+  /** El idioma en que abre el link. */
+  locale: Locale;
 }
 
 /** Los dos cambios que piden confirmación. */
@@ -53,16 +58,19 @@ const UNAVAILABLE_MESSAGE = "No pudimos completarlo. Probá de nuevo en unos min
 const NOT_FOUND_MESSAGE = "No encontramos a ese alumno. Puede que lo hayan borrado: volvé a la lista de alumnos.";
 const ALREADY_LINKED_MESSAGE =
   "Este alumno ya tiene una cuenta vinculada. Si querés invitar a otra, desvinculá primero esta.";
+const INVALID_LANGUAGE_MESSAGE = "Elegí uno de los idiomas de la lista.";
 const COPY_FAILED_MESSAGE = "No pudimos copiarlo. Seleccioná el link y copialo a mano.";
 const MESSAGE_ID = "portal-card-message";
+const QUESTION_ID = "portal-card-question";
 
-/** Qué se pregunta, qué dicen los botones y qué acción corre cada cambio. */
+/** Qué se pregunta, qué dicen los botones, qué se avisa al terminar y qué acción corre cada cambio. */
 const CHANGES: Record<
   Change,
   {
     question: (account: string) => string;
     yes: string;
     no: string;
+    done: string;
     run: (customerId: string) => Promise<PortalAccountChangeResult>;
   }
 > = {
@@ -71,6 +79,7 @@ const CHANGES: Record<
       `¿Desvincular la ${account}? Se cierran sus sesiones y deja de ver las compras de este alumno. La cuenta sigue existiendo y podés invitarlo de nuevo.`,
     yes: "Sí, desvincular",
     no: "No, dejarla vinculada",
+    done: "Cuenta desvinculada. Se cerraron sus sesiones.",
     run: unlinkPortalAccountAction,
   },
   delete: {
@@ -78,14 +87,29 @@ const CHANGES: Record<
       `¿Borrar la ${account} del portal? Se borran la cuenta y sus sesiones. Las ventas y las entregas siguen en el panel.`,
     yes: "Sí, borrar la cuenta",
     no: "No, conservarla",
+    done: "Cuenta borrada del portal.",
     run: deletePortalAccountAction,
   },
 };
 
-/** El link de la invitación, a la vista una sola vez, con su vencimiento y el botón para copiarlo. */
+/** El idioma de `locale` escrito en ese idioma ("Português"). */
+function languageName(locale: Locale): string {
+  return INVITE_LANGUAGES.find(({ value }) => value === locale)?.label ?? locale;
+}
+
+/**
+ * El link de la invitación, a la vista una sola vez, con su vencimiento y el botón para copiarlo.
+ * Al aparecer se lleva el foco al campo del link: quien usa un lector de pantalla oye de qué se
+ * trata (y su vencimiento) en el acto, y quien usa el teclado queda a un Tab del botón de copiar.
+ */
 function InviteLink({ invite }: { invite: ShownInvite }) {
   const hydrated = useHydrated();
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
+  const field = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    field.current?.focus();
+  }, []);
 
   async function copyLink() {
     try {
@@ -101,11 +125,12 @@ function InviteLink({ invite }: { invite: ShownInvite }) {
       <Field
         id="portal-invite-url"
         label="Link de invitación"
-        hint={`Vence el ${formatMoment(invite.expiresAt)}. Se ve una sola vez: si lo perdés, generá otro.`}
+        hint={`Link en ${languageName(invite.locale)}. Vence el ${formatMoment(invite.expiresAt)}. Se ve una sola vez: si lo perdés, generá otro.`}
       >
         {(control) => (
           <Input
             {...control}
+            ref={field}
             readOnly
             value={invite.url}
             onFocus={(event) => event.currentTarget.select()}
@@ -125,6 +150,24 @@ function InviteLink({ invite }: { invite: ShownInvite }) {
   );
 }
 
+/**
+ * El aviso de que el cambio se hizo. Los botones que lo pidieron ya no están (la cuenta se fue),
+ * así que el foco se lleva al aviso: es lo que hace que se lea.
+ */
+function DoneNotice({ children }: { children: ReactNode }) {
+  const box = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    box.current?.focus();
+  }, []);
+
+  return (
+    <div ref={box} tabIndex={-1} className="mt-4 outline-offset-0">
+      <Notice tone="ok">{children}</Notice>
+    </div>
+  );
+}
+
 interface ConfirmChangeProps {
   change: Change;
   /** La cuenta como se nombra en la pregunta ("cuenta de Discord «Ana»"). */
@@ -134,7 +177,10 @@ interface ConfirmChangeProps {
   onCancel: () => void;
 }
 
-/** La pregunta antes de desvincular o borrar. Se abre con el foco en la opción segura ("No"). */
+/**
+ * La pregunta antes de desvincular o borrar. Se abre con el foco en la opción segura ("No"), y
+ * los dos botones la tienen como descripción: se lee junto con cada uno.
+ */
 function ConfirmChange({ change, accountName, busy, onConfirm, onCancel }: ConfirmChangeProps) {
   const keepButton = useRef<HTMLButtonElement>(null);
   const text = CHANGES[change];
@@ -145,12 +191,22 @@ function ConfirmChange({ change, accountName, busy, onConfirm, onCancel }: Confi
 
   return (
     <div className="mt-4 flex flex-col gap-3">
-      <Notice tone="info">{text.question(accountName)}</Notice>
+      <Notice tone="info" id={QUESTION_ID}>
+        {text.question(accountName)}
+      </Notice>
       <div className="flex flex-wrap gap-3">
-        <Button type="button" size="sm" disabled={busy} onClick={onConfirm}>
+        <Button type="button" size="sm" disabled={busy} aria-describedby={QUESTION_ID} onClick={onConfirm}>
           {busy ? "Un momento…" : text.yes}
         </Button>
-        <Button ref={keepButton} type="button" size="sm" variant="ink-outline" disabled={busy} onClick={onCancel}>
+        <Button
+          ref={keepButton}
+          type="button"
+          size="sm"
+          variant="ink-outline"
+          disabled={busy}
+          aria-describedby={QUESTION_ID}
+          onClick={onCancel}
+        >
           {text.no}
         </Button>
       </div>
@@ -158,11 +214,18 @@ function ConfirmChange({ change, accountName, busy, onConfirm, onCancel }: Confi
   );
 }
 
+/** Lo que cuenta la tarjeta cuando la invitación no se pudo generar. */
+const INVITE_ERRORS = {
+  "not-found": NOT_FOUND_MESSAGE,
+  "already-linked": ALREADY_LINKED_MESSAGE,
+  "invalid-language": INVALID_LANGUAGE_MESSAGE,
+} as const;
+
 /**
  * La tarjeta "Portal del alumno" de la ficha: si el alumno ya tiene una cuenta vinculada (con
  * qué proveedor y qué nombre) y los botones para invitarlo, desvincularla o borrarla. El
- * link de la invitación se ve una sola vez, acá: en la base queda solo su hash. Desvincular
- * y borrar piden confirmación, con la opción segura enfocada.
+ * link de la invitación se ve una sola vez, acá, en el idioma que se elija: en la base queda
+ * solo su hash. Desvincular y borrar piden confirmación, con la opción segura enfocada.
  */
 export function PortalCard({ customerId, account }: PortalCardProps) {
   const router = useRouter();
@@ -170,15 +233,20 @@ export function PortalCard({ customerId, account }: PortalCardProps) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [invite, setInvite] = useState<ShownInvite | null>(null);
+  const [language, setLanguage] = useState<Locale>(DEFAULT_INVITE_LANGUAGE);
   const [confirming, setConfirming] = useState<Change | null>(null);
+  const [done, setDone] = useState<Change | null>(null);
   const triggers = useRef<Record<Change, HTMLButtonElement | null>>({ unlink: null, delete: null });
   const previousConfirming = useRef<Change | null>(null);
 
-  // Al cerrar la pregunta, el foco vuelve al botón que la abrió (al abrirla, lo lleva la propia pregunta).
+  // Al cerrar la pregunta sin cambiar nada, el foco vuelve al botón que la abrió (al abrirla, lo lleva
+  // la propia pregunta; al terminar el cambio, el aviso).
   useEffect(() => {
-    if (confirming === null && previousConfirming.current !== null) triggers.current[previousConfirming.current]?.focus();
+    if (confirming === null && previousConfirming.current !== null && done === null) {
+      triggers.current[previousConfirming.current]?.focus();
+    }
     previousConfirming.current = confirming;
-  }, [confirming]);
+  }, [confirming, done]);
 
   // Si mientras tanto el alumno se vinculó (abrió el link en otro lado), el link ya no tiene sentido.
   const shownInvite = account ? null : invite;
@@ -187,6 +255,7 @@ export function PortalCard({ customerId, account }: PortalCardProps) {
   async function perform(task: () => Promise<string | null>) {
     setBusy(true);
     setMessage(null);
+    setDone(null);
     try {
       setMessage(await task());
     } catch {
@@ -198,14 +267,14 @@ export function PortalCard({ customerId, account }: PortalCardProps) {
 
   function generateInvite() {
     void perform(async () => {
-      const result = await createPortalInviteAction(customerId);
+      const result = await createPortalInviteAction(customerId, language);
       if (result.ok) {
-        setInvite({ url: result.url, expiresAt: new Date(result.expiresAt) });
+        setInvite({ url: result.url, expiresAt: new Date(result.expiresAt), locale: language });
         return null;
       }
       setInvite(null);
       router.refresh();
-      return result.error === "already-linked" ? ALREADY_LINKED_MESSAGE : NOT_FOUND_MESSAGE;
+      return INVITE_ERRORS[result.error];
     });
   }
 
@@ -214,12 +283,15 @@ export function PortalCard({ customerId, account }: PortalCardProps) {
       const result = await CHANGES[change].run(customerId);
       setConfirming(null);
       router.refresh();
-      return result.ok ? null : NOT_FOUND_MESSAGE;
+      if (!result.ok) return NOT_FOUND_MESSAGE;
+      setDone(change);
+      return null;
     });
   }
 
   function ask(change: Change) {
     setMessage(null);
+    setDone(null);
     setConfirming(change);
   }
 
@@ -251,10 +323,33 @@ export function PortalCard({ customerId, account }: PortalCardProps) {
             Generá un link de un solo uso y mandáselo por donde hables con él. Al abrirlo entra con Discord o Google y
             queda vinculado. Vence a los {INVITE_DAYS} días; si generás otro, el anterior deja de valer.
           </p>
+          <Field
+            id="portal-invite-language"
+            label="Idioma del link"
+            hint="En qué idioma abre el portal el alumno."
+            className="mt-3 max-w-[16rem]"
+          >
+            {(control) => (
+              <NativeSelect
+                {...control}
+                value={language}
+                disabled={busy}
+                onChange={(event) => setLanguage(event.target.value as Locale)}
+              >
+                {INVITE_LANGUAGES.map(({ value, label }) => (
+                  <NativeSelectOption key={value} value={value}>
+                    {label}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            )}
+          </Field>
         </>
       )}
 
       {shownInvite ? <InviteLink key={shownInvite.url} invite={shownInvite} /> : null}
+
+      {done ? <DoneNotice key={done}>{CHANGES[done].done}</DoneNotice> : null}
 
       {message ? (
         <Notice tone="error" id={MESSAGE_ID} className="mt-4">

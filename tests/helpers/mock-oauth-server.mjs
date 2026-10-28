@@ -7,9 +7,15 @@
 // Habla como Discord o Google, sin pantallas:
 //
 //   GET  /authorize  Vuelve enseguida (302) al `redirect_uri` con un `code` y el `state`
-//                    recibido. El alumno se elige con `login_hint` (por defecto
-//                    `alumno-1`); con `deny=1` vuelve con `error=access_denied`, como
-//                    cuando el alumno cancela. Exige el flujo con PKCE S256.
+//                    recibido. El alumno se elige con `login_hint` o, si no viene, con la
+//                    cookie `mock_oauth_student` (el navegador no puede agregar un
+//                    `login_hint` a la redirección que le manda el sitio, pero el test sí
+//                    puede poner la cookie en su contexto). Sin ninguno de los dos vuelve
+//                    con `error=invalid_request`: no hay una identidad compartida por
+//                    defecto, así un test que falla a medias no deja a nadie vinculado para
+//                    el reintento ni para el siguiente. Con `deny=1` vuelve con
+//                    `error=access_denied`, como cuando el alumno cancela. Exige el flujo
+//                    con PKCE S256.
 //   POST /token      Cambia el código por un token de acceso. El código vale una sola
 //                    vez y solo con el `code_verifier` cuyo SHA-256 es el
 //                    `code_challenge` de `/authorize`, el mismo `redirect_uri` y el
@@ -24,9 +30,10 @@ import { createHash, randomBytes } from "node:crypto";
 import { createServer } from "node:http";
 
 const PORT = Number(process.env.MOCK_OAUTH_PORT ?? 3110);
-const DEFAULT_STUDENT = "alumno-1";
 /** Un alumno de prueba: letras minúsculas, números y guiones. */
 const STUDENT_ID = /^[a-z0-9-]{1,64}$/;
+/** La cookie con la que un test elige al alumno cuando el navegador no puede mandar `login_hint`. */
+const STUDENT_COOKIE = "mock_oauth_student";
 const PKCE_VALUE = /^[A-Za-z0-9._~-]{43,128}$/;
 const CODE_TTL_MS = 60_000;
 const MAX_BODY_BYTES = 16 * 1024;
@@ -72,7 +79,26 @@ function redirectBack(response, redirectUri, params) {
   send(response, 302, "", { Location: url.toString() });
 }
 
-function authorize(url, response) {
+/**
+ * El valor de la cookie `name` del encabezado `Cookie`, o `null` si no está. Sin decodificar
+ * de más: el valor se valida enseguida con `STUDENT_ID`.
+ * @param {string | undefined} header
+ * @param {string} name
+ */
+function cookieValue(header, name) {
+  for (const part of (header ?? "").split(";")) {
+    const [key, ...value] = part.trim().split("=");
+    if (key !== name) continue;
+    try {
+      return decodeURIComponent(value.join("="));
+    } catch {
+      return null; // Un valor con un `%` roto no es un alumno.
+    }
+  }
+  return null;
+}
+
+function authorize(url, request, response) {
   const params = url.searchParams;
   const redirectUri = params.get("redirect_uri");
   const state = params.get("state") ?? "";
@@ -85,7 +111,7 @@ function authorize(url, response) {
   if (params.get("code_challenge_method") !== "S256" || !PKCE_VALUE.test(challenge)) {
     return redirectBack(response, redirectUri, { error: "invalid_request", state });
   }
-  const hint = params.get("login_hint") || DEFAULT_STUDENT;
+  const hint = params.get("login_hint") || cookieValue(request.headers.cookie, STUDENT_COOKIE) || "";
   if (!STUDENT_ID.test(hint)) return redirectBack(response, redirectUri, { error: "invalid_request", state });
 
   const code = randomValue();
@@ -156,7 +182,7 @@ async function handle(request, response) {
   const route = `${request.method} ${url.pathname}`;
   try {
     if (route === "GET /health") return send(response, 200, "ok");
-    if (route === "GET /authorize") return authorize(url, response);
+    if (route === "GET /authorize") return authorize(url, request, response);
     if (route === "POST /token") return await token(request, response);
     if (route === "GET /userinfo") return userinfo(request, response);
     return send(response, 404, "no existe");

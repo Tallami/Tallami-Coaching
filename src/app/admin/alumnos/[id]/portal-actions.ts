@@ -5,6 +5,7 @@ import { requireAdmin } from "@/admin/auth/require-admin";
 import { getDb, type Db } from "@/db/client";
 import { customers } from "@/db/schema";
 import { isUuid } from "@/db/uuid";
+import { routing, type Locale } from "@/i18n/routing";
 import { accountForCustomer, deleteAccountOfCustomer, unlinkCustomer } from "@/portal/accounts";
 import { createInvite, inviteExpiry, inviteUrl } from "@/portal/invites";
 import { revokeAccountSessions } from "@/portal/sessions";
@@ -17,9 +18,12 @@ import { revokeAccountSessions } from "@/portal/sessions";
 /** El resultado de invitar: el link (se ve una sola vez) y cuándo vence, o por qué no se pudo. */
 export type CreatePortalInviteResult =
   | { ok: true; url: string; expiresAt: string }
-  | { ok: false; error: "not-found" | "already-linked" };
+  | { ok: false; error: "not-found" | "already-linked" | "invalid-language" };
 
-/** El resultado de desvincular o borrar la cuenta. Repetirlo no falla: si ya no hay cuenta, no hay nada que hacer. */
+/**
+ * El resultado de desvincular o borrar la cuenta. Repetirlo no falla: si el alumno ya no tiene
+ * cuenta, no hay nada que hacer. `not-found` es un alumno que ya no existe (se borró en otra pestaña).
+ */
 export type PortalAccountChangeResult = { ok: true } | { ok: false; error: "not-found" };
 
 const NOT_FOUND = { ok: false, error: "not-found" } as const;
@@ -29,13 +33,21 @@ async function studentExists(db: Db, customerId: string): Promise<boolean> {
   return student !== undefined;
 }
 
+/** El idioma del sitio que dice `value`, o `null` si no es uno (viene del navegador: no se le cree). */
+function siteLocale(value: string): Locale | null {
+  return routing.locales.find((locale) => locale === value) ?? null;
+}
+
 /**
- * Genera la invitación al portal del alumno `customerId` (anula la anterior sin usar).
- * El link lleva el token en claro y no vuelve a poder verse: en la base queda su hash.
- * Un alumno que ya tiene cuenta no se invita de nuevo: primero se desvincula la cuenta.
+ * Genera la invitación al portal del alumno `customerId` (anula la anterior sin usar). El link
+ * abre el portal en `locale` (es, pt o en; cualquier otra cosa se rechaza) y lleva el token en
+ * claro: no vuelve a poder verse, en la base queda su hash. Un alumno que ya tiene cuenta no se
+ * invita de nuevo: primero se desvincula la cuenta.
  */
-export async function createPortalInviteAction(customerId: string): Promise<CreatePortalInviteResult> {
+export async function createPortalInviteAction(customerId: string, locale: string): Promise<CreatePortalInviteResult> {
   await requireAdmin();
+  const language = siteLocale(locale);
+  if (!language) return { ok: false, error: "invalid-language" };
   if (!isUuid(customerId)) return NOT_FOUND;
 
   const db = await getDb();
@@ -44,7 +56,7 @@ export async function createPortalInviteAction(customerId: string): Promise<Crea
 
   const now = new Date();
   const token = await createInvite(db, customerId, now);
-  return { ok: true, url: inviteUrl(token), expiresAt: inviteExpiry(now).toISOString() };
+  return { ok: true, url: inviteUrl(token, language), expiresAt: inviteExpiry(now).toISOString() };
 }
 
 /**
@@ -56,7 +68,9 @@ export async function unlinkPortalAccountAction(customerId: string): Promise<Por
   await requireAdmin();
   if (!isUuid(customerId)) return NOT_FOUND;
 
-  await (await getDb()).transaction(async (tx) => {
+  const db = await getDb();
+  if (!(await studentExists(db, customerId))) return NOT_FOUND;
+  await db.transaction(async (tx) => {
     const accountId = await unlinkCustomer(tx, customerId);
     if (accountId) await revokeAccountSessions(tx, accountId);
   });
@@ -71,6 +85,8 @@ export async function deletePortalAccountAction(customerId: string): Promise<Por
   await requireAdmin();
   if (!isUuid(customerId)) return NOT_FOUND;
 
-  await deleteAccountOfCustomer(await getDb(), customerId);
+  const db = await getDb();
+  if (!(await studentExists(db, customerId))) return NOT_FOUND;
+  await deleteAccountOfCustomer(db, customerId);
   return { ok: true };
 }

@@ -61,8 +61,17 @@ export function inviteExpiry(now: Date): Date {
 export async function createInvite(db: Db, customerId: string, now: Date = new Date()): Promise<string> {
   const token = randomBytes(TOKEN_BYTES).toString("base64url");
   await db.transaction(async (tx) => {
-    // Bloquea la ficha del alumno: dos invitaciones a la vez no dejan dos sin usar.
-    await tx.select({ id: customers.id }).from(customers).where(eq(customers.id, customerId)).for("update");
+    // Bloquea la ficha del alumno para que dos invitaciones a la vez se turnen y no dejen dos sin
+    // usar. Es `no key update` y no `update` a propósito: Postgres toma un `key share` sobre la
+    // fila del alumno cada vez que otra transacción escribe una fila que la referencia (canjear
+    // una invitación vincula la cuenta, y eso lo hace). `update` choca con `key share`: quien crea
+    // esperaría a quien canjea y quien canjea a quien crea (interbloqueo). `no key update` sigue
+    // chocando consigo mismo, que es lo que hace falta, y no con `key share`.
+    await tx
+      .select({ id: customers.id })
+      .from(customers)
+      .where(eq(customers.id, customerId))
+      .for("no key update");
     await tx
       .delete(portalInvites)
       .where(and(eq(portalInvites.customerId, customerId), isNull(portalInvites.usedAt)));
