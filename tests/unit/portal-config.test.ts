@@ -47,6 +47,18 @@ describe("getPortalSecret", () => {
 
     expect(getPortalSecret()).toBeNull();
   });
+
+  test("trims the spaces around the value, like the other variables: 32 spaces are not a secret", () => {
+    vi.stubEnv("PORTAL_SESSION_SECRET", " ".repeat(32));
+    expect(getPortalSecret()).toBeNull();
+
+    // 31 caracteres con espacios alrededor tampoco llegan al mínimo.
+    vi.stubEnv("PORTAL_SESSION_SECRET", `  ${"a".repeat(31)}  `);
+    expect(getPortalSecret()).toBeNull();
+
+    vi.stubEnv("PORTAL_SESSION_SECRET", `\n${"a".repeat(32)} `);
+    expect(getPortalSecret()).toEqual(new TextEncoder().encode("a".repeat(32)));
+  });
 });
 
 describe("enabledProviders", () => {
@@ -93,13 +105,29 @@ describe("enabledProviders", () => {
     expect(enabledProviders()).toEqual(["test"]);
   });
 
-  test("ignores the test provider in Vercel production and says so in the log", () => {
+  test("ignores the test provider in Vercel production and says so in the log", async () => {
+    // Un módulo nuevo: el aviso sale una sola vez por proceso y otro test pudo haberlo dado.
+    vi.resetModules();
+    const fresh = await import("@/portal/config");
     vi.stubEnv("PORTAL_OAUTH_TEST_ISSUER", "http://localhost:3199");
     vi.stubEnv("VERCEL_ENV", "production");
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-    expect(enabledProviders()).toEqual([]);
+    expect(fresh.enabledProviders()).toEqual([]);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("PORTAL_OAUTH_TEST_ISSUER"));
+  });
+
+  test("says it only once per process, however many times the providers are asked for", async () => {
+    vi.resetModules();
+    const fresh = await import("@/portal/config");
+    vi.stubEnv("PORTAL_OAUTH_TEST_ISSUER", "http://localhost:3199");
+    vi.stubEnv("VERCEL_ENV", "production");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    for (let i = 0; i < 5; i += 1) expect(fresh.enabledProviders()).toEqual([]);
+    expect(fresh.isPortalConfigured()).toBe(false);
+
+    expect(warn).toHaveBeenCalledTimes(1);
   });
 
   test("keeps the real providers in Vercel production", () => {

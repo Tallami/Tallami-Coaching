@@ -2,18 +2,19 @@ import { createHash, randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { beforeAll, beforeEach, describe, expect, test } from "vitest";
 import type { Db } from "@/db/client";
-import { portalAccounts, portalSessions } from "@/db/schema";
+import { portalAccounts, portalInvites, portalSessions } from "@/db/schema";
 import { PORTAL_SESSION_MS } from "@/portal/policy";
 import {
   PORTAL_COOKIE,
   createPortalSession,
   portalCookieOptions,
+  purgePortalRecords,
   readPortalSession,
   revokeAccountSessions,
   revokePortalSession,
 } from "@/portal/sessions";
 import { createTestDb } from "../helpers/db";
-import { insertTestAccount } from "../helpers/portal";
+import { insertTestAccount, insertTestCustomer } from "../helpers/portal";
 
 const MINUTE_MS = 60_000;
 const DAY_MS = 24 * 60 * MINUTE_MS;
@@ -206,6 +207,97 @@ describe("revokeAccountSessions", () => {
 
   test("does nothing for an account without sessions", async () => {
     await expect(revokeAccountSessions(db, accountId, START)).resolves.toBeUndefined();
+  });
+});
+
+describe("purgePortalRecords", () => {
+  const NOW = after(60 * DAY_MS);
+
+  /** Una sesión con horas a medida; devuelve su id en la base. */
+  async function insertSession(times: { createdAt: Date; expiresAt: Date; revokedAt?: Date }): Promise<string> {
+    const id = sha256Hex(randomBytes(32).toString("base64url"));
+    await db.insert(portalSessions).values({ id, accountId, ...times });
+    return id;
+  }
+
+  /** Una invitación con horas a medida; devuelve su id. */
+  async function insertInvite(customerId: string, times: { expiresAt: Date; usedAt?: Date }): Promise<string> {
+    const [row] = await db
+      .insert(portalInvites)
+      .values({ tokenHash: sha256Hex(randomBytes(32).toString("base64url")), customerId, createdAt: START, ...times })
+      .returning({ id: portalInvites.id });
+    return row.id;
+  }
+
+  async function sessionIds(): Promise<string[]> {
+    return (await db.select({ id: portalSessions.id }).from(portalSessions)).map(({ id }) => id).sort();
+  }
+
+  async function inviteIds(): Promise<string[]> {
+    return (await db.select({ id: portalInvites.id }).from(portalInvites)).map(({ id }) => id).sort();
+  }
+
+  beforeEach(async () => {
+    await db.delete(portalInvites);
+  });
+
+  test("deletes the sessions that expired or were closed more than a day ago, and keeps the rest", async () => {
+    const created = after(-31 * DAY_MS, NOW);
+    const expiredLongAgo = await insertSession({ createdAt: created, expiresAt: after(-DAY_MS - 1, NOW) });
+    const closedLongAgo = await insertSession({
+      createdAt: after(-5 * DAY_MS, NOW),
+      expiresAt: after(25 * DAY_MS, NOW),
+      revokedAt: after(-2 * DAY_MS, NOW),
+    });
+    const expiredToday = await insertSession({ createdAt: created, expiresAt: after(-DAY_MS + MINUTE_MS, NOW) });
+    const closedToday = await insertSession({
+      createdAt: after(-5 * DAY_MS, NOW),
+      expiresAt: after(25 * DAY_MS, NOW),
+      revokedAt: after(-MINUTE_MS, NOW),
+    });
+    const open = await insertSession({ createdAt: after(-DAY_MS, NOW), expiresAt: after(29 * DAY_MS, NOW) });
+
+    await purgePortalRecords(db, NOW);
+
+    const remaining = await sessionIds();
+    expect(remaining).toEqual([expiredToday, closedToday, open].sort());
+    expect(remaining).not.toContain(expiredLongAgo);
+    expect(remaining).not.toContain(closedLongAgo);
+  });
+
+  test("deletes the invites used or expired more than a day ago, and keeps pending and recent ones", async () => {
+    const customerId = await insertTestCustomer(db);
+    const usedLongAgo = await insertInvite(customerId, {
+      expiresAt: after(5 * DAY_MS, NOW),
+      usedAt: after(-2 * DAY_MS, NOW),
+    });
+    const expiredLongAgo = await insertInvite(customerId, { expiresAt: after(-2 * DAY_MS, NOW) });
+    const usedToday = await insertInvite(customerId, { expiresAt: after(5 * DAY_MS, NOW), usedAt: after(-MINUTE_MS, NOW) });
+    const expiredToday = await insertInvite(customerId, { expiresAt: after(-MINUTE_MS, NOW) });
+    const pending = await insertInvite(customerId, { expiresAt: after(10 * DAY_MS, NOW) });
+
+    await purgePortalRecords(db, NOW);
+
+    const remaining = await inviteIds();
+    expect(remaining).toEqual([usedToday, expiredToday, pending].sort());
+    expect(remaining).not.toContain(usedLongAgo);
+    expect(remaining).not.toContain(expiredLongAgo);
+  });
+
+  test("never touches the accounts", async () => {
+    await insertSession({ createdAt: START, expiresAt: after(PORTAL_SESSION_MS) });
+
+    await purgePortalRecords(db, after(5 * PORTAL_SESSION_MS));
+
+    expect(await db.select().from(portalAccounts)).toHaveLength(1);
+  });
+
+  test("uses the current hour when none is given", async () => {
+    await insertSession({ createdAt: new Date(Date.now() - 40 * DAY_MS), expiresAt: new Date(Date.now() - 10 * DAY_MS) });
+
+    await purgePortalRecords(db);
+
+    expect(await sessionIds()).toEqual([]);
   });
 });
 

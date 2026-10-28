@@ -1,16 +1,27 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { verifyPassword } from "@/admin/auth/password";
 import {
   ADMIN_TEST_OLD_PASSWORD_HASH,
   ADMIN_TEST_PASSWORD,
   ADMIN_TEST_PASSWORD_HASH,
+  E2E_PORTS,
   SEED_E2E_PASSKEYS_COMMAND,
   adminServerEnv,
   demoServerEnv,
   securityServerEnv,
 } from "../helpers/admin-server";
 import { assertTestDatabase } from "../helpers/seed-e2e-passkeys";
+
+/** Los archivos de código de una carpeta, con sus subcarpetas. */
+function listSourceFiles(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) return listSourceFiles(full);
+    return /\.(tsx?|mjs|jsx?)$/.test(entry.name) ? [full] : [];
+  });
+}
 
 // Importar los helpers o las configuraciones de Playwright arma el entorno del
 // servidor y, en el proceso principal, borra la carpeta de la base de los e2e:
@@ -23,21 +34,18 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-/** El entorno con el que una configuración de Playwright arranca su servidor. */
-async function serverEnvOf(configPath: string): Promise<Record<string, string>> {
-  const config = (await import(configPath)).default as {
-    webServer?: { env?: Record<string, string> } | { env?: Record<string, string> }[];
-  };
-  const servers = [config.webServer].flat();
-  expect(servers).toHaveLength(1);
-  return servers[0]?.env ?? {};
-}
-
 const CONFIGS = [
   ["main", "../../playwright.config", 3100],
   ["demo", "../../playwright.demo.config", 3101],
   ["security", "../../playwright.security.config", 3102],
 ] as const;
+
+interface WebServer {
+  command?: string;
+  url?: string;
+  reuseExistingServer?: boolean;
+  env?: Record<string, string>;
+}
 
 /** La configuración de Playwright tal como la carga Playwright (lo que se mira de cada una). */
 async function configOf(configPath: string) {
@@ -47,8 +55,27 @@ async function configOf(configPath: string) {
     workers?: number;
     fullyParallel?: boolean;
     use?: { baseURL?: string };
-    webServer?: { command?: string; reuseExistingServer?: boolean };
+    webServer?: WebServer | WebServer[];
   };
+}
+
+/** Los servidores que arranca una configuración (uno solo, o una lista). */
+async function serversOf(configPath: string): Promise<WebServer[]> {
+  const config = await configOf(configPath);
+  return [config.webServer ?? []].flat();
+}
+
+/** El servidor de la web de una configuración: el que contesta en su `baseURL`. */
+async function appServerOf(configPath: string): Promise<WebServer> {
+  const config = await configOf(configPath);
+  const apps = (await serversOf(configPath)).filter((server) => server.url === config.use?.baseURL);
+  expect(apps).toHaveLength(1);
+  return apps[0];
+}
+
+/** El entorno con el que una configuración de Playwright arranca el servidor de la web. */
+async function serverEnvOf(configPath: string): Promise<Record<string, string>> {
+  return (await appServerOf(configPath)).env ?? {};
 }
 
 describe("environment of the e2e servers", () => {
@@ -94,22 +121,64 @@ describe("environment of the e2e servers", () => {
   });
 
   test("the main and the demo servers get the test passkeys before they start; the security one starts with none", async () => {
-    const main = await configOf("../../playwright.config");
-    const demo = await configOf("../../playwright.demo.config");
-    const security = await configOf("../../playwright.security.config");
+    const main = await appServerOf("../../playwright.config");
+    const demo = await appServerOf("../../playwright.demo.config");
+    const security = await appServerOf("../../playwright.security.config");
 
-    for (const command of [main.webServer?.command ?? "", demo.webServer?.command ?? ""]) {
+    for (const command of [main.command ?? "", demo.command ?? ""]) {
       expect(command).toMatch(/npm run e2e:seed-passkeys && npm run start/);
     }
-    expect(security.webServer?.command ?? "").not.toContain("seed-passkeys");
-    expect(security.webServer?.reuseExistingServer).toBe(false);
+    expect(security.command ?? "").not.toContain("seed-passkeys");
+    expect(security.reuseExistingServer).toBe(false);
   });
 
   test("no server command goes through npx: a missing tool must fail, never be downloaded from the network", async () => {
     // `npx tsx` baja tsx de internet si no está instalado; un script de npm usa el de `node_modules` o falla.
     for (const [, config] of CONFIGS) {
-      expect((await configOf(config)).webServer?.command ?? "").not.toMatch(/\bnpx\b/);
+      for (const server of await serversOf(config)) {
+        expect(server.command ?? "").not.toMatch(/\bnpx\b/);
+      }
     }
+  });
+
+  test("the main config also starts the fake OAuth server on 3110, with plain node; the other two do not", async () => {
+    const servers = await serversOf("../../playwright.config");
+    const oauth = servers.filter((server) => server.command?.includes("mock-oauth-server"));
+
+    expect(servers).toHaveLength(2);
+    expect(oauth).toHaveLength(1);
+    expect(oauth[0].command).toBe("node tests/helpers/mock-oauth-server.mjs");
+    expect(oauth[0].url).toBe("http://localhost:3110/health");
+    expect(oauth[0].env?.MOCK_OAUTH_PORT).toBe("3110");
+    expect(E2E_PORTS.oauth).toBe(3110);
+    for (const config of ["../../playwright.demo.config", "../../playwright.security.config"]) {
+      expect(await serversOf(config)).toHaveLength(1);
+    }
+  });
+
+  test("the main server enables the test provider against that fake server, with its own portal secret", async () => {
+    const env = await adminServerEnv();
+
+    expect(env.PORTAL_OAUTH_TEST_ISSUER).toBe("http://localhost:3110");
+    expect(env.PORTAL_SESSION_SECRET.trim().length).toBeGreaterThanOrEqual(32);
+    expect(env.PORTAL_SESSION_SECRET).not.toBe(env.ADMIN_SESSION_SECRET);
+    // Los proveedores de verdad, vacíos: los e2e nunca hablan con Discord ni con Google.
+    for (const name of ["DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]) {
+      expect(env[name], name).toBe("");
+    }
+    expect((await serverEnvOf("../../playwright.config")).PORTAL_OAUTH_TEST_ISSUER).toBe("http://localhost:3110");
+  });
+
+  test("the fake OAuth server is never part of the app: nothing under src imports it", () => {
+    // Un `import … from "…mock-oauth-server…"` o un `import("…mock-oauth-server…")`; nombrarlo en un comentario no cuenta.
+    const importsMock = /(?:\bfrom\s*|\bimport\s*\(?\s*)["'][^"']*mock-oauth-server/;
+    const offenders = listSourceFiles(path.join(process.cwd(), "src")).filter((file) =>
+      importsMock.test(readFileSync(file, "utf8")),
+    );
+
+    expect(offenders).toEqual([]);
+    expect(importsMock.test('import { x } from "../../tests/helpers/mock-oauth-server.mjs";')).toBe(true);
+    expect(importsMock.test('await import("../tests/helpers/mock-oauth-server.mjs")')).toBe(true);
   });
 
   test("the passkey seeding is an npm script that runs the local tsx", () => {

@@ -9,10 +9,10 @@
 //   secreto. Sin los de un proveedor, ese botón no aparece.
 // - `PORTAL_OAUTH_TEST_ISSUER` habilita el proveedor `test`, un servidor OAuth falso
 //   local para los tests y el desarrollo. En producción de Vercel se ignora con un
-//   aviso en el log, igual que `ADMIN_WEBAUTHN_ORIGIN` y `EXCHANGE_RATE_SOURCE`:
-//   una variable de prueba olvidada ahí dejaría entrar con un proveedor falso. Se
-//   mira `VERCEL_ENV` y no `NODE_ENV` porque los e2e corren un build de producción
-//   en la máquina.
+//   aviso en el log (una vez por proceso), igual que `ADMIN_WEBAUTHN_ORIGIN` y
+//   `EXCHANGE_RATE_SOURCE`: una variable de prueba olvidada ahí dejaría entrar con
+//   un proveedor falso. Se mira `VERCEL_ENV` y no `NODE_ENV` porque los e2e corren
+//   un build de producción en la máquina.
 
 import { isDbConfigured } from "../db/config";
 import { PORTAL_PROVIDERS } from "./policy";
@@ -27,9 +27,12 @@ function readEnv(name: string): string | undefined {
   return process.env[name]?.trim() || undefined;
 }
 
-/** El secreto del portal, o `null` si falta o es más corto que el mínimo. */
+/**
+ * El secreto del portal, sin los espacios de los costados, o `null` si falta o es
+ * más corto que el mínimo (32 espacios no son un secreto).
+ */
 export function getPortalSecret(): Uint8Array | null {
-  const value = process.env.PORTAL_SESSION_SECRET;
+  const value = readEnv("PORTAL_SESSION_SECRET");
   if (!value || value.length < MIN_PORTAL_SECRET_LENGTH) return null;
   return new TextEncoder().encode(value);
 }
@@ -39,13 +42,19 @@ function hasClientCredentials(idName: string, secretName: string): boolean {
   return readEnv(idName) !== undefined && readEnv(secretName) !== undefined;
 }
 
+/** ¿Ya se avisó en este proceso que el proveedor de prueba se ignora? (Se pregunta en cada pedido.) */
+let warnedTestProviderIgnored = false;
+
 /** ¿Corresponde usar el proveedor de prueba? (Está pedido y no estamos en producción de Vercel.) */
 function isTestProviderEnabled(): boolean {
   if (!readEnv("PORTAL_OAUTH_TEST_ISSUER")) return false;
   if (process.env.VERCEL_ENV === "production") {
-    console.warn(
-      "PORTAL_OAUTH_TEST_ISSUER se ignora en producción (VERCEL_ENV=production): no hay proveedor de prueba. Sacá la variable.",
-    );
+    if (!warnedTestProviderIgnored) {
+      warnedTestProviderIgnored = true;
+      console.warn(
+        "PORTAL_OAUTH_TEST_ISSUER se ignora en producción (VERCEL_ENV=production): no hay proveedor de prueba. Sacá la variable.",
+      );
+    }
     return false;
   }
   return true;

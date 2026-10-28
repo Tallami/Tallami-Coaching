@@ -33,12 +33,23 @@ export const ADMIN_TEST_OLD_PASSWORD_HASH = ADMIN_TEST_PASSWORD_HASH.replace(
 export const ADMIN_TEST_SESSION_SECRET =
   "secreto-de-prueba-solo-para-los-e2e-0123456789";
 
+/** Más de 32 caracteres, el mínimo del portal del alumno, y distinto del secreto del panel. */
+export const PORTAL_TEST_SESSION_SECRET = "secreto-del-portal-solo-para-los-e2e-9876543210";
+
 /**
  * Los puertos de los tres servidores de los e2e: el principal (`playwright.config.ts`),
  * el de los datos de ejemplo (`playwright.demo.config.ts`) y el de la seguridad del
- * ingreso (`playwright.security.config.ts`). Nunca el 3000, que es el de desarrollo.
+ * ingreso (`playwright.security.config.ts`); y el del servidor OAuth falso que arranca
+ * la configuración principal para el ingreso de los alumnos. Nunca el 3000, que es el
+ * de desarrollo.
  */
-export const E2E_PORTS = { main: 3100, demo: 3101, security: 3102 } as const;
+export const E2E_PORTS = { main: 3100, demo: 3101, security: 3102, oauth: 3110 } as const;
+
+/**
+ * El servidor OAuth falso del proveedor de prueba del portal (`mock-oauth-server.mjs`):
+ * Node puro, sin dependencias ni `npx`. Lo arranca solo la configuración principal.
+ */
+export const MOCK_OAUTH_SERVER_COMMAND = "node tests/helpers/mock-oauth-server.mjs";
 
 /** La dirección de un servidor de los e2e: también es el origen de sus llaves de acceso. */
 export function e2eBaseUrl(port: number): string {
@@ -109,9 +120,23 @@ async function serverEnv(pgliteDir: string, port: number): Promise<Record<string
   };
 }
 
-/** Variables de entorno con las que Playwright arranca el servidor del panel. */
-export function adminServerEnv(): Promise<Record<string, string>> {
-  return serverEnv(E2E_PGLITE_DIR, E2E_PORTS.main);
+/**
+ * El portal del alumno en el servidor principal: su propio secreto y el proveedor de
+ * prueba contra el servidor OAuth falso. Discord y Google van vacíos aunque el entorno
+ * de quien corre los tests los tenga: los e2e nunca hablan con ellos.
+ */
+const PORTAL_E2E_ENV = {
+  PORTAL_SESSION_SECRET: PORTAL_TEST_SESSION_SECRET,
+  PORTAL_OAUTH_TEST_ISSUER: e2eBaseUrl(E2E_PORTS.oauth),
+  DISCORD_CLIENT_ID: "",
+  DISCORD_CLIENT_SECRET: "",
+  GOOGLE_CLIENT_ID: "",
+  GOOGLE_CLIENT_SECRET: "",
+} as const;
+
+/** Variables de entorno con las que Playwright arranca el servidor del panel (y del portal del alumno). */
+export async function adminServerEnv(): Promise<Record<string, string>> {
+  return { ...(await serverEnv(E2E_PGLITE_DIR, E2E_PORTS.main)), ...PORTAL_E2E_ENV };
 }
 
 /**

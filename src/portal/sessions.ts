@@ -14,10 +14,10 @@
 // recorren los 30 días sin esperar y todo se compara contra la misma hora.
 
 import { createHash, randomBytes } from "node:crypto";
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { and, eq, gt, isNull, lt, or } from "drizzle-orm";
 import type { Db } from "../db/client";
-import { portalSessions } from "../db/schema";
-import { PORTAL_SESSION_MS } from "./policy";
+import { portalInvites, portalSessions } from "../db/schema";
+import { PORTAL_RECORD_RETENTION_MS, PORTAL_SESSION_MS } from "./policy";
 
 /** La cookie de sesión del alumno. La del panel (`tallami_admin`) es otra y nunca se mezclan. */
 export const PORTAL_COOKIE = "tallami_alumno";
@@ -105,6 +105,21 @@ export async function revokePortalSession(
     .update(portalSessions)
     .set({ revokedAt: now })
     .where(and(eq(portalSessions.id, hashToken(token)), isNull(portalSessions.revokedAt)));
+}
+
+/**
+ * Borra lo que ya no sirve desde hace más de un día: las sesiones vencidas o cerradas
+ * y las invitaciones usadas o vencidas. Las cuentas no se tocan. Se corre de pasada
+ * en cada ingreso (`src/portal/oauth/endpoints.ts`); quien llama decide qué hacer si falla.
+ */
+export async function purgePortalRecords(db: Db, now: Date = new Date()): Promise<void> {
+  const cutoff = new Date(now.getTime() - PORTAL_RECORD_RETENTION_MS);
+  await db
+    .delete(portalSessions)
+    .where(or(lt(portalSessions.expiresAt, cutoff), lt(portalSessions.revokedAt, cutoff)));
+  await db
+    .delete(portalInvites)
+    .where(or(lt(portalInvites.expiresAt, cutoff), lt(portalInvites.usedAt, cutoff)));
 }
 
 /** Cierra todas las sesiones abiertas de la cuenta (al desvincularla o al borrarla del panel). */

@@ -14,6 +14,11 @@ export const PORTAL_SESSION_MS = 30 * DAY_MS;
 export const PORTAL_OAUTH_FLOW_MS = 10 * MINUTE_MS;
 /** Una invitación al portal vence a los 14 días (un solo uso). */
 export const PORTAL_INVITE_MS = 14 * DAY_MS;
+/**
+ * Cuánto se guarda una sesión o una invitación que ya no sirve (vencida, cerrada o
+ * usada) antes de borrarla: un día. La limpieza corre de pasada en cada ingreso.
+ */
+export const PORTAL_RECORD_RETENTION_MS = DAY_MS;
 
 /** Con quién puede ingresar un alumno. `test` es el proveedor falso de los tests y del desarrollo. */
 export const PORTAL_PROVIDERS = ["discord", "google", "test"] as const;
