@@ -253,7 +253,7 @@ describe("Discord and Google start only on the public address of the site", () =
       );
 
       expect(response.status).toBe(302);
-      expect(response.headers.get("location")).toBe(`${SITE_URL}/api/portal/auth/${provider}${query}`);
+      expect(response.headers.get("location")).toBe(`${SITE_URL}/api/portal/auth/${provider}${query}&redirigido=1`);
       expect(response.headers.get("cache-control")).toContain("no-store");
       expect(response.cookies.get(FLOW_COOKIE)).toBeUndefined();
     },
@@ -266,8 +266,39 @@ describe("Discord and Google start only on the public address of the site", () =
     const response = await handleSignInStart(request(`${lookalike}/api/portal/auth/discord?locale=es`), "discord");
 
     expect(response.status).toBe(302);
-    expect(response.headers.get("location")).toBe(`${SITE_URL}/api/portal/auth/discord?locale=es`);
+    expect(response.headers.get("location")).toBe(`${SITE_URL}/api/portal/auth/discord?locale=es&redirigido=1`);
     expect(response.cookies.get(FLOW_COOKIE)).toBeUndefined();
+  });
+
+  test.each(["discord", "google"])(
+    "%s: a second hop that arrives marked on a host that is not the public one is a 404, not one more redirect",
+    async (provider) => {
+      // Un servidor de adelante que devuelve la dirección pública a la otra (con `www`, por ejemplo) armaría un bucle.
+      const first = await handleSignInStart(request(`${ORIGIN}/api/portal/auth/${provider}?locale=es`), provider);
+      const bounced = new URL(first.headers.get("location") ?? "");
+      expect(bounced.origin).toBe(new URL(SITE_URL).origin);
+
+      const second = await handleSignInStart(
+        request(`${ORIGIN}${bounced.pathname}${bounced.search}`),
+        provider,
+      );
+
+      expect(second.status).toBe(404);
+      expect(second.headers.get("location")).toBeNull();
+      expect(second.headers.get("cache-control")).toContain("no-store");
+      expect(second.cookies.get(FLOW_COOKIE)).toBeUndefined();
+    },
+  );
+
+  test("the marker on the public address does not get in the way: the sign-in starts", async () => {
+    const response = await handleSignInStart(
+      request(`${SITE_URL}/api/portal/auth/google?locale=en&redirigido=1`),
+      "google",
+    );
+
+    expect(response.status).toBe(302);
+    expect(new URL(response.headers.get("location") ?? "").origin).toBe("https://accounts.google.com");
+    expect(readFlowCookie(response.cookies.get(FLOW_COOKIE)?.value, "google")).toMatchObject({ locale: "en" });
   });
 
   test("on the public address it starts the sign-in: the flow cookie, and the provider coming back to the public address", async () => {

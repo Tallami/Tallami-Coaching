@@ -159,19 +159,44 @@ export function redirectUriFor(provider: PortalProvider, requestOrigin: string):
 }
 
 /**
+ * La marca que lleva la redirección a la dirección pública (`?redirigido=1`). Si la dirección
+ * pública a su vez manda de vuelta al origen de donde vino el pedido (un servidor de adelante que
+ * redirige la raíz al `www`, o al revés), cada vuelta armaría otra redirección y el navegador
+ * giraría hasta rendirse. Un pedido que ya llega marcado a un origen que no es el público no se
+ * redirige otra vez: se corta con un 404 (`isCanonicalRedirectLoop`).
+ */
+export const CANONICAL_REDIRECT_PARAM = "redirigido";
+
+/**
  * Discord y Google vuelven a `SITE_URL`, y la cookie del ingreso tiene que estar en ese
  * mismo sitio: un ingreso que empieza en otra dirección (el `www`, una vista previa de
  * Vercel) dejaría la cookie ahí y la vuelta no la encontraría. Si el pedido llegó a un
- * origen que no es el público, devuelve la misma ruta y consulta en `SITE_URL`, para
- * mandar al navegador ahí antes de empezar. `null` si no hace falta: ya está en el
- * origen público, o es el proveedor de prueba (que vuelve al servidor que empezó).
+ * origen que no es el público, devuelve la misma ruta y consulta en `SITE_URL`, más la marca
+ * `CANONICAL_REDIRECT_PARAM`, para mandar al navegador ahí antes de empezar. `null` si no hace
+ * falta: ya está en el origen público, o es el proveedor de prueba (que vuelve al servidor que
+ * empezó). Quien la usa corta antes los bucles con `isCanonicalRedirectLoop`.
  *
  * La dirección se arma sumando textos (`SITE_URL` + ruta): una ruta como `//otro.com`
  * queda dentro de este sitio, nunca se vuelve una dirección sin protocolo.
  */
 export function canonicalSignInUrl(provider: PortalProvider, requestUrl: URL): string | null {
-  if (provider === "test" || requestUrl.origin === new URL(SITE_URL).origin) return null;
-  return `${SITE_URL}${requestUrl.pathname}${requestUrl.search}`;
+  if (isOnPublicOrigin(provider, requestUrl)) return null;
+  const separator = requestUrl.search ? "&" : "?";
+  return `${SITE_URL}${requestUrl.pathname}${requestUrl.search}${separator}${CANONICAL_REDIRECT_PARAM}=1`;
+}
+
+/**
+ * ¿Es este pedido la segunda vuelta de una redirección a la dirección pública que no llegó a
+ * ella? Lleva la marca y sigue en un origen que no es el público: redirigir otra vez sería un
+ * bucle. En la dirección pública la marca es la vuelta normal y no cuenta.
+ */
+export function isCanonicalRedirectLoop(provider: PortalProvider, requestUrl: URL): boolean {
+  return !isOnPublicOrigin(provider, requestUrl) && requestUrl.searchParams.has(CANONICAL_REDIRECT_PARAM);
+}
+
+/** ¿Empieza el ingreso donde corresponde? El proveedor de prueba, donde sea; los demás, en `SITE_URL`. */
+function isOnPublicOrigin(provider: PortalProvider, requestUrl: URL): boolean {
+  return provider === "test" || requestUrl.origin === new URL(SITE_URL).origin;
 }
 
 type Profile = Record<string, unknown>;

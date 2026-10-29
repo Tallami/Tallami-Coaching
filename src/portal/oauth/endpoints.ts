@@ -6,7 +6,8 @@
 //   GET  /api/portal/auth/[provider]?locale=es&invitacion=…
 //        404 si el proveedor no existe o no está habilitado, o si el portal no está
 //        configurado. Discord y Google solo empiezan en la dirección pública del sitio
-//        (`canonicalSignInUrl`): en otra, 302 a la misma ruta allá, sin cookie. Si no, la
+//        (`canonicalSignInUrl`): en otra, 302 a la misma ruta allá (con la marca `redirigido=1`),
+//        sin cookie; si el pedido ya llega marcado a otra dirección, 404 (sería un bucle). Si no, la
 //        cookie del ingreso y 302 a la autorización del proveedor. La invitación del link
 //        solo viaja en la cookie si el ingreso empezó en el propio sitio (`Sec-Fetch-Site:
 //        same-origin`, o sin ese encabezado un `Referer` del mismo origen): un link de otro
@@ -52,7 +53,7 @@ import {
   startFlow,
   type FlowData,
 } from "./flow";
-import { canonicalSignInUrl, getProviderClient, redirectUriFor } from "./providers";
+import { canonicalSignInUrl, getProviderClient, isCanonicalRedirectLoop, redirectUriFor } from "./providers";
 
 export interface PortalAuthDeps {
   getDb: () => Promise<Db>;
@@ -124,7 +125,9 @@ export function handleSignInStart(
   const provider = asProvider(providerParam);
   if (!provider || !getProviderClient(provider) || !isPortalConfigured()) return emptyResponse(404);
 
-  // La cookie del ingreso tiene que quedar donde vuelve el proveedor: en la dirección pública.
+  // La cookie del ingreso tiene que quedar donde vuelve el proveedor: en la dirección pública. Si ya
+  // se redirigió hacia allá y el pedido volvió acá, redirigir otra vez sería un bucle: se corta.
+  if (isCanonicalRedirectLoop(provider, request.nextUrl)) return emptyResponse(404);
   const canonical = canonicalSignInUrl(provider, request.nextUrl);
   if (canonical) return redirectTo(canonical, 302);
 

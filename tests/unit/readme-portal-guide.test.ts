@@ -3,7 +3,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 import es from "../../messages/es.json";
 import { MIN_PORTAL_SECRET_LENGTH } from "@/portal/config";
-import { redirectUriFor } from "@/portal/oauth/providers";
+import { CANONICAL_REDIRECT_PARAM, redirectUriFor } from "@/portal/oauth/providers";
 import {
   DELIVERY_PDF_MAX_BYTES,
   PORTAL_INVITE_MS,
@@ -88,6 +88,11 @@ describe("the portal guide of the README", () => {
     expect(setup).toContain("`www`");
     // Las vistas previas de Vercel tienen otra dirección que no está registrada: no sirven para entrar.
     expect(setup).toMatch(/vista previa|vistas previas/);
+  });
+
+  test("explains the marker of the redirect to the public address and the 404 that cuts a loop", () => {
+    expect(GUIDE).toContain(`?${CANONICAL_REDIRECT_PARAM}=1`);
+    expect(subsectionOf("Probarlo después de desplegar")).toMatch(/404/);
   });
 
   test("tells to run db:migrate before deploying, and names the migration that adds the tables", () => {

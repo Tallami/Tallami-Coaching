@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { SITE_URL } from "@/lib/site-url";
 import {
+  CANONICAL_REDIRECT_PARAM,
   DISCORD_OAUTH,
   GOOGLE_OAUTH,
   MAX_DISPLAY_NAME_LENGTH,
   canonicalSignInUrl,
   getProviderClient,
+  isCanonicalRedirectLoop,
   profileToIdentity,
   redirectUriFor,
 } from "@/portal/oauth/providers";
@@ -141,27 +143,66 @@ describe("canonicalSignInUrl", () => {
     }
   });
 
-  test("Discord and Google: on any other origin, the same path and query on the public address", () => {
+  test("the marker is called `redirigido`", () => {
+    expect(CANONICAL_REDIRECT_PARAM).toBe("redirigido");
+  });
+
+  test("Discord and Google: on any other origin, the same path and query on the public address, plus the marker", () => {
     const query = "?locale=pt&invitacion=abc";
     const other = ["http://otro-host.example", "https://www.otro-host.example:8443", LOOKALIKE];
     for (const provider of ["discord", "google"] as const) {
       for (const origin of other) {
         expect(canonicalSignInUrl(provider, new URL(`${origin}/api/portal/auth/${provider}${query}`)), origin).toBe(
-          `${SITE_URL}/api/portal/auth/${provider}${query}`,
+          `${SITE_URL}/api/portal/auth/${provider}${query}&redirigido=1`,
         );
       }
     }
+  });
+
+  test("the marker starts the query when there was none", () => {
+    expect(canonicalSignInUrl("google", new URL("http://otro-host.example/api/portal/auth/google"))).toBe(
+      `${SITE_URL}/api/portal/auth/google?redirigido=1`,
+    );
   });
 
   test("the path cannot take the redirect to another site", () => {
     // `//evil.example` al principio de la ruta sería una dirección sin protocolo si se sumara mal.
     const url = new URL("http://otro-host.example//evil.example/x?y=1");
 
-    expect(canonicalSignInUrl("discord", url)).toBe(`${SITE_URL}//evil.example/x?y=1`);
+    expect(canonicalSignInUrl("discord", url)).toBe(`${SITE_URL}//evil.example/x?y=1&redirigido=1`);
   });
 
   test("the test provider stays wherever the request came from", () => {
     expect(canonicalSignInUrl("test", new URL("http://localhost:3100/api/portal/auth/test"))).toBeNull();
+  });
+});
+
+describe("isCanonicalRedirectLoop", () => {
+  const MARKED = "/api/portal/auth/discord?locale=es&redirigido=1";
+
+  test("a request that already carries the marker on an origin that is not the public one is a loop", () => {
+    for (const provider of ["discord", "google"] as const) {
+      expect(isCanonicalRedirectLoop(provider, new URL(`http://otro-host.example${MARKED}`)), provider).toBe(true);
+    }
+  });
+
+  test("the marker on the public address is the normal second hop, not a loop", () => {
+    expect(isCanonicalRedirectLoop("discord", new URL(`${SITE_URL}${MARKED}`))).toBe(false);
+  });
+
+  test("without the marker it is the first hop: not a loop, it gets redirected", () => {
+    expect(isCanonicalRedirectLoop("discord", new URL("http://otro-host.example/api/portal/auth/discord?locale=es"))).toBe(false);
+  });
+
+  test("the test provider never redirects, so it never loops", () => {
+    expect(isCanonicalRedirectLoop("test", new URL("http://localhost:3100/api/portal/auth/test?redirigido=1"))).toBe(false);
+  });
+
+  test("the redirect that canonicalSignInUrl writes is not itself a loop on the public address", () => {
+    const hop = canonicalSignInUrl("discord", new URL("http://otro-host.example/api/portal/auth/discord?locale=es"));
+
+    expect(hop).not.toBeNull();
+    expect(isCanonicalRedirectLoop("discord", new URL(hop ?? ""))).toBe(false);
   });
 });
 
