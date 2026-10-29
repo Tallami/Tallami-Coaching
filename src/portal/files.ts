@@ -65,9 +65,13 @@ export function isPdf(bytes: Uint8Array): boolean {
 }
 
 /**
- * La respuesta que sirve un PDF: en el navegador, sin guardarlo en caché (es de un alumno)
- * y con `nosniff` para que nunca se lea como otra cosa. Las dos rutas que lo sirven (la del
- * portal y la del panel) usan esta, así sus encabezados no se separan.
+ * La respuesta que sirve un PDF: en el navegador, sin guardarlo en caché (es de un alumno),
+ * con `nosniff` para que nunca se lea como otra cosa y con `Content-Security-Policy: sandbox`,
+ * una defensa más: si el visor o un complemento ejecutara algo del PDF, correría en un origen
+ * aparte y sin acceso a las cookies ni a la página del sitio. Los visores de Chrome (se probó con
+ * el 156) lo muestran igual. Safari anterior a la 18.4 no cargaba un PDF con ese encabezado
+ * (arreglado en esa versión): si algún alumno con un iPhone viejo no puede abrirlo, es esta línea.
+ * Las dos rutas que lo sirven (la del portal y la del panel) usan esta, así sus encabezados no se separan.
  */
 export function pdfResponse(file: StoredFile): Response {
   return new Response(new Uint8Array(file.bytes), {
@@ -76,6 +80,7 @@ export function pdfResponse(file: StoredFile): Response {
       "Content-Disposition": 'inline; filename="entrega.pdf"',
       "Cache-Control": "private, no-store",
       "X-Content-Type-Options": "nosniff",
+      "Content-Security-Policy": "sandbox",
     },
   });
 }
