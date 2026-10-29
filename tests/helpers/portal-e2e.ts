@@ -1,7 +1,7 @@
 // Ayudas de los e2e del portal del alumno: entrar con el proveedor de prueba (el servidor
 // OAuth falso de `mock-oauth-server.mjs`) desde el navegador de un test, y armar navegadores
 // de otros alumnos. Las usan los e2e del ingreso (`portal-auth.spec.ts`), de las invitaciones
-// (`portal-invites.spec.ts`) y, más adelante, los del portal mismo.
+// (`portal-invites.spec.ts`) y los de la página del portal (`portal-page.spec.ts`).
 //
 // Cada test entra con su propio alumno del proveedor de prueba (`uniqueProviderStudent`): los
 // tests corren en paralelo sobre la misma base y ninguna identidad se comparte ni se reutiliza,

@@ -2,6 +2,17 @@ import AxeBuilder from "@axe-core/playwright";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 import { expect, loginAsAdmin, test } from "../helpers/admin";
 import { PHONE, createSale, uniqueName } from "../helpers/admin-ui";
+import {
+  addDelivery,
+  addDeliveryForm as addForm,
+  deliveriesCard as card,
+  deliveryHref as hrefOf,
+  deliveryItems as items,
+  inviteStudent,
+  openSale,
+  pdfFile,
+  submitDelivery,
+} from "../helpers/portal-admin-ui";
 import { newStudentBrowser, signIn } from "../helpers/portal-e2e";
 
 // Las entregas desde el panel, de punta a punta: Tallami carga un video de YouTube, un link y un
@@ -24,72 +35,6 @@ const PDF_HEADERS = {
  * a todo lo que sale de `/admin`, y eso pisa el de la ruta. Para el caché es igual de estricto.
  */
 const PDF_HEADERS_IN_PANEL = { ...PDF_HEADERS, "cache-control": "no-store" };
-
-/** Bytes que empiezan como un PDF, del tamaño pedido. */
-function pdfFile(name: string, size = 300) {
-  const buffer = Buffer.alloc(size);
-  buffer.write("%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF\n");
-  return { name, mimeType: "application/pdf", buffer };
-}
-
-/** La tarjeta "Entregas" de la ficha de la venta que se ve ahora. */
-function card(page: Page) {
-  return page.getByRole("region", { name: "Entregas", exact: true });
-}
-
-function addForm(page: Page) {
-  return card(page).getByRole("form", { name: "Agregar una entrega" });
-}
-
-function items(page: Page) {
-  return card(page).getByRole("list", { name: "Entregas de esta venta" }).getByRole("listitem");
-}
-
-/** Abre la ficha de la venta del alumno `student` y espera a que la tarjeta esté lista para usarse. */
-async function openSale(page: Page, student: string): Promise<void> {
-  await page.goto(`/admin/ventas?q=${encodeURIComponent(student)}`);
-  await page.getByRole("row").filter({ hasText: student }).getByRole("link", { name: student }).click();
-  await expect(page.getByRole("heading", { name: "Editar venta" })).toBeVisible();
-  await expect(addForm(page).getByRole("button", { name: "Agregar entrega" })).toBeEnabled();
-}
-
-interface NewDelivery {
-  kind: "youtube" | "pdf" | "link";
-  title: string;
-  url?: string;
-  file?: ReturnType<typeof pdfFile>;
-}
-
-/** Llena el formulario y lo envía; no espera el resultado. */
-async function submitDelivery(page: Page, delivery: NewDelivery): Promise<void> {
-  const form = addForm(page);
-  await form.getByLabel("Tipo", { exact: true }).selectOption(delivery.kind);
-  await form.getByLabel("Título", { exact: true }).fill(delivery.title);
-  if (delivery.kind === "pdf") {
-    if (delivery.file) await form.getByLabel("Archivo PDF", { exact: true }).setInputFiles(delivery.file);
-  } else {
-    await form.getByLabel("Link", { exact: true }).fill(delivery.url ?? "");
-  }
-  await form.getByRole("button", { name: "Agregar entrega" }).click();
-}
-
-/** Agrega una entrega y espera a verla en la lista. */
-async function addDelivery(page: Page, delivery: NewDelivery): Promise<void> {
-  const before = await items(page).count();
-  await submitDelivery(page, delivery);
-  await expect(card(page).getByText("Entrega agregada. El alumno la ve en su portal.")).toBeVisible();
-  await expect(items(page)).toHaveCount(before + 1);
-}
-
-/** La dirección donde se abre la entrega `title` de la lista. */
-async function hrefOf(page: Page, title: string): Promise<string> {
-  const href = await items(page)
-    .filter({ hasText: title })
-    .getByRole("link", { name: new RegExp(`^Abrir ${title}`) })
-    .getAttribute("href");
-  expect(href).not.toBeNull();
-  return href ?? "";
-}
 
 test.describe("the Entregas card of a sale", () => {
   test.beforeEach(async ({ page }) => {
@@ -276,13 +221,7 @@ interface LinkedStudent {
 async function linkedStudentWithSale(page: Page, browser: Browser, prefix: string): Promise<LinkedStudent> {
   const name = uniqueName(prefix);
   await createSale(page, { student: name });
-  await page.goto(`/admin/alumnos?q=${encodeURIComponent(name)}`);
-  await page.getByRole("link", { name }).first().click();
-  const portal = page.getByRole("region", { name: "Portal del alumno" });
-  await portal.getByRole("button", { name: "Invitar al portal" }).click();
-  const link = portal.getByLabel("Link de invitación");
-  await expect(link).toBeVisible();
-  const token = new URL(await link.inputValue()).searchParams.get("invitacion") ?? "";
+  const token = await inviteStudent(page, name);
   const studentBrowser = await newStudentBrowser(browser);
   const landed = await signIn(studentBrowser.page, { invitation: token });
   expect(landed.search).toBe("?invitacion=vinculada");

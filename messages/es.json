@@ -129,7 +129,83 @@
   },
   "Footer": {
     "socialLabel": "Redes",
+    "portal": "Portal de alumnos",
     "legal": "© {year} Tallami Coaching. No afiliado ni respaldado por Epic Games."
+  },
+  "Portal": {
+    "metaTitle": "Portal de alumnos · Tallami Coaching",
+    "metaDescription": "Tus compras y las entregas de Tallami, guardadas en un solo lugar.",
+    "title": "Portal de alumnos",
+    "loading": "Cargando tu portal…",
+    "unavailable": {
+      "title": "El portal todavía no está disponible",
+      "body": "Lo estamos terminando de preparar. Volvé a pasar en unos días."
+    },
+    "loadFailed": {
+      "title": "No pudimos cargar tu portal",
+      "body": "Probá de nuevo en unos minutos. Si sigue igual, escribile a Tallami."
+    },
+    "signIn": {
+      "title": "Entrá a tu portal",
+      "body": "Ahí vas a ver lo que compraste y todo lo que Tallami te entregó, guardado para siempre. Entrás con tu cuenta de Discord o de Google, sin contraseña.",
+      "providersLabel": "Formas de entrar"
+    },
+    "providers": {
+      "discord": { "name": "Discord", "button": "Entrar con Discord" },
+      "google": { "name": "Google", "button": "Entrar con Google" },
+      "test": { "name": "Cuenta de prueba", "button": "Entrar con la cuenta de prueba" }
+    },
+    "notices": {
+      "signInFailed": "No pudimos completar el ingreso. Probá de nuevo.",
+      "inviteToSignIn": "Tenés una invitación de Tallami. Entrá para vincular tu cuenta.",
+      "linked": "Listo, tu cuenta quedó vinculada.",
+      "alreadyLinked": "Tu cuenta ya está vinculada.",
+      "inviteInvalid": "Esa invitación no sirve: venció o ya se usó. Pedile otra a Tallami.",
+      "inviteTaken": "No pudimos usar esa invitación: ese alumno ya tiene otra cuenta, o la tuya ya está vinculada a otro alumno. Escribile a Tallami."
+    },
+    "unlinked": {
+      "title": "Falta un paso",
+      "body": "Tu cuenta todavía no está vinculada. Pedile a Tallami tu invitación.",
+      "withInvite": "Tu cuenta todavía no está vinculada. Entrá de nuevo para usar la invitación que te mandó Tallami."
+    },
+    "account": {
+      "greeting": "Hola, {name}",
+      "signedInWith": "Ingresaste con {provider}.",
+      "signOut": "Salir"
+    },
+    "purchases": {
+      "title": "Tus compras",
+      "empty": "Todavía no tenés compras en tu cuenta.",
+      "paidOn": "Cobro: {date}",
+      "unpaid": "Pendiente de pago"
+    },
+    "items": {
+      "vodRecorded": "VOD review grabado",
+      "vodLive": "VOD review en vivo",
+      "lesson": "Clase 1 a 1",
+      "lessonPack": "Pack de clases 1 a 1",
+      "gamePlan": "Plan de juego personalizado",
+      "tournament": "Coaching de torneo",
+      "proSeason": "Temporada Pro",
+      "other": "Otro servicio"
+    },
+    "status": {
+      "pending": "Pendiente",
+      "paid": "Pagada",
+      "delivered": "Entregada",
+      "cancelled": "Cancelada",
+      "refunded": "Reembolsada"
+    },
+    "deliveries": {
+      "title": "Entregas",
+      "empty": "Tallami todavía no subió entregas para esta compra.",
+      "addedOn": "Subida el {date}",
+      "openYoutube": "Abrir en YouTube",
+      "viewPdf": "Ver PDF",
+      "openLink": "Abrir",
+      "opensInNewTab": "(se abre en una pestaña nueva)",
+      "kinds": { "youtube": "Video", "pdf": "PDF", "link": "Link" }
+    }
   },
   "NotFound": {
     "title": "No encontramos esta página",

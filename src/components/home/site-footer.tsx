@@ -1,5 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import { SOCIAL_LINKS } from "@/content/social";
+import { Link } from "@/i18n/navigation";
 
 /** Año del aviso de copyright; se actualiza a mano al cambiar de año. */
 const COPYRIGHT_YEAR = "2026";
@@ -21,21 +22,32 @@ export async function SiteFooter() {
         >
           Tallami<span className="text-gold">.</span>
         </span>
-        <ul
-          aria-label={t("socialLabel")}
-          className="m-0 flex list-none flex-wrap gap-x-[22px] gap-y-1 p-0"
-        >
-          {SOCIAL_LINKS.map(({ label, href }) => (
-            <li key={label}>
-              <a
-                href={href}
-                className="inline-block py-2.5 font-medium text-on-stage-2 no-underline hover:text-on-stage"
-              >
-                {label}
-              </a>
-            </li>
-          ))}
-        </ul>
+        {/* Las redes y el link al portal comparten el espaciado de los links del pie. */}
+        <div className="flex flex-wrap items-center gap-x-[22px] gap-y-1">
+          <ul
+            aria-label={t("socialLabel")}
+            className="m-0 flex list-none flex-wrap gap-x-[22px] gap-y-1 p-0"
+          >
+            {SOCIAL_LINKS.map(({ label, href }) => (
+              <li key={label}>
+                <a
+                  href={href}
+                  className="inline-block py-2.5 font-medium text-on-stage-2 no-underline hover:text-on-stage"
+                >
+                  {label}
+                </a>
+              </li>
+            ))}
+          </ul>
+          {/* Un link discreto, sin precarga: casi nadie que mira la portada es alumno. */}
+          <Link
+            href="/portal"
+            prefetch={false}
+            className="inline-block py-2.5 font-medium text-on-stage-2 no-underline hover:text-on-stage"
+          >
+            {t("portal")}
+          </Link>
+        </div>
         <small className="text-on-stage-2 [font-size:smaller]">
           {t("legal", { year: COPYRIGHT_YEAR })}
         </small>

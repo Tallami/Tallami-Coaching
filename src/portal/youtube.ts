@@ -38,3 +38,17 @@ export function youtubeVideoId(raw: string): string | null {
   }
   return PATH_WITH_KIND.exec(url.pathname)?.[1] ?? null;
 }
+
+/**
+ * El reproductor de un video: `youtube-nocookie.com`, que no deja cookies de YouTube hasta que el
+ * alumno toca "play". Se arma con el id guardado (escapado) y nunca con el link que pegó Tallami.
+ * Si el sitio tiene una CSP algún día, tiene que permitir `frame-src https://www.youtube-nocookie.com`.
+ */
+export function youtubeEmbedUrl(videoId: string): string {
+  return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}`;
+}
+
+/** La dirección del video en YouTube, para el link "Abrir en YouTube". */
+export function youtubeWatchUrl(videoId: string): string {
+  return `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
+}

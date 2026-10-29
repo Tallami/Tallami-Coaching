@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { youtubeVideoId } from "@/portal/youtube";
+import { youtubeEmbedUrl, youtubeVideoId, youtubeWatchUrl } from "@/portal/youtube";
 
 // De un link de YouTube se guarda solo el id del video (11 caracteres): el portal arma
 // el reproductor con ese id y nunca con el link que pegó Tallami. Todo lo que no es
@@ -76,5 +76,20 @@ describe("youtubeVideoId refuses everything else", () => {
     ["only the id", ID],
   ])("%s", (_label, link) => {
     expect(youtubeVideoId(link)).toBeNull();
+  });
+});
+
+describe("the addresses built from a saved id", () => {
+  test("the player uses youtube-nocookie.com: no YouTube cookies until the student presses play", () => {
+    expect(youtubeEmbedUrl(ID)).toBe(`https://www.youtube-nocookie.com/embed/${ID}`);
+  });
+
+  test("the link to open the video goes to youtube.com", () => {
+    expect(youtubeWatchUrl(ID)).toBe(`https://www.youtube.com/watch?v=${ID}`);
+  });
+
+  test("an id is escaped, so nothing it carries can change the address", () => {
+    expect(youtubeEmbedUrl("a/../b?c=d")).toBe("https://www.youtube-nocookie.com/embed/a%2F..%2Fb%3Fc%3Dd");
+    expect(youtubeWatchUrl("a&b=c")).toBe("https://www.youtube.com/watch?v=a%26b%3Dc");
   });
 });

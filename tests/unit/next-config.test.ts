@@ -2,6 +2,7 @@ import { hasRemoteMatch } from "next/dist/shared/lib/match-remote-pattern";
 import { describe, expect, test } from "vitest";
 import nextConfig from "../../next.config";
 import { TWEET_SNAPSHOTS } from "@/content/tweet-snapshots";
+import { routing } from "@/i18n/routing";
 import { toTweetCard } from "@/lib/tweets";
 import { DELIVERY_PDF_MAX_BYTES } from "@/portal/policy";
 
@@ -40,6 +41,39 @@ function isAllowed(url: string): boolean {
   const { remotePatterns = [] } = nextConfig.images ?? {};
   return hasRemoteMatch([], [...remotePatterns], new URL(url));
 }
+
+type HeaderRule = { source: string; headers: { key: string; value: string }[] };
+
+async function headerRules(): Promise<HeaderRule[]> {
+  return (await nextConfig.headers?.()) ?? [];
+}
+
+describe("next.config headers", () => {
+  // El link de una invitación lleva su token en la dirección (`/es/portal?invitacion=…`). La página lo saca
+  // de la barra, pero mientras carga y en cualquier pedido que salga de ella no puede mandarse en un Referer.
+  const portalSource = `/:locale(${routing.locales.join("|")})/portal`;
+
+  test("the page of the student portal, in every language, sends no Referer at all", async () => {
+    const rule = (await headerRules()).find(({ source }) => source === portalSource);
+
+    expect(rule?.headers).toEqual([{ key: "Referrer-Policy", value: "no-referrer" }]);
+  });
+
+  test("it comes after the baseline for every route, which is what overrides the baseline policy for that page", async () => {
+    const rules = await headerRules();
+    const baseline = rules.findIndex(({ source }) => source === "/:path*");
+    const portal = rules.findIndex(({ source }) => source === portalSource);
+
+    expect(baseline).toBeGreaterThanOrEqual(0);
+    expect(portal).toBeGreaterThan(baseline);
+  });
+
+  test("the rest of the site keeps the baseline policy", async () => {
+    const baseline = (await headerRules()).find(({ source }) => source === "/:path*");
+
+    expect(baseline?.headers).toContainEqual({ key: "Referrer-Policy", value: "strict-origin-when-cross-origin" });
+  });
+});
 
 describe("next.config serverExternalPackages", () => {
   test("keeps PGlite out of the server bundle, where its wasm files cannot load", () => {

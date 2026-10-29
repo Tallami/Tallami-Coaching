@@ -28,8 +28,12 @@ export async function insertTestAccount(
   return row.id;
 }
 
-/** Una venta pagada de `customerId`. */
-export async function insertTestSale(db: Db, customerId: string): Promise<string> {
+/** Una venta pagada de `customerId`; `overrides` cambia lo que cada test prueba. */
+export async function insertTestSale(
+  db: Db,
+  customerId: string,
+  overrides: Partial<typeof sales.$inferInsert> = {},
+): Promise<string> {
   const [row] = await db
     .insert(sales)
     .values({
@@ -45,6 +49,7 @@ export async function insertTestSale(db: Db, customerId: string): Promise<string
       paymentMethod: "transfer",
       status: "paid",
       paidOn: "2026-10-12",
+      ...overrides,
     })
     .returning({ id: sales.id });
   return row.id;

@@ -306,14 +306,15 @@ test.describe("faq", () => {
 });
 
 test.describe("footer", () => {
-  test("footer shows social links and the Epic disclaimer per locale", async ({
+  test("footer shows social links, the link to the student portal and the Epic disclaimer per locale", async ({
     page,
   }) => {
     for (const [path, notice] of EPIC_NOTICES) {
       await page.goto(path);
 
       const footer = page.getByRole("contentinfo");
-      const links = footer.getByRole("link");
+      // Las redes son la lista del pie; el link al portal va aparte, fuera de ella.
+      const links = footer.getByRole("list").getByRole("link");
 
       await expect(footer).toContainText(notice);
       await expect(links).toHaveCount(SOCIAL_LINKS.length);
@@ -322,6 +323,8 @@ test.describe("footer", () => {
         anchors.map((anchor) => anchor.getAttribute("href")),
       );
       expect(hrefs, path).toEqual(SOCIAL_LINKS.map(({ href }) => href));
+      await expect(footer.getByRole("link")).toHaveCount(SOCIAL_LINKS.length + 1);
+      await expect(footer.getByRole("link").last()).toHaveAttribute("href", `${path}/portal`);
     }
   });
 

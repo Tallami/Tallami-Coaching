@@ -16,8 +16,8 @@ import {
 // Las invitaciones al portal, de punta a punta: Tallami invita desde la ficha del alumno,
 // el alumno abre el link en su navegador y entra con el proveedor de prueba (el servidor
 // OAuth falso de `tests/helpers/mock-oauth-server.mjs`), y la ficha muestra "Vinculado".
-// La página del portal todavía no existe (la arma la Tarea 5): los tests miran a dónde
-// vuelve el ingreso (`/es/portal?invitacion=…`) y la ficha del panel, no lo que muestra el portal.
+// Estos tests miran a dónde vuelve el ingreso (`/es/portal?invitacion=…`) y la ficha del panel;
+// lo que muestra la página del portal se prueba en `portal-page.spec.ts`.
 //
 // El link de la invitación sale con la dirección pública del sitio (`NEXT_PUBLIC_SITE_URL`,
 // `http://localhost:3000` si falta), que en los e2e es el servidor de desarrollo de Tallami:

@@ -129,7 +129,83 @@
   },
   "Footer": {
     "socialLabel": "Social media",
+    "portal": "Student portal",
     "legal": "© {year} Tallami Coaching. Not affiliated with or endorsed by Epic Games."
+  },
+  "Portal": {
+    "metaTitle": "Student portal · Tallami Coaching",
+    "metaDescription": "Your purchases and what Tallami delivered to you, all in one place.",
+    "title": "Student portal",
+    "loading": "Loading your portal…",
+    "unavailable": {
+      "title": "The portal is not available yet",
+      "body": "We're still getting it ready. Check back in a few days."
+    },
+    "loadFailed": {
+      "title": "We couldn't load your portal",
+      "body": "Try again in a few minutes. If it keeps happening, message Tallami."
+    },
+    "signIn": {
+      "title": "Sign in to your portal",
+      "body": "You'll see what you bought and everything Tallami delivered to you, saved for good. You sign in with your Discord or Google account, no password needed.",
+      "providersLabel": "Ways to sign in"
+    },
+    "providers": {
+      "discord": { "name": "Discord", "button": "Sign in with Discord" },
+      "google": { "name": "Google", "button": "Sign in with Google" },
+      "test": { "name": "Test account", "button": "Sign in with the test account" }
+    },
+    "notices": {
+      "signInFailed": "We couldn't complete the sign-in. Try again.",
+      "inviteToSignIn": "You have an invitation from Tallami. Sign in to link your account.",
+      "linked": "Done, your account is linked.",
+      "alreadyLinked": "Your account is already linked.",
+      "inviteInvalid": "That invitation doesn't work: it expired or was already used. Ask Tallami for a new one.",
+      "inviteTaken": "We couldn't use that invitation: that student already has another account, or yours is already linked to another student. Message Tallami."
+    },
+    "unlinked": {
+      "title": "One step left",
+      "body": "Your account isn't linked yet. Ask Tallami for your invitation.",
+      "withInvite": "Your account isn't linked yet. Sign in again to use the invitation Tallami sent you."
+    },
+    "account": {
+      "greeting": "Hi, {name}",
+      "signedInWith": "You signed in with {provider}.",
+      "signOut": "Sign out"
+    },
+    "purchases": {
+      "title": "Your purchases",
+      "empty": "You don't have any purchases on your account yet.",
+      "paidOn": "Paid on {date}",
+      "unpaid": "Awaiting payment"
+    },
+    "items": {
+      "vodRecorded": "Recorded VOD review",
+      "vodLive": "Live VOD review",
+      "lesson": "1-on-1 lesson",
+      "lessonPack": "1-on-1 lesson pack",
+      "gamePlan": "Custom game plan",
+      "tournament": "Tournament coaching",
+      "proSeason": "Temporada Pro",
+      "other": "Other service"
+    },
+    "status": {
+      "pending": "Pending",
+      "paid": "Paid",
+      "delivered": "Delivered",
+      "cancelled": "Cancelled",
+      "refunded": "Refunded"
+    },
+    "deliveries": {
+      "title": "Deliveries",
+      "empty": "Tallami hasn't uploaded any deliveries for this purchase yet.",
+      "addedOn": "Uploaded on {date}",
+      "openYoutube": "Open on YouTube",
+      "viewPdf": "View PDF",
+      "openLink": "Open",
+      "opensInNewTab": "(opens in a new tab)",
+      "kinds": { "youtube": "Video", "pdf": "PDF", "link": "Link" }
+    }
   },
   "NotFound": {
     "title": "We couldn't find this page",

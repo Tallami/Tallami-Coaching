@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
+import { routing } from "./src/i18n/routing";
 
 /**
  * Encabezados base para todas las rutas. Sin CSP a propósito: una CSP con
@@ -16,9 +17,21 @@ const SECURITY_HEADERS = [
   },
 ];
 
+/**
+ * La página del portal del alumno en cada idioma (`/es/portal`, `/pt/portal`, `/en/portal`). El link
+ * de una invitación lleva su token en la dirección (`?invitacion=…`): la página lo saca de la barra,
+ * pero mientras carga y en cualquier pedido que salga de ella no puede mandarse en un `Referer`.
+ */
+const PORTAL_PAGE_SOURCE = `/:locale(${routing.locales.join("|")})/portal`;
+
 const nextConfig: NextConfig = {
   async headers() {
-    return [{ source: "/:path*", headers: SECURITY_HEADERS }];
+    return [
+      { source: "/:path*", headers: SECURITY_HEADERS },
+      // Va después de la regla de todas las rutas: cuando dos reglas ponen el mismo encabezado,
+      // gana la última, y acá la política es más estricta que la base.
+      { source: PORTAL_PAGE_SOURCE, headers: [{ key: "Referrer-Policy", value: "no-referrer" }] },
+    ];
   },
   cacheComponents: true,
   partialPrefetching: true,
