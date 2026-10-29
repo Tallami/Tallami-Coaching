@@ -88,8 +88,8 @@ export async function createStudent(page: Page, name: string): Promise<string> {
 }
 
 /**
- * Desde la ficha del alumno `name` (que ya tiene al menos una venta), genera su invitación al portal
- * y devuelve el token del link, que se ve una sola vez.
+ * Desde la ficha del alumno `name` (tenga o no ventas: la invitación no depende de ellas), genera su
+ * invitación al portal y devuelve el token del link, que se ve una sola vez.
  */
 export async function inviteStudent(page: Page, name: string): Promise<string> {
   await page.goto(`/admin/alumnos?q=${encodeURIComponent(name)}`);

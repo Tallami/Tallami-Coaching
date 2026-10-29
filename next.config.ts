@@ -64,6 +64,11 @@ const nextConfig: NextConfig = {
     // apenas por encima, porque el techo de verdad lo pone Vercel, que corta con 413 los
     // pedidos de más de 4,5 MB a una función. Lo que pase de 4 MB y llegue hasta acá lo
     // rechaza la acción (`too-large`). En Next 16 la opción vive bajo `experimental`.
+    //
+    // OJO: es un límite global. Vale para TODAS las Server Actions del sitio (hoy, las del panel, también las
+    // del ingreso), no solo para la que recibe el PDF (`addDeliveryAction`): cualquier otra acepta hasta 5 MB
+    // de cuerpo. Por eso cada acción valida lo que recibe (tipo, largo, tamaño) y no se le confía nada al
+    // formulario. Subirlo exige repensar eso, y más de 10 MB llegaría cortado (`tests/unit/next-config.test.ts`).
     serverActions: { bodySizeLimit: "5mb" },
   },
   turbopack: {

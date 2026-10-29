@@ -87,7 +87,7 @@ describe("without a session nothing reads or writes", () => {
     withoutSession();
     const { deleteDeliveryAction } = await actions();
 
-    await expect(deleteDeliveryAction(SOME_ID)).rejects.toThrow(NO_SESSION);
+    await expect(deleteDeliveryAction(SOME_ID, SOME_ID)).rejects.toThrow(NO_SESSION);
     expect(getDb).not.toHaveBeenCalled();
   });
 });
@@ -171,6 +171,25 @@ describe("addDeliveryAction", () => {
     });
     expect(await counts()).toEqual({ deliveries: 0, files: 0 });
     expect(await addDeliveryAction(saleId, form({ kind: "pdf", title: "Justo", file: exact }))).toEqual({ ok: true });
+  });
+
+  test("judges the size before reading a single byte of the file", async () => {
+    withSession();
+    const saleId = await newSale();
+    const { addDeliveryAction } = await actions();
+    const over = new File([pdfBytes(DELIVERY_PDF_MAX_BYTES + 1)], "pasado.pdf", { type: "application/pdf" });
+    const fine = new File([pdfBytes(200)], "bien.pdf", { type: "application/pdf" });
+    const readOver = vi.spyOn(over, "arrayBuffer");
+    const readFine = vi.spyOn(fine, "arrayBuffer");
+
+    expect(await addDeliveryAction(saleId, form({ kind: "pdf", title: "Pasado", file: over }))).toEqual({
+      ok: false,
+      error: "too-large",
+    });
+    expect(readOver).not.toHaveBeenCalled();
+    // Control: el formulario le entrega a la acción el mismo archivo, así que la espía lo ve leer uno que sí entra.
+    expect(await addDeliveryAction(saleId, form({ kind: "pdf", title: "Bien", file: fine }))).toEqual({ ok: true });
+    expect(readFine).toHaveBeenCalledOnce();
   });
 
   test("refuses a PDF with no file, an empty file, or a text where the file should be", async () => {
@@ -262,7 +281,7 @@ describe("deleteDeliveryAction", () => {
     const [pdf] = await listDeliveriesForSale(db, saleId);
     expect(pdf.kind).toBe("pdf");
 
-    expect(await deleteDeliveryAction(pdf.id)).toEqual({ ok: true });
+    expect(await deleteDeliveryAction(saleId, pdf.id)).toEqual({ ok: true });
 
     expect(await counts()).toEqual({ deliveries: 1, files: 0 });
   });
@@ -274,9 +293,28 @@ describe("deleteDeliveryAction", () => {
     await addDeliveryAction(saleId, form({ kind: "link", title: "Guía", url: DRIVE }));
     const [delivery] = await listDeliveriesForSale(db, saleId);
 
-    expect(await deleteDeliveryAction(delivery.id)).toEqual({ ok: true });
-    expect(await deleteDeliveryAction(delivery.id)).toEqual({ ok: false, error: "not-found" });
-    expect(await deleteDeliveryAction(UNKNOWN_ID)).toEqual({ ok: false, error: "not-found" });
-    expect(await deleteDeliveryAction("no-es-un-uuid")).toEqual({ ok: false, error: "not-found" });
+    expect(await deleteDeliveryAction(saleId, delivery.id)).toEqual({ ok: true });
+    expect(await deleteDeliveryAction(saleId, delivery.id)).toEqual({ ok: false, error: "not-found" });
+    expect(await deleteDeliveryAction(saleId, UNKNOWN_ID)).toEqual({ ok: false, error: "not-found" });
+    expect(await deleteDeliveryAction(saleId, "no-es-un-uuid")).toEqual({ ok: false, error: "not-found" });
+  });
+
+  test("a delivery is deleted from its own sale only: through another sale, or an unknown one, it says not-found and keeps it", async () => {
+    withSession();
+    const saleId = await newSale();
+    const otherSaleId = await newSale();
+    const { addDeliveryAction, deleteDeliveryAction } = await actions();
+    await addDeliveryAction(saleId, form({ kind: "pdf", title: "Plan", file: new File([pdfBytes()], "plan.pdf") }));
+    const [pdf] = await listDeliveriesForSale(db, saleId);
+    expect(await counts()).toEqual({ deliveries: 1, files: 1 });
+
+    expect(await deleteDeliveryAction(otherSaleId, pdf.id)).toEqual({ ok: false, error: "not-found" });
+    expect(await deleteDeliveryAction(UNKNOWN_ID, pdf.id)).toEqual({ ok: false, error: "not-found" });
+    expect(await deleteDeliveryAction("no-es-un-uuid", pdf.id)).toEqual({ ok: false, error: "not-found" });
+    expect(await counts()).toEqual({ deliveries: 1, files: 1 });
+    expect(await listDeliveriesForSale(db, saleId)).toHaveLength(1);
+
+    expect(await deleteDeliveryAction(saleId, pdf.id)).toEqual({ ok: true });
+    expect(await counts()).toEqual({ deliveries: 0, files: 0 });
   });
 });

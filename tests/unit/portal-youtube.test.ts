@@ -50,6 +50,13 @@ describe("youtubeVideoId refuses everything else", () => {
     ["a user name before the real host", `https://user:pass@www.youtube.com/watch?v=${ID}`],
     ["another port", `https://www.youtube.com:8443/watch?v=${ID}`],
     ["a short link of another site", `https://youtu.be.evil.com/${ID}`],
+    // Dominios que se ven como el de YouTube pero tienen una letra de otro alfabeto: `new URL` los
+    // pasa a punycode (`xn--…`), que no es ninguno de los dominios de la lista.
+    ["a Cyrillic е in youtube.com", `https://youtubе.com/watch?v=${ID}`],
+    ["a Cyrillic е in www.youtube.com", `https://www.youtubе.com/watch?v=${ID}`],
+    ["a Cyrillic у in youtube.com", `https://уoutube.com/watch?v=${ID}`],
+    ["a Cyrillic е in youtu.be", `https://youtu.bе/${ID}`],
+    ["the same lookalike written as punycode", `https://xn--youtub-8of.com/watch?v=${ID}`],
     ["the nocookie embed address", `https://www.youtube-nocookie.com/embed/${ID}`],
     ["the embed address", `https://www.youtube.com/embed/${ID}`],
     ["the channel page", "https://www.youtube.com/@tallami1"],

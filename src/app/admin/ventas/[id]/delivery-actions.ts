@@ -7,9 +7,10 @@ import {
   addPdfDelivery,
   addYoutubeDelivery,
   deleteDelivery,
+  getDeliveryOfSale,
   type AddDeliveryError,
 } from "@/portal/deliveries";
-import { DELIVERY_KINDS } from "@/portal/policy";
+import { DELIVERY_KINDS, DELIVERY_PDF_MAX_BYTES } from "@/portal/policy";
 
 // Las acciones de la tarjeta "Entregas" de la ficha de la venta
 // (`src/admin/sales/deliveries-card.tsx`). Como todas las del panel, verifican la sesión
@@ -36,10 +37,10 @@ function textField(formData: FormData, name: string): string {
   return typeof value === "string" ? value : "";
 }
 
-/** Los bytes del archivo del formulario; sin archivo (o con un texto en su lugar) son cero bytes. */
-async function fileBytes(formData: FormData): Promise<Uint8Array> {
-  const file = formData.get("file");
-  return file instanceof Blob ? new Uint8Array(await file.arrayBuffer()) : new Uint8Array(0);
+/** El archivo del formulario, o `null` si no hay (o si en su lugar vino un texto). */
+function fileField(formData: FormData): Blob | null {
+  const value = formData.get("file");
+  return value instanceof Blob ? value : null;
 }
 
 /**
@@ -60,14 +61,24 @@ export async function addDeliveryAction(saleId: string, formData: FormData): Pro
       return addYoutubeDelivery(db, saleId, title, textField(formData, "url"));
     case "link":
       return addLinkDelivery(db, saleId, title, textField(formData, "url"));
-    case "pdf":
-      return addPdfDelivery(db, saleId, title, await fileBytes(formData));
+    case "pdf": {
+      // El tamaño se mira antes de leer el archivo: uno enorme no se carga en memoria para rechazarlo.
+      // `addPdfDelivery` vuelve a exigir el tamaño y los bytes (`%PDF-`) de lo que se leyó.
+      const file = fileField(formData);
+      if (file && file.size > DELIVERY_PDF_MAX_BYTES) return { ok: false, error: "too-large" };
+      const bytes = file ? new Uint8Array(await file.arrayBuffer()) : new Uint8Array(0);
+      return addPdfDelivery(db, saleId, title, bytes);
+    }
   }
 }
 
-/** Borra la entrega `deliveryId` y, si era un PDF, su archivo. */
-export async function deleteDeliveryAction(deliveryId: string): Promise<DeleteDeliveryActionResult> {
+/**
+ * Borra la entrega `deliveryId` de la venta `saleId` y, si era un PDF, su archivo. Solo la
+ * borra si es de esa venta: la ficha que se está viendo no puede tocar las entregas de otra.
+ */
+export async function deleteDeliveryAction(saleId: string, deliveryId: string): Promise<DeleteDeliveryActionResult> {
   await requireAdmin();
   const db = await getDb();
+  if (!(await getDeliveryOfSale(db, saleId, deliveryId))) return { ok: false, error: "not-found" };
   return (await deleteDelivery(db, deliveryId)) ? { ok: true } : { ok: false, error: "not-found" };
 }

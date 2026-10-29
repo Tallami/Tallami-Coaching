@@ -111,13 +111,15 @@ function DoneNotice({ children }: { children: string }) {
 }
 
 interface DeliveryItemProps {
+  /** La venta de la ficha: la acción solo borra la entrega si es de esta venta. */
+  saleId: string;
   delivery: DeliveryRow;
   /** Avisa a la tarjeta que la entrega se borró, para que lo anuncie. */
   onDeleted: () => void;
 }
 
 /** Una entrega de la lista, con "Abrir" y "Borrar" (que pregunta antes, con el "No" enfocado). */
-function DeliveryItem({ delivery, onDeleted }: DeliveryItemProps) {
+function DeliveryItem({ saleId, delivery, onDeleted }: DeliveryItemProps) {
   const router = useRouter();
   const hydrated = useHydrated();
   const [confirming, setConfirming] = useState(false);
@@ -138,7 +140,7 @@ function DeliveryItem({ delivery, onDeleted }: DeliveryItemProps) {
     setBusy(true);
     setMessage(null);
     try {
-      const result = await deleteDeliveryAction(delivery.id);
+      const result = await deleteDeliveryAction(saleId, delivery.id);
       router.refresh();
       if (result.ok) {
         onDeleted();
@@ -299,6 +301,7 @@ export function DeliveriesCard({ saleId, deliveries }: DeliveriesCardProps) {
           {deliveries.map((delivery) => (
             <DeliveryItem
               key={delivery.id}
+              saleId={saleId}
               delivery={delivery}
               onDeleted={() => {
                 setAdded(false);
