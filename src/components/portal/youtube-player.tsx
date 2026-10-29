@@ -11,8 +11,8 @@ interface YoutubePlayerProps {
  * toca "play". 16:9 y de ancho flexible. Se carga recién cuando se acerca a la pantalla (`lazy`).
  *
  * `referrerPolicy` es lo que YouTube exige a sus reproductores embebidos: sin un encabezado
- * `Referer` el video responde con un error. La página manda `no-referrer`, así que el marco lleva
- * su propia política, que pisa la de la página solo para este pedido.
+ * `Referer` el video responde con un error. La página manda `same-origin` (nada hacia otros sitios),
+ * así que el marco lleva su propia política, que pisa la de la página solo para este pedido.
  */
 export function YoutubePlayer({ videoId, title }: YoutubePlayerProps) {
   return (

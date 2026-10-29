@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { getLocale, getTranslations } from "next-intl/server";
 import { Button } from "@/components/ui/button";
 import { formatPortalMoment, linkDomain } from "@/portal/format";
@@ -8,45 +9,56 @@ import { YoutubePlayer } from "./youtube-player";
 /** Un link que abre en otra pestaña, sin darle a esa página el `window.opener` ni la dirección de esta. */
 const NEW_TAB = { target: "_blank", rel: "noopener noreferrer" } as const;
 
-/** El botón de una entrega: cada tipo abre lo suyo. */
+/**
+ * El botón de una entrega: un link que abre en otra pestaña. Un texto largo (el dominio de un link) se corta
+ * donde haga falta en vez de ensanchar la página.
+ */
+function NewTabButton({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <Button asChild variant="ink-outline" size="sm" className="h-auto max-w-full py-2">
+      <a href={href} {...NEW_TAB}>
+        {children}
+      </a>
+    </Button>
+  );
+}
+
+/** Lo que abre cada tipo de entrega: el video en YouTube, el PDF desde la ruta del portal o el link con su dominio. */
 async function DeliveryAction({ delivery }: { delivery: StudentDelivery }) {
   const t = await getTranslations("Portal.deliveries");
   const hint = <span className="sr-only"> {t("opensInNewTab")}</span>;
 
   if (delivery.kind === "youtube" && delivery.youtubeVideoId) {
     return (
-      <Button asChild variant="ink-outline" size="sm" className="h-auto max-w-full py-2">
-        <a href={youtubeWatchUrl(delivery.youtubeVideoId)} {...NEW_TAB}>
-          {t("openYoutube")}
-          {hint}
-        </a>
-      </Button>
+      <NewTabButton href={youtubeWatchUrl(delivery.youtubeVideoId)}>
+        {t("openYoutube")}
+        {hint}
+      </NewTabButton>
     );
   }
   if (delivery.kind === "pdf" && delivery.fileHref) {
     return (
-      <Button asChild variant="ink-outline" size="sm" className="h-auto max-w-full py-2">
-        <a href={delivery.fileHref} {...NEW_TAB}>
-          {t("viewPdf")}
-          {hint}
-        </a>
-      </Button>
+      <NewTabButton href={delivery.fileHref}>
+        {t("viewPdf")}
+        {hint}
+      </NewTabButton>
     );
   }
-  const domain = delivery.url ? linkDomain(delivery.url) : null;
   if (delivery.kind === "link" && delivery.url) {
+    const domain = linkDomain(delivery.url);
     return (
-      <Button asChild variant="ink-outline" size="sm" className="h-auto max-w-full py-2">
-        <a href={delivery.url} {...NEW_TAB}>
-          {t("openLink")}
-          {domain ? (
+      <NewTabButton href={delivery.url}>
+        {t("openLink")}
+        {domain ? (
+          <>
+            {/* Un espacio de verdad entre la acción y el dominio: así se lee en el nombre del link ("Abrir drive.google.com"). */}{" "}
             <span translate="no" className="ml-2 min-w-0 font-medium opacity-80 [overflow-wrap:anywhere]">
               {domain}
             </span>
-          ) : null}
-          {hint}
-        </a>
-      </Button>
+          </>
+        ) : null}
+        {hint}
+      </NewTabButton>
     );
   }
   return null;

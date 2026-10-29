@@ -199,6 +199,20 @@ describe("the invite of the address counts only when the sign-in starts on the p
     });
   });
 
+  test("without Sec-Fetch-Site, the Referer is the portal page without the token (what the page sends once it took it off the bar): the invite of the start address is kept", async () => {
+    // La página saca el token de la barra, así que el Referer de un clic ya no lo trae: el token viaja en la
+    // dirección de inicio (el `href` del botón), y alcanza con que el Referer sea del propio sitio.
+    for (const referer of [`${ORIGIN}/es/portal`, `${ORIGIN}/pt/portal?ingreso=fallido`]) {
+      expect(await startedWith({ referer }), referer).toMatchObject({ locale: "pt", inviteToken: INVITE });
+    }
+  });
+
+  test("without Sec-Fetch-Site, a Referer of another site that names the portal page does not keep the invite", async () => {
+    for (const referer of ["https://evil.example/es/portal", `https://evil.example/es/portal?volver=${ORIGIN}/es/portal`]) {
+      expect(await startedWith({ referer }), referer).toMatchObject({ inviteToken: null });
+    }
+  });
+
   test("without Sec-Fetch-Site, no Referer, one of another origin or one that is not an address drops the invite", async () => {
     const cases: Record<string, string>[] = [
       {},

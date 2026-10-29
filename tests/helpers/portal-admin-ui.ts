@@ -76,6 +76,17 @@ export async function deliveryHref(page: Page, title: string): Promise<string> {
   return href ?? "";
 }
 
+/** Da de alta un alumno por el formulario (sin ventas) y espera a estar en su ficha. Devuelve su dirección. */
+export async function createStudent(page: Page, name: string): Promise<string> {
+  await page.goto("/admin/alumnos/nuevo");
+  const form = page.getByRole("form", { name: "Datos del alumno" });
+  await expect(form).toHaveAttribute("data-hydrated", "true");
+  await form.getByLabel("Nombre", { exact: true }).fill(name);
+  await page.getByRole("button", { name: "Guardar alumno" }).click();
+  await expect(page).toHaveURL(/\/admin\/alumnos\/[0-9a-f-]{36}\?guardado=creado$/);
+  return new URL(page.url()).pathname;
+}
+
 /**
  * Desde la ficha del alumno `name` (que ya tiene al menos una venta), genera su invitación al portal
  * y devuelve el token del link, que se ve una sola vez.

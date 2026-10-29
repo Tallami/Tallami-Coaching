@@ -10,9 +10,9 @@ import { getPathname } from "@/i18n/navigation";
 import { routing } from "@/i18n/routing";
 
 /**
- * Privada: sin buscadores (`noindex`) y sin `Referer` (`no-referrer`). El `Referrer-Policy` de
- * verdad es el encabezado de `next.config.ts`; esta marca es el respaldo si un servidor
- * intermedio lo cambia. El link de una invitación lleva su token en la dirección.
+ * Privada: sin buscadores (`noindex`) y sin `Referer` hacia otros sitios (`same-origin`: al propio sitio
+ * sigue llegando, ver `next.config.ts`). El `Referrer-Policy` de verdad es ese encabezado; esta marca es
+ * el respaldo si un servidor intermedio lo cambia. El link de una invitación lleva su token en la dirección.
  */
 export async function generateMetadata(props: PageProps<"/[locale]/portal">): Promise<Metadata> {
   const { locale } = await props.params;
@@ -25,7 +25,7 @@ export async function generateMetadata(props: PageProps<"/[locale]/portal">): Pr
     // Su propia dirección y ninguna versión en otros idiomas: no es una copia de la portada.
     alternates: { canonical: getPathname({ locale, href: "/portal" }) },
     robots: { index: false, follow: false, nocache: true, googleBot: { index: false, follow: false, noimageindex: true } },
-    referrer: "no-referrer",
+    referrer: "same-origin",
   };
 }
 

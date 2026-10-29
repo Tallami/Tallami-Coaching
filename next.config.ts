@@ -20,7 +20,11 @@ const SECURITY_HEADERS = [
 /**
  * La página del portal del alumno en cada idioma (`/es/portal`, `/pt/portal`, `/en/portal`). El link
  * de una invitación lleva su token en la dirección (`?invitacion=…`): la página lo saca de la barra,
- * pero mientras carga y en cualquier pedido que salga de ella no puede mandarse en un `Referer`.
+ * pero mientras carga y en cualquier pedido que salga de ella no puede mandarse en un `Referer` a otro sitio.
+ *
+ * `same-origin` y no `no-referrer`: al propio sitio el `Referer` tiene que seguir llegando, porque es el
+ * respaldo con el que `startedOnThisSite` reconoce un clic de la página en los navegadores sin
+ * `Sec-Fetch-Site`; y con `no-referrer` el `Origin` de un POST del propio sitio ("Salir") pasa a ser `null`.
  */
 const PORTAL_PAGE_SOURCE = `/:locale(${routing.locales.join("|")})/portal`;
 
@@ -29,8 +33,8 @@ const nextConfig: NextConfig = {
     return [
       { source: "/:path*", headers: SECURITY_HEADERS },
       // Va después de la regla de todas las rutas: cuando dos reglas ponen el mismo encabezado,
-      // gana la última, y acá la política es más estricta que la base.
-      { source: PORTAL_PAGE_SOURCE, headers: [{ key: "Referrer-Policy", value: "no-referrer" }] },
+      // gana la última, y acá la política es más estricta que la base: nada sale hacia otros sitios.
+      { source: PORTAL_PAGE_SOURCE, headers: [{ key: "Referrer-Policy", value: "same-origin" }] },
     ];
   },
   cacheComponents: true,

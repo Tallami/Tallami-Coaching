@@ -50,13 +50,16 @@ async function headerRules(): Promise<HeaderRule[]> {
 
 describe("next.config headers", () => {
   // El link de una invitación lleva su token en la dirección (`/es/portal?invitacion=…`). La página lo saca
-  // de la barra, pero mientras carga y en cualquier pedido que salga de ella no puede mandarse en un Referer.
+  // de la barra, pero mientras carga y en cualquier pedido que salga de ella no puede mandarse en un Referer
+  // a otro sitio. `same-origin` y no `no-referrer`: al propio sitio el Referer tiene que seguir llegando
+  // (`startedOnThisSite`, el respaldo de los navegadores sin `Sec-Fetch-Site`) y el `Origin` de un POST del
+  // propio sitio ("Salir") no puede volverse `null`.
   const portalSource = `/:locale(${routing.locales.join("|")})/portal`;
 
-  test("the page of the student portal, in every language, sends no Referer at all", async () => {
+  test("the page of the student portal, in every language, sends no Referer to other sites", async () => {
     const rule = (await headerRules()).find(({ source }) => source === portalSource);
 
-    expect(rule?.headers).toEqual([{ key: "Referrer-Policy", value: "no-referrer" }]);
+    expect(rule?.headers).toEqual([{ key: "Referrer-Policy", value: "same-origin" }]);
   });
 
   test("it comes after the baseline for every route, which is what overrides the baseline policy for that page", async () => {

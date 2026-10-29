@@ -2,7 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import type { Browser, BrowserContext, Locator, Page } from "@playwright/test";
 import { expect, loginAsAdmin, test } from "../helpers/admin";
 import { PHONE, createSale, createSaleForExisting, uniqueName } from "../helpers/admin-ui";
-import { addDelivery, inviteStudent, openSale, pdfFile } from "../helpers/portal-admin-ui";
+import { addDelivery, createStudent, inviteStudent, openSale, pdfFile } from "../helpers/portal-admin-ui";
 import {
   FLOW_COOKIE,
   STUDENT_COOKIE,
@@ -64,6 +64,71 @@ function purchases(page: Page): Locator {
   return page.getByRole("article");
 }
 
+/** Dónde cae el foco en cada Tab: el nombre de lo que lo tiene y cómo se dibuja su aro. */
+interface FocusStop {
+  name: string;
+  tag: string;
+  focusVisible: boolean;
+  outlineStyle: string;
+  outlineWidth: string;
+}
+
+/** Más Tab que esto sin llegar a `until` es que el foco se perdió: el recorrido falla en vez de seguir. */
+const MAX_TABS = 40;
+
+/**
+ * Pulsa Tab desde el principio de la página y anota dónde cae el foco cada vez, hasta llegar a lo que se llama `until`
+ * (el último link del pie): ahí termina, para no salir del documento.
+ */
+async function tabThrough(page: Page, until: string): Promise<FocusStop[]> {
+  const stops: FocusStop[] = [];
+  for (let press = 0; press < MAX_TABS; press += 1) {
+    await page.keyboard.press("Tab");
+    stops.push(
+      await page.evaluate(() => {
+        const element = document.activeElement as HTMLElement;
+        const style = getComputedStyle(element);
+        // Un marco se nombra por su `title`; todo lo demás, por su texto (con lo que lee el lector de pantalla).
+        const label = element.getAttribute("title") ?? element.textContent ?? "";
+        return {
+          name: label.trim().replace(/\s+/g, " ").slice(0, 80),
+          tag: element.tagName,
+          focusVisible: element.matches(":focus-visible"),
+          outlineStyle: style.outlineStyle,
+          outlineWidth: style.outlineWidth,
+        };
+      }),
+    );
+    if (stops[stops.length - 1].name.startsWith(until)) return stops;
+  }
+  throw new Error(`El foco no llegó a "${until}" en ${MAX_TABS} Tab: ${JSON.stringify(stops.map(({ name }) => name))}`);
+}
+
+/** Los nombres esperados aparecen en ese orden (empiezan igual: los links nuevos agregan "(se abre en una pestaña nueva)"). */
+function expectInOrder(names: string[], expected: string[]): void {
+  let from = 0;
+  for (const name of expected) {
+    const index = names.findIndex((value, position) => position >= from && value.startsWith(name));
+    expect(index, `"${name}" after position ${from} in ${JSON.stringify(names)}`).toBeGreaterThanOrEqual(0);
+    from = index + 1;
+  }
+}
+
+/**
+ * Cada parada del foco tiene su aro a la vista: el de `:focus-visible` de la marca, de 3 px y sólido. El marco del
+ * reproductor se salta: cuando el foco entra al video, el aro lo dibuja el reproductor de YouTube, no la página.
+ */
+function expectVisibleFocus(walk: FocusStop[]): void {
+  for (const stop of walk.filter(({ tag }) => tag !== "IFRAME")) {
+    expect(stop.focusVisible, `${stop.name} matches :focus-visible`).toBe(true);
+    expect({ name: stop.name, style: stop.outlineStyle, width: stop.outlineWidth }).toEqual({
+      name: stop.name,
+      style: "solid",
+      width: "3px",
+    });
+  }
+}
+
 interface LinkedStudent {
   name: string;
   browser: { context: BrowserContext; page: Page };
@@ -111,19 +176,21 @@ test.describe("the student portal without a session", () => {
     });
   }
 
-  test("is private: not indexed, not cached, and it sends no Referer to anywhere", async ({ request, page }) => {
+  test("is private: not indexed, not cached, and it sends no Referer to other sites", async ({ request, page }) => {
     for (const { locale } of LOCALES) {
       const response = await request.get(`/${locale}/portal`);
 
       expect(response.status(), locale).toBe(200);
-      expect(response.headers()["referrer-policy"], locale).toBe("no-referrer");
+      // `same-origin`: nada sale hacia otros sitios, y al propio sitio el Referer y el `Origin` de un POST siguen llegando.
+      expect(response.headers()["referrer-policy"], locale).toBe("same-origin");
       expect(response.headers()["cache-control"], locale).not.toMatch(/public|s-maxage/);
+      expect(response.headers()["cache-control"], locale).toMatch(/no-store|private/);
     }
     await page.goto("/es/portal");
     await expect(page.locator("meta[name=robots]")).toHaveAttribute("content", /noindex/);
     await expect(page.locator("meta[name=robots]")).toHaveAttribute("content", /nofollow/);
     // El respaldo del encabezado: la misma política, en la propia página.
-    await expect(page.locator("meta[name=referrer]")).toHaveAttribute("content", "no-referrer");
+    await expect(page.locator("meta[name=referrer]")).toHaveAttribute("content", "same-origin");
     await expect(page).toHaveTitle(es.Portal.metaTitle);
     // No se anuncia como una versión de la portada: su dirección canónica es la propia.
     await expect(page.locator("link[rel=canonical]")).toHaveAttribute("href", /\/es\/portal$/);
@@ -168,9 +235,11 @@ test.describe("the student portal without a session", () => {
     // El botón lleva la invitación a la ruta del ingreso (es lo único que la lleva)...
     const sign = page.getByRole("link", { name: es.Portal.providers.test.button });
     await expect(sign).toHaveAttribute("href", `/api/portal/auth/test?locale=es&invitacion=${FAKE_TOKEN}`);
-    // ...y la barra de direcciones ya no la tiene, ni ahora ni un rato después.
+    // ...y la barra de direcciones ya no la tiene: ni cuando la página la saca, ni cuando todo lo que estaba
+    // en curso (la hidratación, las precargas del router) terminó de acomodarse.
     await expect.poll(() => new URL(page.url()).search).toBe("");
-    await page.waitForTimeout(500);
+    await page.waitForLoadState("networkidle");
+    expect(new URL(page.url()).search).toBe("");
     expect(page.url()).not.toContain(FAKE_TOKEN);
     expect(page.url()).not.toContain("invitacion");
     // Ningún otro atributo de la página lo repite: ni un link canónico ni una etiqueta del encabezado.
@@ -189,19 +258,43 @@ test.describe("the student portal without a session", () => {
     await expect(page.getByText(es.Portal.notices.inviteInvalid)).toHaveCount(0);
   });
 
-  test("has no accessibility problems and no sideways scroll on a phone and on a desktop, with and without a notice", async ({ page }) => {
-    for (const [label, size] of [
-      ["celular", PHONE],
-      ["escritorio", DESKTOP],
-    ] as const) {
-      await page.setViewportSize(size);
-      await page.goto("/es/portal");
-      await expect(page.getByRole("link", { name: es.Portal.providers.test.button })).toBeVisible();
-      await audit(page, `sin sesión, ${label}`);
-      await page.goto(`/es/portal?ingreso=fallido`);
-      await expect(alerts(page)).toBeVisible();
-      await audit(page, `con un aviso, ${label}`);
+  test("has no accessibility problems and no sideways scroll on a phone and on a desktop, in every language, with and without a notice", async ({
+    page,
+  }) => {
+    for (const { locale, messages } of LOCALES) {
+      for (const [label, size] of [
+        ["celular", PHONE],
+        ["escritorio", DESKTOP],
+      ] as const) {
+        const where = `${locale}, ${label}`;
+        await page.setViewportSize(size);
+        await page.goto(`/${locale}/portal`);
+        await expect(page.getByRole("link", { name: messages.Portal.providers.test.button })).toBeVisible();
+        await audit(page, `sin sesión, ${where}`);
+        // El aviso de error (`alert`) y el informativo de la invitación (`status`).
+        await page.goto(`/${locale}/portal?ingreso=fallido`);
+        await expect(alerts(page)).toBeVisible();
+        await audit(page, `con un error, ${where}`);
+        await page.goto(`/${locale}/portal?invitacion=${FAKE_TOKEN}`);
+        await expect(page.getByRole("main").getByRole("status").filter({ hasText: messages.Portal.notices.inviteToSignIn })).toBeVisible();
+        await audit(page, `con el aviso de la invitación, ${where}`);
+      }
     }
+  });
+
+  test("the keyboard reaches the skip link, the brand, the languages, the sign-in button and the footer, each with a visible focus ring", async ({
+    page,
+  }) => {
+    await page.goto("/es/portal");
+    await expect(page.getByRole("link", { name: es.Portal.providers.test.button })).toBeVisible();
+
+    const walk = await tabThrough(page, es.Footer.portal);
+
+    expectInOrder(
+      walk.map((stop) => stop.name),
+      [es.Common.skipLink, "Tallami.", "ES", "PT", "EN", es.Portal.providers.test.button, "X", es.Footer.portal],
+    );
+    expectVisibleFocus(walk);
   });
 });
 
@@ -222,8 +315,18 @@ test.describe("signing in from the page", () => {
     await studentPage.goto(`/es/portal?invitacion=${token}`);
     await expect(studentPage.getByText(es.Portal.notices.inviteToSignIn)).toBeVisible();
     await expect.poll(() => new URL(studentPage.url()).search).toBe("");
+    const origin = new URL(studentPage.url()).origin;
+    const started = studentPage.waitForRequest((request) => new URL(request.url()).pathname === "/api/portal/auth/test");
     await studentPage.getByRole("link", { name: es.Portal.providers.test.button }).click();
 
+    // Lo que el navegador manda al empezar el ingreso: es un clic dentro del sitio, y el Referer es la página del
+    // portal sin el token (ya no estaba en la barra). `same-origin` lo deja llegar al propio sitio, y a nadie más.
+    const startRequest = await started;
+    const startHeaders = await startRequest.allHeaders();
+    expect(startHeaders["sec-fetch-site"]).toBe("same-origin");
+    expect(startHeaders["referer"]).toBe(`${origin}/es/portal`);
+    expect(startRequest.url()).toContain(token); // viaja en la dirección de inicio, que es lo que lo canjea...
+    expect(startHeaders["referer"]).not.toContain(token); // ...y no en el Referer.
     await expect(studentPage).toHaveURL(/\/es\/portal\?invitacion=vinculada$/);
     await expect(studentPage.getByRole("status").filter({ hasText: es.Portal.notices.linked })).toBeVisible();
     await expect(studentPage.getByRole("heading", { level: 2, name: es.Portal.purchases.title })).toBeVisible();
@@ -295,6 +398,88 @@ test.describe("signing in from the page", () => {
     await second.context.close();
   });
 
+  test("a browser without Sec-Fetch-Site keeps the invite when the Referer is the portal page without the token, and drops it for a Referer of another site", async ({
+    page,
+    browser,
+  }) => {
+    await loginAsAdmin(page);
+    const name = uniqueName("Alumno sin sec-fetch");
+    await createSale(page, { student: name });
+    const token = await inviteStudent(page, name);
+    const origin = new URL(test.info().project.use.baseURL ?? "").origin;
+    const student = await newStudentBrowser(browser);
+
+    // Un pedido crudo, como el de un navegador viejo: sin `Sec-Fetch-Site`, solo el `Referer`.
+    // Desde otro sitio, no se canjea: la persona entra, sin vincularse.
+    const fromAnotherSite = await signIn(student.page, { invitation: token, headers: { referer: "https://evil.example/es/portal" } });
+    expect(fromAnotherSite.pathname + fromAnotherSite.search).toBe("/es/portal");
+    await expect(student.page.getByText(es.Portal.unlinked.body)).toBeVisible();
+
+    // Desde la página del portal (la dirección sin el token, que es lo que manda la página una vez que lo sacó de la barra), sí.
+    const fromThePortal = await signIn(student.page, { invitation: token, headers: { referer: `${origin}/es/portal` } });
+    expect(fromThePortal.pathname + fromThePortal.search).toBe("/es/portal?invitacion=vinculada");
+    await expect(purchases(student.page)).toHaveCount(1);
+    await student.context.close();
+  });
+
+  test("a linked account with no purchases sees an empty list that says so, and the page has no accessibility problems", async ({
+    page,
+    browser,
+  }) => {
+    await loginAsAdmin(page);
+    const name = uniqueName("Alumna sin compras");
+    await createStudent(page, name);
+    const token = await inviteStudent(page, name);
+    const student = await newStudentBrowser(browser);
+    expect((await signIn(student.page, { invitation: token })).search).toBe("?invitacion=vinculada");
+    const s = student.page;
+
+    await expect(s.getByRole("heading", { level: 2, name: es.Portal.purchases.title })).toBeVisible();
+    await expect(s.getByText(es.Portal.purchases.empty)).toBeVisible();
+    await expect(purchases(s)).toHaveCount(0);
+    await expect(s.getByRole("button", { name: es.Portal.account.signOut })).toBeVisible();
+    for (const [label, size] of [
+      ["celular", PHONE],
+      ["escritorio", DESKTOP],
+    ] as const) {
+      await s.setViewportSize(size);
+      await s.goto("/es/portal");
+      await expect(s.getByText(es.Portal.purchases.empty)).toBeVisible();
+      await audit(s, `vinculada sin compras, ${label}`);
+    }
+    await student.context.close();
+  });
+
+  test("an account that is not linked yet has no accessibility problems on a phone and on a desktop, with and without the invitation, in every language", async ({
+    browser,
+  }) => {
+    const student = await newStudentBrowser(browser);
+    await signIn(student.page, {});
+    const s = student.page;
+
+    for (const { locale, messages } of LOCALES) {
+      for (const [label, size] of [
+        ["celular", PHONE],
+        ["escritorio", DESKTOP],
+      ] as const) {
+        const where = `${locale}, ${label}`;
+        await s.setViewportSize(size);
+        await s.goto(`/${locale}/portal`);
+        await expect(s.getByText(messages.Portal.unlinked.body)).toBeVisible();
+        await audit(s, `sin vincular, ${where}`);
+        // Con el link de una invitación: la vista le pide entrar de nuevo, con los botones sobre el color del escenario.
+        await s.goto(`/${locale}/portal?invitacion=${FAKE_TOKEN}`);
+        await expect(s.getByText(messages.Portal.unlinked.withInvite)).toBeVisible();
+        await audit(s, `sin vincular, con la invitación, ${where}`);
+        // Y con el aviso de error de una invitación que no sirve.
+        await s.goto(`/${locale}/portal?invitacion=invalida`);
+        await expect(alerts(s)).toHaveText(messages.Portal.notices.inviteInvalid);
+        await audit(s, `sin vincular, con la invitación inválida, ${where}`);
+      }
+    }
+    await student.context.close();
+  });
+
   test("Salir closes the session: the cookie goes, the page asks to sign in again, and the old cookie opens nothing", async ({
     page,
     browser,
@@ -305,7 +490,14 @@ test.describe("signing in from the page", () => {
     expect(cookie?.value).toMatch(URL_SAFE_32_BYTES);
 
     await student.page.goto("/es/portal");
+    const origin = new URL(student.page.url()).origin;
+    const loggedOut = student.page.waitForRequest((request) => request.method() === "POST" && new URL(request.url()).pathname === "/api/portal/auth/logout");
     await student.page.getByRole("button", { name: es.Portal.account.signOut }).click();
+
+    // Un POST del propio sitio: con `same-origin` el `Origin` llega (con `no-referrer` el navegador lo mandaba `null`).
+    const logoutHeaders = await (await loggedOut).allHeaders();
+    expect(logoutHeaders["origin"]).toBe(origin);
+    expect(logoutHeaders["referer"]).toBe(`${origin}/es/portal`);
 
     await expect(student.page).toHaveURL(/\/es\/portal$/);
     await expect(student.page.getByRole("link", { name: es.Portal.providers.test.button })).toBeVisible();
@@ -378,6 +570,12 @@ test.describe("a student with purchases and deliveries", () => {
     // --- Ana, en español ---
     await a.goto("/es/portal");
     await expect(purchases(a)).toHaveCount(2);
+    // También con la sesión abierta, la página con las compras de alguien no se guarda en ningún caché compartido.
+    const authenticated = await a.request.get("/es/portal");
+    expect(authenticated.status()).toBe(200);
+    expect(authenticated.headers()["cache-control"]).not.toMatch(/public|s-maxage/);
+    expect(authenticated.headers()["cache-control"]).toMatch(/no-store|private/);
+    expect(authenticated.headers()["referrer-policy"]).toBe("same-origin");
     const [pending, paid] = [purchases(a).nth(0), purchases(a).nth(1)];
     // La más nueva primero: la que todavía no se cobró arriba.
     await expect(pending.getByRole("heading", { level: 3, name: "Plan de juego personalizado" })).toBeVisible();
@@ -406,6 +604,7 @@ test.describe("a student with purchases and deliveries", () => {
     await expect(watch).toHaveAttribute("target", "_blank");
     await expect(watch).toHaveAttribute("rel", /noopener/);
     await expect(watch).toHaveAttribute("rel", /noreferrer/);
+    await expect(watch).toHaveAccessibleName("Abrir en YouTube (se abre en una pestaña nueva)");
 
     // El link: con el dominio a la vista, en otra pestaña y sin opener ni referer.
     const drive = paid.getByRole("listitem").filter({ hasText: "Guía en Drive" });
@@ -415,11 +614,16 @@ test.describe("a student with purchases and deliveries", () => {
     await expect(open).toHaveAttribute("rel", /noopener/);
     await expect(open).toHaveAttribute("rel", /noreferrer/);
     await expect(drive).toContainText("drive.google.com");
+    // El nombre accesible del link: la acción, el dominio (con un espacio entre los dos) y el aviso de la pestaña nueva.
+    await expect(open).toHaveAccessibleName("Abrir drive.google.com (se abre en una pestaña nueva)");
     await expect(drive).not.toContainText("usp=sharing");
 
     // El PDF: un botón que lo abre desde la ruta del portal, solo para su dueña.
     await expect(pending.getByRole("listitem").filter({ hasText: "Plan de juego de Ana" })).toContainText("Subida el");
     const view = pending.getByRole("link", { name: new RegExp(`^${es.Portal.deliveries.viewPdf}`) });
+    await expect(view).toHaveAccessibleName("Ver PDF (se abre en una pestaña nueva)");
+    await expect(view).toHaveAttribute("target", "_blank");
+    await expect(view).toHaveAttribute("rel", /noreferrer/);
     const pdfHref = (await view.getAttribute("href")) ?? "";
     expect(pdfHref).toMatch(/^\/api\/portal\/files\/[0-9a-f-]{36}$/);
     const served = await a.request.get(pdfHref);
@@ -430,6 +634,28 @@ test.describe("a student with purchases and deliveries", () => {
     // Nada del panel en la página: ni notas, ni factura, ni medio de pago, ni pesos calculados, ni cotización.
     const text = await a.locator("main").innerText();
     expect(text).not.toMatch(/Transferencia|factur|cotizaci|BCRA|Notas|Mercado Pago|dólares/i);
+
+    // --- Ana, con el teclado: Salir y cada acción de las entregas se alcanzan en orden, con su aro de foco a la vista ---
+    await a.goto("/es/portal");
+    await expect(purchases(a)).toHaveCount(2);
+    const walk = await tabThrough(a, es.Footer.portal);
+    expectInOrder(
+      walk.map((stop) => stop.name),
+      [
+        es.Common.skipLink,
+        "Tallami.",
+        "ES",
+        "PT",
+        "EN",
+        es.Portal.account.signOut,
+        es.Portal.deliveries.viewPdf, // la compra pendiente va primero: su PDF
+        "Review de tu partida", // el marco del video (su `title`)
+        es.Portal.deliveries.openYoutube,
+        `${es.Portal.deliveries.openLink} drive.google.com`,
+        "X",
+      ],
+    );
+    expectVisibleFocus(walk);
 
     // --- Ana, en portugués y en inglés: la misma sesión, los textos traducidos ---
     for (const { locale, messages, day, pesos } of [

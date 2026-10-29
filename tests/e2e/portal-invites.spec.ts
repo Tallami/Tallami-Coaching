@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import type { Browser, Page } from "@playwright/test";
 import { expect, loginAsAdmin, test } from "../helpers/admin";
 import { PHONE, uniqueName } from "../helpers/admin-ui";
+import { createStudent } from "../helpers/portal-admin-ui";
 import {
   STUDENT_COOKIE,
   URL_SAFE_32_BYTES,
@@ -25,17 +26,6 @@ import {
 //
 // Cada test entra con su propio alumno del proveedor de prueba (`tests/helpers/portal-e2e.ts`):
 // ninguno comparte identidad con otro ni con un reintento.
-
-/** Da de alta un alumno por el formulario y espera a estar en su ficha. Devuelve su dirección. */
-async function createStudent(page: Page, name: string): Promise<string> {
-  await page.goto("/admin/alumnos/nuevo");
-  const form = page.getByRole("form", { name: "Datos del alumno" });
-  await expect(form).toHaveAttribute("data-hydrated", "true");
-  await form.getByLabel("Nombre", { exact: true }).fill(name);
-  await page.getByRole("button", { name: "Guardar alumno" }).click();
-  await expect(page).toHaveURL(/\/admin\/alumnos\/[0-9a-f-]{36}\?guardado=creado$/);
-  return new URL(page.url()).pathname;
-}
 
 /** La tarjeta "Portal del alumno" de la ficha que se ve ahora. */
 function portalCard(page: Page) {
