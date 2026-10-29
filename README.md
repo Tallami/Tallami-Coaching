@@ -25,7 +25,7 @@ La web queda en http://localhost:3000 (redirige a `/es`, `/pt` o `/en` según el
 | `npm run lint` | ESLint |
 | `npm run typecheck` | TypeScript sin emitir archivos (corré antes `npm run build` o `npx next typegen`) |
 | `npm run test` | Tests unitarios (Vitest) |
-| `npm run test:e2e` | Tests end to end (Playwright), en tres tandas: la web en el puerto 3100 (hace el build); las pantallas del panel que se prueban con datos de ejemplo (resumen, Servicios, Facturación y la calidad de todo el panel: accesibilidad, scroll y teclado) en el 3101 (reutiliza ese build); y la seguridad del ingreso (primera llave, códigos, sesiones, y la calidad de esas pantallas) en el 3102 (también reutiliza el build). `test:e2e:main`, `test:e2e:demo` y `test:e2e:security` corren cada una por separado (las dos últimas siempre arman el build antes) |
+| `npm run test:e2e` | Tests end to end (Playwright), en tres tandas: la web en el puerto 3100 (hace el build) junto con el servidor OAuth falso del portal en el 3110; las pantallas del panel que se prueban con datos de ejemplo (resumen, Servicios, Facturación y la calidad de todo el panel: accesibilidad, scroll y teclado) en el 3101 (reutiliza ese build); y la seguridad del ingreso (primera llave, códigos, sesiones, y la calidad de esas pantallas) en el 3102 (también reutiliza el build). `test:e2e:main`, `test:e2e:demo` y `test:e2e:security` corren cada una por separado (las dos últimas siempre arman el build antes) |
 | `npm run db:generate` | Genera en `drizzle/` la migración SQL de los cambios hechos en `src/db/schema.ts` (la migración se sube al repo) |
 | `npm run db:migrate` | Aplica las migraciones de `drizzle/` a la base de `DATABASE_URL` (Supabase); sin esa variable avisa en español y no hace nada. La base local (PGlite) se migra sola al abrirse. Todas las tablas llevan RLS activada y sin políticas (la Data API de Supabase no ve nada; la app se conecta como dueño de las tablas): toda tabla nueva termina en `.enableRLS()` en `src/db/schema.ts` y un test lo exige |
 | `npm run db:seed:demo` | Carga en la base local (PGlite) 25 alumnos, unas 120 ventas y unos 750 clics en "Reservar" ficticios de los últimos 14 meses, para ver el resumen y Servicios con números. Se niega a correr si hay `DATABASE_URL`; se puede repetir (refresca las fechas). Con `npm run db:seed:demo -- --clear` los borra, y nada más |
@@ -360,6 +360,124 @@ Los tests que cambian la seguridad de todo el panel (registrar la primera llave,
 
 Los tests unitarios (`npm run test`) crean cada base de prueba clonando una base ya migrada (`tests/helpers/db.ts`), y `vitest.config.ts` sube el tiempo máximo de cada test a 30 segundos: con la máquina cargada, abrir la base o lanzar un script tardaba más que los 5 segundos de Vitest aunque nada estuviera roto.
 
+## Portal del alumno
+
+El portal es la página donde cada alumno ve lo que compró y todo lo que Tallami le entregó, guardado para siempre: `/es/portal`, `/pt/portal` y `/en/portal` (hay un enlace «Portal de alumnos» en el pie del sitio). El alumno entra con su cuenta de **Discord o Google**, sin contraseña. Vos lo manejás desde el panel: invitás al alumno desde su ficha y cargás las entregas desde la ficha de cada venta. El portal nunca muestra notas, facturas, pesos, cotizaciones ni nada de otros alumnos. Por ahora es solo para ver: pagar y escribirte desde la web vienen después.
+
+Esta guía sigue a "Ponerlo en línea": da por hecho que ya tenés Supabase y Vercel andando y el panel en línea.
+
+### Dejarlo listo
+
+Una sola vez. Cada paso dice dónde hacerlo; los nombres de los menús de Discord, Google y Vercel cambian de vez en cuando, así que si algo no coincide con lo que ves en pantalla, mandan las guías oficiales que se linkean.
+
+1. **Crear las tablas.** El portal suma tablas nuevas a la base (cuentas, sesiones, invitaciones, entregas y archivos: la migración `0006_student_portal`). **Antes de desplegar**, corré `npm run db:migrate` como en "Ponerlo en línea", paso 3 (en una terminal aparte y con la cadena de migración de Supabase). Sin las tablas el portal no puede cargar.
+2. **Anotar las direcciones de vuelta.** Cuando el alumno autoriza el ingreso, Discord y Google lo mandan de vuelta a tu web. Esas dos direcciones salen de `NEXT_PUBLIC_SITE_URL` y hay que registrarlas en cada servicio, idénticas, letra por letra:
+   - Discord: `https://<tu-dominio>/api/portal/auth/discord/callback`
+   - Google: `https://<tu-dominio>/api/portal/auth/google/callback`
+
+   `<tu-dominio>` es la dirección exacta donde termina el navegador al abrir la web, o sea `NEXT_PUBLIC_SITE_URL` (ver "Ponerlo en línea", paso 5): si la web abre con `www` y sin `www` y una redirige a la otra, la que queda después de la redirección. Con `https://` y sin barra al final. Si un alumno empieza el ingreso en otra dirección (por ejemplo en la `www` cuando la definitiva es la raíz), el sitio lo manda primero a `NEXT_PUBLIC_SITE_URL`, que es donde vuelven Discord y Google. Los despliegues de vista previa de Vercel (los de cada rama) tienen otra dirección que no está registrada, así que **en una vista previa no se puede entrar con Discord ni con Google**: probá el portal siempre en la dirección de producción.
+3. **Crear la aplicación de Discord.**
+   1. Entrá al [Developer Portal de Discord](https://discord.com/developers/applications) con tu cuenta y creá una aplicación nueva (por ejemplo «Tallami Coaching»).
+   2. En la parte **OAuth2** de la aplicación están el *Client ID* y el *Client Secret*: copialos. Discord puede mostrar el secreto una sola vez, así que guardalo enseguida en tu administrador de contraseñas.
+   3. En esa misma parte registrá como URL de vuelta (*redirect*) `https://<tu-dominio>/api/portal/auth/discord/callback`.
+   4. No hace falta elegir permisos ahí: el sitio pide `identify` y `email` cada vez que alguien entra. La guía oficial es [OAuth2](https://docs.discord.com/developers/topics/oauth2).
+4. **Crear el cliente de Google.**
+   1. Entrá a la [consola de Google Cloud](https://console.cloud.google.com/) y creá un proyecto (por ejemplo «Tallami Coaching»).
+   2. Configurá la pantalla de consentimiento, que es lo que ve el alumno cuando Google le pregunta si autoriza el ingreso: nombre de la aplicación, tu email de contacto, tipo de usuario **External** (cualquier cuenta de Google) y los permisos `openid`, `email` y `profile`. Los pasos están en [Configure the OAuth consent screen](https://developers.google.com/workspace/guides/configure-oauth-consent) (en inglés).
+   3. Dejala publicada («In production»): mientras está en «Testing», Google la puede limitar a los usuarios de prueba que cargues. Qué cambia con cada estado lo explica [Manage App Audience](https://support.google.com/cloud/answer/15549945). Google pide verificar la aplicación solo cuando usa permisos sensibles o restringidos; estos tres son los básicos.
+   4. Creá el cliente: en **Google Auth platform → Clients** elegí crear un cliente de tipo **Web application** y, en las direcciones de redirección autorizadas, poné `https://<tu-dominio>/api/portal/auth/google/callback`. Google exige `https` y que coincida exacto, y un cambio puede tardar entre 5 minutos y unas horas en aplicarse. Copiá el *Client ID* y el *Client secret* (el secreto puede verse una sola vez: guardalo en tu administrador de contraseñas). Guías oficiales: [OpenID Connect](https://developers.google.com/identity/openid-connect/openid-connect) y [Manage OAuth Clients](https://support.google.com/cloud/answer/15549257).
+5. **Cargar las variables en Vercel.** En el proyecto, Settings → Environment Variables (como en "Ponerlo en línea", paso 5), en el entorno de producción. Guía oficial: [Environment variables](https://vercel.com/docs/environment-variables).
+
+   | Variable | Qué poner |
+   | --- | --- |
+   | `PORTAL_SESSION_SECRET` | Un secreto propio del portal, de 32 caracteres o más y distinto de `ADMIN_SESSION_SECRET`. Generalo con `node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"` y pegá lo que imprime. Firma los ingresos a medio camino: si lo cambiás, quien estaba entrando en ese momento tiene que volver a empezar (las sesiones abiertas de los alumnos siguen) |
+   | `DISCORD_CLIENT_ID` y `DISCORD_CLIENT_SECRET` | El *Client ID* y el *Client Secret* de la aplicación de Discord |
+   | `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` | El *Client ID* y el *Client secret* del cliente de Google |
+
+   Marcá como «Secret» `PORTAL_SESSION_SECRET`, `DISCORD_CLIENT_SECRET` y `GOOGLE_CLIENT_SECRET` (ver "Seguridad de tus cuentas"). El botón de un proveedor aparece solo si cargaste **las dos** variables de ese proveedor: podés empezar con Discord y sumar Google después. Sin `PORTAL_SESSION_SECRET` (o con uno de menos de 32 caracteres), o sin ningún proveedor completo, el portal dice «El portal todavía no está disponible» y no deja entrar a nadie. `.env.example` tiene las mismas variables, sin valores.
+6. **Desplegar.** Volvé a desplegar: Vercel aplica las variables nuevas solo a los despliegues nuevos. Después, hacé la prueba de abajo.
+
+### Probarlo después de desplegar
+
+1. En una ventana privada, abrí `https://<tu-dominio>/es/portal`. Tiene que decir «Entrá a tu portal» con un botón por cada proveedor que cargaste.
+2. Tocá «Entrar con Discord», autorizá y fijate que volvés a `/es/portal` **en la misma dirección** en la que empezaste, con «Hola, …» y tu nombre arriba. Como tu cuenta todavía no está vinculada a ningún alumno, vas a ver «Falta un paso». Tocá «Salir» y repetí con «Entrar con Google».
+3. Si la página rebota entre la dirección con `www` y la sin `www`, o termina en otra distinta de la que abriste, `NEXT_PUBLIC_SITE_URL` no coincide con la dirección final: corregila y desplegá de nuevo (se lee en el build).
+4. Si Discord o Google muestran un error de «redirect» (en Google, `redirect_uri_mismatch`), la dirección de vuelta registrada no es idéntica a la de arriba. Si el portal vuelve con «No pudimos completar el ingreso», revisá que el *Client ID* y el *Client Secret* de Vercel sean los del proveedor y volvé a desplegar.
+5. Para ver el recorrido completo, creá en el panel un alumno de prueba, invitalo con tu propia cuenta (ver "Invitar a un alumno") y, si querés ver una compra, cargale una venta en estado «Pendiente»: no suma en ningún número del panel. El alumno de prueba queda en la lista de Alumnos.
+
+### Invitar a un alumno
+
+1. En el panel, abrí la ficha del alumno (Alumnos) y buscá la tarjeta **Portal del alumno**.
+2. Elegí el **Idioma del link** (Español, Português o English): es el idioma en que el alumno abre el portal.
+3. Tocá **Invitar al portal** y después **Copiar link**. El link se ve **una sola vez** (en la base queda solo una huella): si lo perdés, generá otro. Sirve para una persona y vence a los 14 días; si generás otro, el anterior deja de valer.
+4. Mandáselo por donde hables con él. El alumno lo abre, toca «Entrar con Discord» o «Entrar con Google» **en esa misma página** (la invitación viaja con ese ingreso) y queda vinculado: ve «Listo, tu cuenta quedó vinculada.» y sus compras.
+
+**Qué ve el alumno.** Cada compra con el nombre del servicio, la fecha de cobro (o «Pendiente de pago»), el estado, lo que pagó en la moneda de la venta y sus entregas, y un botón «Salir». Si todavía no tiene compras, lo dice; si entra con una cuenta que no está vinculada, ve «Falta un paso» y que te pida su invitación. Nunca ve notas, facturas, pesos, cotizaciones ni el medio de pago, ni nada de otros alumnos.
+
+**Desvincular o borrar la cuenta.** Con la cuenta vinculada, la tarjeta muestra «Vinculado» con el proveedor y el nombre. Los dos botones piden confirmar:
+
+- **Desvincular** cierra las sesiones de esa cuenta y el alumno deja de ver sus compras. La cuenta sigue existiendo y podés invitarlo de nuevo. Un alumno que ya tiene cuenta no se puede invitar otra vez hasta desvincularla: para pasar de Discord a Google, desvinculá y generá otra invitación.
+- **Borrar cuenta del portal** borra la cuenta y sus sesiones. Las ventas y las entregas siguen en el panel.
+
+### Cargar entregas
+
+1. En el panel, abrí la venta (Ventas) y buscá la tarjeta **Entregas**.
+2. Elegí el **Tipo**, escribí un **Título** (de 1 a 120 caracteres: lo que lee el alumno, por ejemplo «Review de tu partida del sábado»), completá lo que pide cada tipo y tocá **Agregar entrega**. El alumno la ve en su portal, dentro de esa compra, la próxima vez que lo abra. Cada entrega tiene **Abrir** y **Borrar** (pregunta antes; si era un PDF, borra también el archivo).
+
+| Tipo | Qué cargás | Cómo lo ve el alumno |
+| --- | --- | --- |
+| Video de YouTube | El link del video (`youtube.com/watch`, `youtu.be`, `youtube.com/live` o `youtube.com/shorts`). Subilo como **no listado** ([Change video privacy settings](https://support.google.com/youtube/answer/157177)): no aparece en tu canal ni en las búsquedas, pero lo ve cualquiera que tenga el link | El video dentro de la página (con `youtube-nocookie.com`, que no deja cookies de YouTube hasta que toca «play») y «Abrir en YouTube» |
+| PDF | Un archivo PDF de hasta 4 MB. Se verifica por su contenido que sea un PDF de verdad: cambiarle el nombre no alcanza | «Ver PDF», que lo abre solo si la sesión es del alumno dueño |
+| Link | Cualquier dirección que empiece con `https://`, para lo que pase de 4 MB o no sea un video de YouTube. Si es de Google Drive, compartilo con «cualquiera con el link» ([Share and manage access](https://support.google.com/drive/answer/7166529)) | «Abrir», en una pestaña nueva, con el dominio a la vista |
+
+Un video no listado lo puede ver cualquiera que reciba el link, tenga o no cuenta en el portal. Para algo que solo deba ver ese alumno, no uses ese tipo.
+
+**Dónde se guardan los PDF.** En la base de datos (tabla `delivery_files`), no en un almacenamiento de archivos. Es lo más simple, pero ocupan el espacio de la base: el plan gratuito de Supabase incluye 500 MB (octubre de 2026; confirmalo en [precios](https://supabase.com/pricing)), y cómo se cuenta y qué pasa si te pasás lo explica [Understanding Database and Disk Size](https://supabase.com/docs/guides/platform/database-size) (el uso lo ves como en "Vigilar el uso de la base", más arriba). Cien PDF de 4 MB ya son 400 MB. Para PDF grandes o muchos, mejor un link de Google Drive. Los PDF también viajan en cada copia de seguridad de la base. El código los guarda detrás de una interfaz (`src/portal/files.ts`), así que más adelante se pueden pasar a un almacenamiento de archivos sin tocar el resto.
+
+**Por qué el tope es de 4 MB.** El PDF viaja en el formulario del panel (una Server Action de Next.js), que por defecto acepta 1 MB. `next.config.ts` lo sube a 5 MB (`experimental.serverActions.bodySizeLimit`), pero ese límite vale para **todas** las Server Actions del sitio, no solo para esta, y Vercel corta con un error 413 los pedidos de más de 4,5 MB a una función ([Vercel Functions Limits](https://vercel.com/docs/functions/limitations)). Por eso el tope es 4 MB y no 5: lo que pase de 4 MB lo rechaza la acción con un aviso que manda a Drive.
+
+### Qué se guarda de cada alumno
+
+Al entrar con Discord o Google, la base guarda solo esto:
+
+- el proveedor (Discord o Google) y el id del usuario en ese proveedor (un número interno, no su usuario);
+- el nombre para mostrar que tiene en esa cuenta;
+- el email, solo si el proveedor dice que está verificado;
+- cuándo se creó la cuenta, cuándo entró por última vez y a qué alumno del panel está vinculada;
+- una huella de su sesión (no la sesión misma): dura 30 días.
+
+No se guarda el avatar, ni la contraseña (no hay), ni la IP, ni los permisos que da el proveedor: se descartan en cuanto se lee el perfil. Muchos alumnos son menores de edad, por eso se guarda lo mínimo. Las sesiones y las invitaciones que ya no sirven se borran al día siguiente, de pasada, cuando alguien entra. Al borrar la cuenta desde el panel se va todo lo de arriba.
+
+La política de privacidad del sitio todavía no está escrita: queda para la investigación legal pendiente. Hasta entonces, el portal no guarda nada fuera de esta lista.
+
+### Probarlo en tu compu
+
+Solo para desarrollo: sin Discord ni Google, con un servidor OAuth falso que corre en tu compu (el mismo que usan los tests). La variable `PORTAL_OAUTH_TEST_ISSUER` activa un proveedor de prueba que deja entrar a quien elija un nombre: **no la cargues nunca en Vercel**. En producción de Vercel se ignora y el log avisa, pero igual no la pongas en ningún entorno de Vercel.
+
+1. En `.env.local` (el archivo de "Dejarlo listo", en "Panel de admin") sumá `PORTAL_SESSION_SECRET=` con un secreto generado con el comando de arriba, y `PORTAL_OAUTH_TEST_ISSUER=http://localhost:3110`.
+2. En una terminal aparte corré `node tests/helpers/mock-oauth-server.mjs` (el puerto 3110 sale de ahí; se cambia con `MOCK_OAUTH_PORT`). Se queda corriendo; Ctrl+C lo cierra.
+3. Corré `npm run dev` y abrí `http://localhost:3000/es/portal` (por `localhost`, no por la IP de tu red). Aparece el botón «Entrar con la cuenta de prueba».
+4. El servidor falso necesita saber quién entra. En el navegador, abrí la consola de las herramientas de desarrollo (F12) y escribí `document.cookie = "mock_oauth_student=ana; path=/"` (con letras minúsculas, números y guiones): entrás como «Alumno ana». Con otro nombre, entrás como otro alumno.
+5. Tocá el botón: volvés a `/es/portal` con tu sesión. Para probar una invitación, generala en `http://localhost:3000/admin`, en la ficha de un alumno, y abrí el link.
+
+### Cómo se protege el portal
+
+| Qué | Cómo |
+| --- | --- |
+| Ingreso | OAuth 2.0 *authorization code* con PKCE (S256) y `state`, guardados en una cookie corta (`tallami_alumno_oauth`: `httpOnly`, `SameSite=Lax`, solo para `/api/portal/auth`, 10 minutos, un solo uso) firmada con una clave derivada de `PORTAL_SESSION_SECRET` (`src/portal/oauth/flow.ts`). Discord pide `identify email`; Google, `openid email profile` |
+| Sesión | Cookie `tallami_alumno` (`httpOnly`, `SameSite=Lax`, `path=/`, `Secure` salvo http en `localhost`) con un token al azar de 32 bytes; la base guarda solo su SHA-256 (`portal_sessions`). Dura 30 días desde el ingreso, se use o no, y "Salir" la cierra en la base (`src/portal/sessions.ts`) |
+| Separada del panel | Otra cookie, otra tabla y otro secreto: la sesión de un alumno no sirve en `/admin` ni la del panel en el portal |
+| Invitación | Token de 32 bytes al azar, guardado como hash, 14 días, un solo uso. Solo se canjea si el ingreso empezó en la página del portal del propio sitio: un link de otro sitio no puede hacer que la cuenta de otro alumno la consuma (`src/portal/invites.ts`) |
+| Direcciones | Después de entrar solo se vuelve a `/{es,pt,en}/portal`. Si el ingreso con Discord o Google empieza en una dirección que no es `NEXT_PUBLIC_SITE_URL`, se lo manda ahí antes de empezar, porque la cookie del ingreso tiene que quedar donde vuelve el proveedor |
+| Datos | Lo que sale hacia la página del alumno pasa por un tipo de datos propio con campos explícitos (`src/portal/purchases.ts`): nunca la fila entera de una venta |
+| PDF | `/api/portal/files/<id>` lee la sesión y busca la entrega solo entre las compras de ese alumno; si no es suya, no existe o no hay sesión, contesta lo mismo (404 sin cuerpo). Se sirve con `Content-Type: application/pdf`, `Content-Disposition: inline`, `Cache-Control: private, no-store` y `X-Content-Type-Options: nosniff` |
+| La página | `/[idioma]/portal` es dinámica (lee la sesión) y manda `Referrer-Policy: same-origin` y `noindex`: el link de una invitación lleva su token en la dirección y no sale hacia otros sitios. El resto del sitio sigue estático |
+| Base | Las tablas del portal tienen RLS activada y sin políticas, como todas |
+
+### Tests del portal
+
+`npm run test` y `npm run test:e2e` cubren el portal sin salir a internet: el e2e arranca el servidor OAuth falso (puerto 3110) y el proveedor de prueba habla con él, nunca con Discord ni con Google. Los e2e del portal están en `tests/e2e/portal-*.spec.ts` (ingreso, invitaciones, entregas del panel y la página del alumno). `tests/unit/readme-portal-guide.test.ts` mantiene esta guía igual al código: las variables, las direcciones de vuelta, la migración y el comando del secreto.
+
 ## Deploy (Vercel)
 
 La web se despliega en Vercel como un proyecto Next.js, sin configuración especial.
@@ -369,6 +487,8 @@ Variables de entorno (Project Settings → Environment Variables):
 | Variable | Qué hace |
 | --- | --- |
 | `NEXT_PUBLIC_SITE_URL` | Origen público del sitio, sin barra final (por ejemplo `https://tallami.com`). Define canonical, hreflang, Open Graph, `sitemap.xml` y `robots.txt`. Se lee en el build: si la cambiás, volvé a desplegar. También es la dirección a la que quedan atadas las llaves de acceso del panel: si cambia, dejan de servir (ver "La dirección de la web"). |
+
+Las variables del portal del alumno (`PORTAL_SESSION_SECRET`, `DISCORD_*` y `GOOGLE_*`) se cargan como dice "Portal del alumno" → "Dejarlo listo". Las direcciones de vuelta de Discord y Google salen de `NEXT_PUBLIC_SITE_URL`.
 
 Para el panel en producción `NEXT_PUBLIC_SITE_URL` es obligatoria (ver "Ponerlo en línea", paso 5). Si no está definida (o está vacía), el build usa `https://${VERCEL_PROJECT_PRODUCTION_URL}`: el dominio de producción del proyecto (por ejemplo `tallami-coaching.vercel.app`), que Vercel define solo. Así los metadatos nunca apuntan a `localhost` en un deploy. Fuera de Vercel y sin ninguna de las dos, se usa `http://localhost:3000`.
 
