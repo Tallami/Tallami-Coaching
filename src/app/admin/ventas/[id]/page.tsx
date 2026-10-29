@@ -6,6 +6,8 @@ import { invoiceUndoNotice } from "@/admin/billing/saved-notice";
 import { todayInArgentina } from "@/admin/dates";
 import { ADMIN_ROUTES } from "@/admin/routes";
 import { saleToFormValues } from "@/admin/sales/form-values";
+import { DeliveriesCard } from "@/admin/sales/deliveries-card";
+import { toDeliveryRows } from "@/admin/sales/delivery-rows";
 import { priceListUsd } from "@/admin/sales/price-list";
 import { getSale } from "@/admin/sales/repository";
 import { SaleForm } from "@/admin/sales/sale-form";
@@ -16,6 +18,7 @@ import { Notice } from "@/admin/ui/notice";
 import { PageHeader } from "@/admin/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { getDb } from "@/db/client";
+import { listDeliveriesForSale } from "@/portal/deliveries";
 import { PanelShell } from "@/app/admin/panel-shell";
 import { markInvoicePendingAction, updateSaleAction } from "../actions";
 
@@ -26,7 +29,8 @@ export default async function EditSalePage(props: PageProps<"/admin/ventas/[id]"
   const { id } = await props.params;
   // El aviso de después de volver la factura a pendiente viene de la dirección: lo que no se reconoce no muestra nada.
   const notice = invoiceUndoNotice(await props.searchParams);
-  const sale = await getSale(await getDb(), id);
+  const db = await getDb();
+  const sale = await getSale(db, id);
 
   if (!sale) {
     return (
@@ -45,6 +49,8 @@ export default async function EditSalePage(props: PageProps<"/admin/ventas/[id]"
     );
   }
 
+  const deliveryRows = toDeliveryRows(sale.id, await listDeliveriesForSale(db, sale.id));
+
   return (
     <PanelShell active="sales">
       <PageHeader
@@ -62,6 +68,7 @@ export default async function EditSalePage(props: PageProps<"/admin/ventas/[id]"
         undoAction={markInvoicePendingAction.bind(null, sale.id)}
         today={todayInArgentina()}
       />
+      <DeliveriesCard saleId={sale.id} deliveries={deliveryRows} />
       <SaleForm
         mode="edit"
         draftKey={DRAFT_KEYS.sale(sale.id)}

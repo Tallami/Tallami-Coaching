@@ -3,6 +3,7 @@ import { describe, expect, test } from "vitest";
 import nextConfig from "../../next.config";
 import { TWEET_SNAPSHOTS } from "@/content/tweet-snapshots";
 import { toTweetCard } from "@/lib/tweets";
+import { DELIVERY_PDF_MAX_BYTES } from "@/portal/policy";
 
 // El optimizador de imágenes de Next rechaza con 400 cualquier `url` que no
 // coincida con `images.remotePatterns`. Se prueba con el mismo comparador que
@@ -43,6 +44,30 @@ function isAllowed(url: string): boolean {
 describe("next.config serverExternalPackages", () => {
   test("keeps PGlite out of the server bundle, where its wasm files cannot load", () => {
     expect(nextConfig.serverExternalPackages).toContain("@electric-sql/pglite");
+  });
+});
+
+/** "5mb" → bytes (la forma que usa Next para los límites de tamaño; también acepta un número de bytes). */
+function sizeLimitBytes(limit: number | string | undefined): number {
+  if (typeof limit === "number") return limit;
+  const match = /^(\d+(?:\.\d+)?)\s*(b|kb|mb)$/i.exec(limit ?? "");
+  if (!match) throw new Error(`Límite de tamaño ilegible: ${String(limit)}`);
+  const unit = { b: 1, kb: 1024, mb: 1024 * 1024 }[match[2].toLowerCase() as "b" | "kb" | "mb"];
+  return Number(match[1]) * unit;
+}
+
+describe("next.config experimental.serverActions.bodySizeLimit", () => {
+  // Next corta con 413 el cuerpo de una Server Action que pase de 1 MB si no se dice otra cosa, y
+  // el PDF de una entrega pesa hasta 4 MB (más lo que suman los otros campos del formulario).
+  const limit = () => sizeLimitBytes(nextConfig.experimental?.serverActions?.bodySizeLimit);
+  const FORM_OVERHEAD_BYTES = 100 * 1024;
+
+  test("lets a PDF of the largest allowed size, with the rest of the form, reach the action", () => {
+    expect(limit()).toBeGreaterThanOrEqual(DELIVERY_PDF_MAX_BYTES + FORM_OVERHEAD_BYTES);
+  });
+
+  test("stays under the 10 MB that the proxy buffers: past it the body would arrive cut", () => {
+    expect(limit()).toBeLessThanOrEqual(10 * 1024 * 1024);
   });
 });
 

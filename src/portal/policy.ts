@@ -29,3 +29,5 @@ export const DELIVERY_KINDS = ["youtube", "pdf", "link"] as const;
 export const DELIVERY_PDF_MAX_BYTES = 4 * 1024 * 1024;
 /** El título de una entrega tiene de 1 a 120 caracteres. */
 export const DELIVERY_TITLE_MAX_LENGTH = 120;
+/** Un link de entrega tiene como mucho 2048 caracteres (lo que aguantan sin problema los navegadores y los servidores). */
+export const DELIVERY_URL_MAX_LENGTH = 2048;

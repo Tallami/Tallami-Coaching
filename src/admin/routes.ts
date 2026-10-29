@@ -22,6 +22,11 @@ export function saleHref(id: string): string {
   return `${ADMIN_ROUTES.sales}/${id}`;
 }
 
+/** El PDF de la entrega `deliveryId` de la venta `saleId` (solo con sesión del panel). */
+export function saleDeliveryFileHref(saleId: string, deliveryId: string): string {
+  return `${saleHref(saleId)}/entregas/${deliveryId}`;
+}
+
 /** La ficha del alumno `id`. */
 export function studentHref(id: string): string {
   return `${ADMIN_ROUTES.students}/${id}`;

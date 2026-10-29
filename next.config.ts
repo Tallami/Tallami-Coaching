@@ -42,6 +42,12 @@ const nextConfig: NextConfig = {
     // Habilita `src/app/global-not-found.tsx`: el 404 localizado que se
     // renderiza en el servidor (ver el comentario de ese archivo).
     globalNotFound: true,
+    // Las Server Actions aceptan 1 MB de cuerpo por defecto y un PDF de entrega pesa
+    // hasta 4 MB (`DELIVERY_PDF_MAX_BYTES`, más el resto del formulario). Se sube a 5 MB:
+    // apenas por encima, porque el techo de verdad lo pone Vercel, que corta con 413 los
+    // pedidos de más de 4,5 MB a una función. Lo que pase de 4 MB y llegue hasta acá lo
+    // rechaza la acción (`too-large`). En Next 16 la opción vive bajo `experimental`.
+    serverActions: { bodySizeLimit: "5mb" },
   },
   turbopack: {
     rules: {
