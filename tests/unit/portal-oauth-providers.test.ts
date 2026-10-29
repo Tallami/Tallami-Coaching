@@ -100,13 +100,19 @@ describe("getProviderClient", () => {
     });
   });
 
-  test("there is no test provider in Vercel production, nor with an issuer that is not an http address", () => {
-    vi.spyOn(console, "warn").mockImplementation(() => {});
-    vi.stubEnv("PORTAL_OAUTH_TEST_ISSUER", "http://localhost:3199");
-    vi.stubEnv("VERCEL_ENV", "production");
-    expect(getProviderClient("test")).toBeNull();
+  test.each(["production", "preview", "development"])(
+    "there is no test provider on Vercel, whatever the environment (%s)",
+    (vercelEnv) => {
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      vi.stubEnv("PORTAL_OAUTH_TEST_ISSUER", "http://localhost:3199");
+      vi.stubEnv("VERCEL", "1");
+      vi.stubEnv("VERCEL_ENV", vercelEnv);
 
-    vi.stubEnv("VERCEL_ENV", "");
+      expect(getProviderClient("test")).toBeNull();
+    },
+  );
+
+  test("there is no test provider with an issuer that is not an http address", () => {
     for (const issuer of ["no es una dirección", "ftp://localhost:3199", "javascript:alert(1)"]) {
       vi.stubEnv("PORTAL_OAUTH_TEST_ISSUER", issuer);
       expect(getProviderClient("test"), issuer).toBeNull();

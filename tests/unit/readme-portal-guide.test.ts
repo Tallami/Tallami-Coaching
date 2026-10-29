@@ -177,6 +177,8 @@ describe("the portal guide of the README", () => {
     expect(local).toContain("tests/helpers/mock-oauth-server.mjs");
     expect(local).toMatch(/solo para desarrollo/i);
     expect(local).toMatch(/nunca en Vercel/i);
+    // Se ignora en todo Vercel (`VERCEL`), no solo en producción: también en las vistas previas.
+    expect(local).toMatch(/en cualquier entorno \(producción y vista previa\)/);
     expect(local).toContain(es.Portal.providers.test.button);
   });
 

@@ -18,14 +18,18 @@
 //   reutiliza; el email puede cambiar), `name`, `email` y `email_verified`.
 // - El proveedor de prueba es el servidor OAuth falso de los tests
 //   (`tests/helpers/mock-oauth-server.mjs`) en `PORTAL_OAUTH_TEST_ISSUER`; nunca en
-//   producción de Vercel (`config.ts`). Habla como uno de verdad.
+//   Vercel (`testClient`). Habla como uno de verdad.
+//
+// `getProviderClient` es la única que decide si un proveedor está habilitado: la lista de
+// `enabledProviders` (`config.ts`) sale de ella, así la lista de botones y la ruta que
+// empieza el ingreso no pueden discrepar.
 //
 // De un perfil se guarda solo el id, el nombre para mostrar y el email si el proveedor
 // dice que está verificado: nada de avatar ni de tokens.
 
 import { SITE_URL } from "@/lib/site-url";
 import type { ProviderIdentity } from "../accounts";
-import { enabledProviders, type PortalProvider } from "../config";
+import type { PortalProvider } from "../config";
 
 /** Las direcciones de OAuth de un proveedor y lo que se le pide. */
 export interface OAuthEndpoints {
@@ -84,7 +88,28 @@ function testIssuer(): string | null {
   return protocol === "http:" || protocol === "https:" ? issuer : null;
 }
 
+/** ¿Ya se avisó en este proceso que el proveedor de prueba se ignora? (Se pregunta en cada pedido.) */
+let warnedTestProviderIgnored = false;
+
+/**
+ * El cliente del servidor OAuth falso, o `null` si `PORTAL_OAUTH_TEST_ISSUER` falta o no es
+ * una dirección http(s). En Vercel (`VERCEL`, en cualquier entorno: producción, vista previa o
+ * `vercel dev`) se ignora con un aviso en el log, una vez por proceso, igual que
+ * `ADMIN_WEBAUTHN_ORIGIN` y `EXCHANGE_RATE_SOURCE`: una variable de prueba olvidada ahí dejaría
+ * entrar con un proveedor falso. Se mira `VERCEL` y no `NODE_ENV` porque los e2e corren un
+ * build de producción en la máquina.
+ */
 function testClient(): ProviderClient | null {
+  if (!readEnv("PORTAL_OAUTH_TEST_ISSUER")) return null;
+  if (process.env.VERCEL) {
+    if (!warnedTestProviderIgnored) {
+      warnedTestProviderIgnored = true;
+      console.warn(
+        "PORTAL_OAUTH_TEST_ISSUER se ignora en Vercel (VERCEL está definida): no hay proveedor de prueba. Sacá la variable.",
+      );
+    }
+    return null;
+  }
   const issuer = testIssuer();
   if (!issuer) return null;
   return {
@@ -108,10 +133,9 @@ function realClient(provider: "discord" | "google", endpoints: OAuthEndpoints): 
 /**
  * El proveedor listo para usar, o `null` si no está habilitado ahora (sin su id y su
  * secreto, o el de prueba sin `PORTAL_OAUTH_TEST_ISSUER`, con una dirección que no
- * sirve, o en producción de Vercel).
+ * sirve, o en Vercel). Es la fuente de verdad de qué proveedores están habilitados.
  */
 export function getProviderClient(provider: PortalProvider): ProviderClient | null {
-  if (!enabledProviders().includes(provider)) return null;
   switch (provider) {
     case "discord":
       return realClient("discord", DISCORD_OAUTH);

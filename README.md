@@ -458,7 +458,7 @@ La política de privacidad del sitio todavía no está escrita: queda para la in
 
 ### Probarlo en tu compu
 
-Solo para desarrollo: sin Discord ni Google, con un servidor OAuth falso que corre en tu compu (el mismo que usan los tests). La variable `PORTAL_OAUTH_TEST_ISSUER` activa un proveedor de prueba que deja entrar a quien elija un nombre: **no la cargues nunca en Vercel**. En producción de Vercel se ignora y el log avisa, pero igual no la pongas en ningún entorno de Vercel.
+Solo para desarrollo: sin Discord ni Google, con un servidor OAuth falso que corre en tu compu (el mismo que usan los tests). La variable `PORTAL_OAUTH_TEST_ISSUER` activa un proveedor de prueba que deja entrar a quien elija un nombre: **no la cargues nunca en Vercel**. En Vercel se ignora en cualquier entorno (producción y vista previa) y el log avisa, pero igual no la pongas en ninguno. Por la misma razón no anda con `vercel dev`: usá `npm run dev`.
 
 1. En `.env.local` (el archivo de "Dejarlo listo", en "Panel de admin") sumá `PORTAL_SESSION_SECRET=` con un secreto generado con el comando de arriba, y `PORTAL_OAUTH_TEST_ISSUER=http://localhost:3110`.
 2. En una terminal aparte corré `node tests/helpers/mock-oauth-server.mjs` (el puerto 3110 sale de ahí; se cambia con `MOCK_OAUTH_PORT`). Se queda corriendo; Ctrl+C lo cierra.

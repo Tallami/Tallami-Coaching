@@ -8,13 +8,15 @@
 // - Un proveedor (Discord, Google) está disponible si tiene su id de cliente y su
 //   secreto. Sin los de un proveedor, ese botón no aparece.
 // - `PORTAL_OAUTH_TEST_ISSUER` habilita el proveedor `test`, un servidor OAuth falso
-//   local para los tests y el desarrollo. En producción de Vercel se ignora con un
-//   aviso en el log (una vez por proceso), igual que `ADMIN_WEBAUTHN_ORIGIN` y
-//   `EXCHANGE_RATE_SOURCE`: una variable de prueba olvidada ahí dejaría entrar con
-//   un proveedor falso. Se mira `VERCEL_ENV` y no `NODE_ENV` porque los e2e corren
-//   un build de producción en la máquina.
+//   local para los tests y el desarrollo, si es una dirección http(s). En Vercel (la
+//   variable `VERCEL`, en cualquier entorno) se ignora con un aviso en el log.
+//
+// Qué proveedores están habilitados lo decide `getProviderClient`
+// (`oauth/providers.ts`): `enabledProviders` solo junta los que tienen cliente, así
+// los botones de la página y la ruta que empieza el ingreso nunca discrepan.
 
 import { isDbConfigured } from "../db/config";
+import { getProviderClient } from "./oauth/providers";
 import { PORTAL_PROVIDERS } from "./policy";
 
 /** Largo mínimo del secreto del portal. */
@@ -37,36 +39,9 @@ export function getPortalSecret(): Uint8Array | null {
   return new TextEncoder().encode(value);
 }
 
-/** ¿Están el id de cliente y el secreto de un proveedor real? */
-function hasClientCredentials(idName: string, secretName: string): boolean {
-  return readEnv(idName) !== undefined && readEnv(secretName) !== undefined;
-}
-
-/** ¿Ya se avisó en este proceso que el proveedor de prueba se ignora? (Se pregunta en cada pedido.) */
-let warnedTestProviderIgnored = false;
-
-/** ¿Corresponde usar el proveedor de prueba? (Está pedido y no estamos en producción de Vercel.) */
-function isTestProviderEnabled(): boolean {
-  if (!readEnv("PORTAL_OAUTH_TEST_ISSUER")) return false;
-  if (process.env.VERCEL_ENV === "production") {
-    if (!warnedTestProviderIgnored) {
-      warnedTestProviderIgnored = true;
-      console.warn(
-        "PORTAL_OAUTH_TEST_ISSUER se ignora en producción (VERCEL_ENV=production): no hay proveedor de prueba. Sacá la variable.",
-      );
-    }
-    return false;
-  }
-  return true;
-}
-
 /** Los proveedores con los que se puede ingresar ahora, en el orden en que se muestran. */
 export function enabledProviders(): PortalProvider[] {
-  const enabled: PortalProvider[] = [];
-  if (hasClientCredentials("DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET")) enabled.push("discord");
-  if (hasClientCredentials("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET")) enabled.push("google");
-  if (isTestProviderEnabled()) enabled.push("test");
-  return enabled;
+  return PORTAL_PROVIDERS.filter((provider) => getProviderClient(provider) !== null);
 }
 
 /** ¿Puede abrir el portal? Hace falta el secreto, al menos un proveedor y una base. */
