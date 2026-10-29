@@ -16,7 +16,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { and, eq, gt, isNull, lt, or } from "drizzle-orm";
 import type { Db } from "../db/client";
-import { portalInvites, portalSessions } from "../db/schema";
+import { portalAccounts, portalInvites, portalSessions } from "../db/schema";
 import { PORTAL_RECORD_RETENTION_MS, PORTAL_SESSION_MS } from "./policy";
 
 /** La cookie de sesión del alumno. La del panel (`tallami_admin`) es otra y nunca se mezclan. */
@@ -109,8 +109,13 @@ export async function revokePortalSession(
 
 /**
  * Borra lo que ya no sirve desde hace más de un día: las sesiones vencidas o cerradas
- * y las invitaciones usadas o vencidas. Las cuentas no se tocan. Se corre de pasada
- * en cada ingreso (`src/portal/oauth/endpoints.ts`); quien llama decide qué hacer si falla.
+ * y las invitaciones usadas o vencidas. También las cuentas sin vincular a ningún alumno
+ * (quien entró sin invitación, o una cuenta desvinculada) que no entran desde hace más de
+ * 31 días: los 30 de la sesión más larga y el día que se guarda lo que ya no sirve. A esa
+ * altura no puede quedar abierta ninguna sesión de la cuenta; las que queden se van con
+ * ella (`on delete cascade`) y las invitaciones que usó quedan sin cuenta (`set null`).
+ * Una cuenta vinculada no se borra nunca de acá: eso lo decide el panel. Se corre de
+ * pasada en cada ingreso (`src/portal/oauth/endpoints.ts`); quien llama decide qué hacer si falla.
  */
 export async function purgePortalRecords(db: Db, now: Date = new Date()): Promise<void> {
   const cutoff = new Date(now.getTime() - PORTAL_RECORD_RETENTION_MS);
@@ -120,6 +125,10 @@ export async function purgePortalRecords(db: Db, now: Date = new Date()): Promis
   await db
     .delete(portalInvites)
     .where(or(lt(portalInvites.expiresAt, cutoff), lt(portalInvites.usedAt, cutoff)));
+  const staleLogin = new Date(now.getTime() - (PORTAL_SESSION_MS + PORTAL_RECORD_RETENTION_MS));
+  await db
+    .delete(portalAccounts)
+    .where(and(isNull(portalAccounts.customerId), lt(portalAccounts.lastLoginAt, staleLogin)));
 }
 
 /** Cierra todas las sesiones abiertas de la cuenta (al desvincularla o al borrarla del panel). */

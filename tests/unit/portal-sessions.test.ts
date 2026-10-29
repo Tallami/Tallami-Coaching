@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { beforeAll, beforeEach, describe, expect, test } from "vitest";
 import type { Db } from "@/db/client";
 import { portalAccounts, portalInvites, portalSessions } from "@/db/schema";
-import { PORTAL_SESSION_MS } from "@/portal/policy";
+import { PORTAL_RECORD_RETENTION_MS, PORTAL_SESSION_MS } from "@/portal/policy";
 import {
   PORTAL_COOKIE,
   createPortalSession,
@@ -239,6 +239,8 @@ describe("purgePortalRecords", () => {
 
   beforeEach(async () => {
     await db.delete(portalInvites);
+    // La cuenta de estos tests entró hace un momento (en la hora de los tests, no en la de la máquina).
+    await db.update(portalAccounts).set({ lastLoginAt: NOW }).where(eq(portalAccounts.id, accountId));
   });
 
   test("deletes the sessions that expired or were closed more than a day ago, and keeps the rest", async () => {
@@ -284,12 +286,88 @@ describe("purgePortalRecords", () => {
     expect(remaining).not.toContain(expiredLongAgo);
   });
 
-  test("never touches the accounts", async () => {
-    await insertSession({ createdAt: START, expiresAt: after(PORTAL_SESSION_MS) });
+  describe("the accounts", () => {
+    /** Con una sesión abierta de las que su último ingreso pudo abrir, y una invitación que usó. */
+    async function accountWithRecords(lastLoginAt: Date, customerId: string | null) {
+      const id = await insertTestAccount(db, { customerId, lastLoginAt });
+      await db.insert(portalSessions).values({
+        id: sha256Hex(randomBytes(32).toString("base64url")),
+        accountId: id,
+        createdAt: lastLoginAt,
+        expiresAt: after(PORTAL_SESSION_MS, lastLoginAt),
+      });
+      return id;
+    }
 
-    await purgePortalRecords(db, after(5 * PORTAL_SESSION_MS));
+    async function accountIds(): Promise<string[]> {
+      return (await db.select({ id: portalAccounts.id }).from(portalAccounts)).map(({ id }) => id);
+    }
 
-    expect(await db.select().from(portalAccounts)).toHaveLength(1);
+    /** El límite: la sesión más larga (30 días) más el día que se guarda lo que ya no sirve. */
+    const WINDOW_MS = PORTAL_SESSION_MS + PORTAL_RECORD_RETENTION_MS;
+
+    test("the window is 31 days: 30 of the session plus the day that dead records are kept", () => {
+      expect(WINDOW_MS).toBe(31 * DAY_MS);
+    });
+
+    test("deletes an account that is not linked and last signed in more than 31 days ago, with its sessions", async () => {
+      const stale = await accountWithRecords(after(-WINDOW_MS - 1, NOW), null);
+
+      await purgePortalRecords(db, NOW);
+
+      expect(await accountIds()).toEqual([accountId]);
+      expect(await db.select().from(portalSessions).where(eq(portalSessions.accountId, stale))).toEqual([]);
+    });
+
+    test("keeps an account that is not linked while its last sign-in is inside the window", async () => {
+      const edge = await accountWithRecords(after(-WINDOW_MS, NOW), null);
+      const recent = await accountWithRecords(after(-WINDOW_MS + MINUTE_MS, NOW), null);
+
+      await purgePortalRecords(db, NOW);
+
+      expect((await accountIds()).sort()).toEqual([accountId, edge, recent].sort());
+    });
+
+    test("keeps a linked account however long ago it signed in: deleting it is the panel's decision", async () => {
+      const customerId = await insertTestCustomer(db);
+      const linked = await accountWithRecords(after(-400 * DAY_MS, NOW), customerId);
+
+      await purgePortalRecords(db, NOW);
+
+      expect(await accountIds()).toContain(linked);
+    });
+
+    test("keeps the account of a student who unlinked and signed in again today, whatever its age", async () => {
+      const unlinked = await insertTestAccount(db, { customerId: null, lastLoginAt: NOW });
+      await db.update(portalAccounts).set({ createdAt: after(-400 * DAY_MS, NOW) }).where(eq(portalAccounts.id, unlinked));
+
+      await purgePortalRecords(db, NOW);
+
+      expect(await accountIds()).toContain(unlinked);
+    });
+
+    test("an invite used by a deleted account stays, without the account it points to", async () => {
+      const customerId = await insertTestCustomer(db);
+      const stale = await accountWithRecords(after(-WINDOW_MS - 1, NOW), null);
+      const inviteId = await insertInvite(customerId, { expiresAt: after(5 * DAY_MS, NOW) });
+      await db.update(portalInvites).set({ usedByAccountId: stale }).where(eq(portalInvites.id, inviteId));
+
+      await purgePortalRecords(db, NOW);
+
+      expect(await inviteIds()).toEqual([inviteId]);
+      const [invite] = await db.select().from(portalInvites).where(eq(portalInvites.id, inviteId));
+      expect(invite.usedByAccountId).toBeNull();
+    });
+
+    test("an account that was just linked is not caught by the cleanup that was about to delete it", async () => {
+      const customerId = await insertTestCustomer(db);
+      const account = await accountWithRecords(after(-WINDOW_MS - 1, NOW), null);
+      await db.update(portalAccounts).set({ customerId }).where(eq(portalAccounts.id, account));
+
+      await purgePortalRecords(db, NOW);
+
+      expect(await accountIds()).toContain(account);
+    });
   });
 
   test("uses the current hour when none is given", async () => {

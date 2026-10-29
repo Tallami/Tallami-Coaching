@@ -4,7 +4,12 @@ import { describe, expect, test } from "vitest";
 import es from "../../messages/es.json";
 import { MIN_PORTAL_SECRET_LENGTH } from "@/portal/config";
 import { redirectUriFor } from "@/portal/oauth/providers";
-import { DELIVERY_PDF_MAX_BYTES, PORTAL_INVITE_MS } from "@/portal/policy";
+import {
+  DELIVERY_PDF_MAX_BYTES,
+  PORTAL_INVITE_MS,
+  PORTAL_RECORD_RETENTION_MS,
+  PORTAL_SESSION_MS,
+} from "@/portal/policy";
 
 // La guía "Portal del alumno" del README es lo único que Tallami tiene para dejar el portal
 // andando: las variables que carga en Vercel, las direcciones que registra en Discord y en
@@ -146,6 +151,23 @@ describe("the portal guide of the README", () => {
     for (const item of ["proveedor", "nombre para mostrar", "email", "verificado"]) expect(data, item).toContain(item);
     expect(data).toMatch(/política de privacidad/);
     expect(data).toMatch(/investigación legal/);
+  });
+
+  test("says how long an account that is not linked stays, and what the panel deletes", () => {
+    const data = subsectionOf("Qué se guarda de cada alumno");
+    const days = (PORTAL_SESSION_MS + PORTAL_RECORD_RETENTION_MS) / (24 * 60 * 60 * 1000);
+
+    expect(days).toBe(31);
+    expect(data).toMatch(new RegExp(`cuenta[^.]*sin vincular[^.]*${days} días[^.]*último ingreso`, "i"));
+    expect(data).toContain("Borrar cuenta del portal");
+  });
+
+  test("limits `nothing outside this list` to the database: the hosting provider keeps its own request logs", () => {
+    const data = subsectionOf("Qué se guarda de cada alumno");
+
+    expect(data).toMatch(/no guarda nada en la base de datos fuera de esta lista/);
+    expect(data).toMatch(/hosting[^.]*registros/);
+    expect(data).not.toMatch(/no guarda nada fuera de esta lista/);
   });
 
   test("teaches the development sign-in with the mock server, and says it never goes to Vercel", () => {

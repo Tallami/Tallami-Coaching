@@ -142,15 +142,15 @@ export function handleSignInStart(
 }
 
 /**
- * Borra las sesiones y las invitaciones viejas. Es una limpieza de pasada: si falla, el
- * alumno igual entra. Se anota solo el nombre del error (el mensaje podría traer la
- * conexión a la base).
+ * Borra las sesiones, las invitaciones y las cuentas sin vincular viejas. Es una limpieza
+ * de pasada: si falla, el alumno igual entra. Se anota solo el nombre del error (el mensaje
+ * podría traer la conexión a la base).
  */
 async function purgeQuietly(db: Db, now: Date): Promise<void> {
   try {
     await purgePortalRecords(db, now);
   } catch (error) {
-    console.error(`Portal: no se pudieron borrar las sesiones y las invitaciones viejas. ${errorName(error)}`);
+    console.error(`Portal: no se pudieron borrar los registros viejos. ${errorName(error)}`);
   }
 }
 

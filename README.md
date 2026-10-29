@@ -416,7 +416,7 @@ Una sola vez. Cada paso dice dónde hacerlo; los nombres de los menús de Discor
 
 **Desvincular o borrar la cuenta.** Con la cuenta vinculada, la tarjeta muestra «Vinculado» con el proveedor y el nombre. Los dos botones piden confirmar:
 
-- **Desvincular** cierra las sesiones de esa cuenta y el alumno deja de ver sus compras. La cuenta sigue existiendo y podés invitarlo de nuevo. Un alumno que ya tiene cuenta no se puede invitar otra vez hasta desvincularla: para pasar de Discord a Google, desvinculá y generá otra invitación.
+- **Desvincular** cierra las sesiones de esa cuenta y el alumno deja de ver sus compras. La cuenta sigue existiendo y podés invitarlo de nuevo; si no la volvés a vincular, se borra sola unos 31 días después de su último ingreso (ver «Qué se guarda de cada alumno»). Un alumno que ya tiene cuenta no se puede invitar otra vez hasta desvincularla: para pasar de Discord a Google, desvinculá y generá otra invitación.
 - **Borrar cuenta del portal** borra la cuenta y sus sesiones. Las ventas y las entregas siguen en el panel.
 
 ### Cargar entregas
@@ -446,9 +446,15 @@ Al entrar con Discord o Google, la base guarda solo esto:
 - cuándo se creó la cuenta, cuándo entró por última vez y a qué alumno del panel está vinculada;
 - una huella de su sesión (no la sesión misma): dura 30 días.
 
-No se guarda el avatar, ni la contraseña (no hay), ni la IP, ni los permisos que da el proveedor: se descartan en cuanto se lee el perfil. Muchos alumnos son menores de edad, por eso se guarda lo mínimo. Las sesiones y las invitaciones que ya no sirven se borran al día siguiente, de pasada, cuando alguien entra. Al borrar la cuenta desde el panel se va todo lo de arriba.
+En la base no se guarda el avatar, ni la contraseña (no hay), ni la IP, ni los permisos que da el proveedor: se descartan en cuanto se lee el perfil. Muchos alumnos son menores de edad, por eso se guarda lo mínimo.
 
-La política de privacidad del sitio todavía no está escrita: queda para la investigación legal pendiente. Hasta entonces, el portal no guarda nada fuera de esta lista.
+Cuánto tiempo queda cada cosa. La limpieza corre de pasada, cuando alguien entra al portal:
+
+- Las sesiones y las invitaciones que ya no sirven se borran al día siguiente.
+- Una cuenta sin vincular a ningún alumno (alguien que entró sin invitación, o una cuenta que desvinculaste) se borra sola, con sus sesiones, unos 31 días después de su último ingreso: los 30 de la sesión más larga y el día que se guarda lo que ya no sirve.
+- Una cuenta vinculada se queda hasta que la borres vos: en la ficha del alumno, «Borrar cuenta del portal» borra la cuenta y se va todo lo de arriba.
+
+La política de privacidad del sitio todavía no está escrita: queda para la investigación legal pendiente. Hasta entonces, el portal no guarda nada en la base de datos fuera de esta lista. Eso no incluye al servicio de hosting (Vercel), que lleva por su cuenta sus propios registros de los pedidos que recibe el sitio: no están en la base ni los maneja el código.
 
 ### Probarlo en tu compu
 
