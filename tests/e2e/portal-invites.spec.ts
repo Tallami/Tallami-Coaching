@@ -230,6 +230,13 @@ test.describe("the Portal del alumno card", () => {
     await loginAsAdmin(page);
   });
 
+  test("shows no warning about the configuration when the portal is configured", async ({ page }) => {
+    await createStudent(page, uniqueName("Alumno configurado"));
+
+    await expect(portalCard(page)).toContainText("Sin vincular");
+    await expect(portalCard(page)).not.toContainText("todavía no está configurado");
+  });
+
   test("has no accessibility problems and no sideways scroll on a phone, with the link on screen and with the question open", async ({
     page,
     browser,

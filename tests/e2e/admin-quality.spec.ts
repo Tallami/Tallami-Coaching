@@ -127,6 +127,21 @@ test.describe("panel details with the demo data", () => {
     await loginAsAdmin(page);
   });
 
+  test("the Portal del alumno card of a student without an account warns that this server has no portal configured", async ({ page }) => {
+    // Este servidor no tiene las variables del portal (el principal sí): el link que se genere no iría a funcionar.
+    const target = PANEL_PAGES.find((candidate) => candidate.name === "Ficha de un alumno");
+    await openPanelPage(page, requireDemo(target, "la ficha de un alumno"), DESKTOP_WIDTH);
+
+    const card = page.getByRole("region", { name: "Portal del alumno" });
+    await expect(card).toContainText("Sin vincular");
+    await expect(
+      card.getByRole("status").filter({
+        hasText: "El portal todavía no está configurado: el link no va a funcionar hasta que cargues las variables.",
+      }),
+    ).toBeVisible();
+    await expect(card.getByRole("button", { name: "Invitar al portal" })).toBeVisible();
+  });
+
   test("the labels of the charts are at least 11px on the phone", async ({ page }) => {
     await openPanelPage(page, PANEL_PAGES[0], PHONE_WIDTH);
 

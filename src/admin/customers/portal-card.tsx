@@ -31,6 +31,8 @@ interface PortalCardProps {
   customerId: string;
   /** La cuenta vinculada a este alumno, o `null` si todavía no tiene. */
   account: PortalCardAccount | null;
+  /** ¿Está el portal listo para abrir (`isPortalConfigured`)? Si no, un link de invitación no va a funcionar. */
+  portalConfigured: boolean;
 }
 
 interface ShownInvite {
@@ -54,6 +56,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** Cuánto dura la invitación, en días enteros, para decirlo en pantalla: sale de la política, no de una copia del número. */
 const INVITE_DAYS = Math.round(PORTAL_INVITE_MS / DAY_MS);
 
+const NOT_CONFIGURED_MESSAGE =
+  "El portal todavía no está configurado: el link no va a funcionar hasta que cargues las variables.";
 const UNAVAILABLE_MESSAGE = "No pudimos completarlo. Probá de nuevo en unos minutos.";
 const NOT_FOUND_MESSAGE = "No encontramos a ese alumno. Puede que lo hayan borrado: volvé a la lista de alumnos.";
 const ALREADY_LINKED_MESSAGE =
@@ -225,9 +229,11 @@ const INVITE_ERRORS = {
  * La tarjeta "Portal del alumno" de la ficha: si el alumno ya tiene una cuenta vinculada (con
  * qué proveedor y qué nombre) y los botones para invitarlo, desvincularla o borrarla. El
  * link de la invitación se ve una sola vez, acá, en el idioma que se elija: en la base queda
- * solo su hash. Desvincular y borrar piden confirmación, con la opción segura enfocada.
+ * solo su hash. Desvincular y borrar piden confirmación, con la opción segura enfocada. Con el portal
+ * sin configurar (`portalConfigured` falso) la invitación se genera igual, pero la tarjeta avisa que
+ * el link no va a funcionar todavía.
  */
-export function PortalCard({ customerId, account }: PortalCardProps) {
+export function PortalCard({ customerId, account, portalConfigured }: PortalCardProps) {
   const router = useRouter();
   const hydrated = useHydrated();
   const [busy, setBusy] = useState(false);
@@ -323,6 +329,11 @@ export function PortalCard({ customerId, account }: PortalCardProps) {
             Generá un link de un solo uso y mandáselo por donde hables con él. Al abrirlo entra con Discord o Google y
             queda vinculado. Vence a los {INVITE_DAYS} días; si generás otro, el anterior deja de valer.
           </p>
+          {portalConfigured ? null : (
+            <Notice tone="warn" className="mt-3">
+              {NOT_CONFIGURED_MESSAGE}
+            </Notice>
+          )}
           <Field
             id="portal-invite-language"
             label="Idioma del link"

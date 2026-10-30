@@ -16,6 +16,7 @@ import { firstValue } from "@/admin/ui/search-params";
 import { Button } from "@/components/ui/button";
 import { getDb } from "@/db/client";
 import { accountForCustomer } from "@/portal/accounts";
+import { isPortalConfigured } from "@/portal/config";
 import { PanelShell } from "@/app/admin/panel-shell";
 import { updateStudentAction } from "../actions";
 
@@ -81,6 +82,7 @@ export default async function StudentPage(props: PageProps<"/admin/alumnos/[id]"
       <PortalCard
         customerId={student.id}
         account={portalAccount && { provider: portalAccount.provider, displayName: portalAccount.displayName }}
+        portalConfigured={isPortalConfigured()}
       />
       <div className="grid grid-cols-1 items-start gap-x-8 gap-y-8 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <StudentHistory sales={student.sales} today={todayInArgentina(now)} />
