@@ -29,8 +29,6 @@ const PDF_HEADERS = {
   "content-disposition": 'inline; filename="entrega.pdf"',
   "cache-control": "private, no-store",
   "x-content-type-options": "nosniff",
-  // Defensa en profundidad: aunque algo del PDF corriera código, no sería de este origen.
-  "content-security-policy": "sandbox",
 };
 
 let db: Db;

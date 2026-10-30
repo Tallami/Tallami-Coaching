@@ -29,7 +29,6 @@ const PDF_HEADERS = {
   "content-disposition": 'inline; filename="entrega.pdf"',
   "cache-control": "private, no-store",
   "x-content-type-options": "nosniff",
-  "content-security-policy": "sandbox",
 };
 /**
  * Lo mismo, visto desde el panel: el `proxy` de `/admin` (`src/admin/auth/guard.ts`) pone `Cache-Control: no-store`

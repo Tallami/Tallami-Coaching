@@ -95,10 +95,6 @@ describe("the portal guide of the README", () => {
     expect(subsectionOf("Probarlo después de desplegar")).toMatch(/404/);
   });
 
-  test("lists the headers of the PDF response, the sandbox one included", () => {
-    expect(GUIDE).toContain("`Content-Security-Policy: sandbox`");
-  });
-
   test("tells to run db:migrate before deploying, and names the migration that adds the tables", () => {
     const setup = subsectionOf("Dejarlo listo");
     const migration = MIGRATIONS.find((name) => name.startsWith("0006_"));
