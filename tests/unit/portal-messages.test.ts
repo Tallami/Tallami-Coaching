@@ -122,12 +122,26 @@ describe("Portal messages", () => {
     expect(portalOf(es).get("notices.alreadyLinked")).toBe("Tu cuenta ya está vinculada.");
   });
 
-  test("the notice for a linked account that opens someone else's invitation says it is another account and to sign out, in every language", () => {
-    expect(portalOf(es).get("notices.inviteOtherAccount")).toBe("Entraste con otra cuenta. Salí para usar esta invitación.");
-    expect(portalOf(pt).get("notices.inviteOtherAccount")).toMatch(/outra conta/);
-    expect(portalOf(pt).get("notices.inviteOtherAccount")).toMatch(/Saia/);
-    expect(portalOf(en).get("notices.inviteOtherAccount")).toMatch(/another account/);
-    expect(portalOf(en).get("notices.inviteOtherAccount")).toMatch(/[Ss]ign out/);
+  test("the notice for a linked account that opens an invitation link says the account is already linked and what to do if the invitation is for another one, in every language", () => {
+    // No sabe de quién es la invitación (sin consultar la base): sirve tanto para la propia ya usada como para la de otra cuenta.
+    expect(portalOf(es).get("notices.inviteOtherAccount")).toBe(
+      "Tu cuenta ya está vinculada. Si esta invitación es para otra cuenta, salí y entrá con esa.",
+    );
+    expect(portalOf(pt).get("notices.inviteOtherAccount")).toBe(
+      "A sua conta já está vinculada. Se este convite é para outra conta, saia e entre com ela.",
+    );
+    expect(portalOf(en).get("notices.inviteOtherAccount")).toBe(
+      "Your account is already linked. If this invitation is for another account, sign out and sign in with that one.",
+    );
+  });
+
+  test("the notice for a linked account that opens an invitation link does not tell the student to sign out as if the invitation were someone else's", () => {
+    for (const [locale, messages] of [["es", es], ["pt", pt], ["en", en]] as const) {
+      const text = portalOf(messages).get("notices.inviteOtherAccount") ?? "";
+      // Empieza diciendo que la cuenta ya está vinculada; salir es solo si la invitación es de otra cuenta.
+      expect(text, locale).toMatch(/^(Tu cuenta ya está|A sua conta já está|Your account is already) /);
+      expect(text, locale).toMatch(/(Si|Se|If) /);
+    }
   });
 
   test("the empty state of a purchase says what happens", () => {

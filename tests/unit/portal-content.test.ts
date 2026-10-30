@@ -276,7 +276,7 @@ describe("PortalContent with a session", () => {
     expect(html).not.toContain("<article");
   });
 
-  test("a linked account that opens an invitation link is told it is signed in with another account, keeps its own purchases and has the token taken off the bar", async () => {
+  test("a linked account that opens an invitation link is told its account is already linked, keeps its own purchases and has the token taken off the bar", async () => {
     currentStudent.mockResolvedValue(ACCOUNT);
     purchasesOf.mockResolvedValue([]);
 
@@ -289,11 +289,11 @@ describe("PortalContent with a session", () => {
     expect(propsOf(tree, SignInView)).toBeUndefined();
   });
 
-  test("the notice about the other account is announced without interrupting, and tells to sign out", async () => {
+  test("the notice for a linked account with an invitation link is announced without interrupting, says the account is already linked and what to do if the invitation is for another", async () => {
     const html = renderToStaticMarkup(await PortalNotice({ notice: { key: "inviteOtherAccount", tone: "info" } }));
 
     expect(html).toContain('role="status"');
-    expect(html).toContain("Entraste con otra cuenta. Salí para usar esta invitación.");
+    expect(html).toContain("Tu cuenta ya está vinculada. Si esta invitación es para otra cuenta, salí y entrá con esa.");
     expect(es.Portal.account.signOut).toBe("Salir");
   });
 

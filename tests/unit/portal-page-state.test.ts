@@ -81,7 +81,7 @@ describe("portalNotice", () => {
     expect(notice({ inviteToken: TOKEN }, "signedOut")).toEqual({ key: "inviteToSignIn", tone: "info" });
   });
 
-  test("a linked account that opens the link of an invitation is told it is signed in with another account", () => {
+  test("a linked account that opens the link of an invitation is told its account is already linked (its own used invitation, or one for another account: the page cannot tell)", () => {
     expect(notice({ inviteToken: TOKEN }, "linked")).toEqual({ key: "inviteOtherAccount", tone: "info" });
   });
 

@@ -341,10 +341,15 @@ test.describe("signing in from the page", () => {
     await expect(alerts(studentPage)).toHaveCount(0);
     await expect(purchases(studentPage)).toHaveCount(1);
 
-    // Ya vinculada, abrir el link de una invitación (con su token) avisa que entró con otra cuenta, sin tocar
-    // lo suyo, y saca el token de la barra.
+    // Ya vinculada, volver a tocar el link de su propia invitación (ya usada) o el de otra cuenta, con el token en la
+    // dirección: la página no sabe de quién es, así que dice que la cuenta ya está vinculada y qué hacer si la invitación
+    // es para otra. No toca lo suyo, no es un error y saca el token de la barra.
     await studentPage.goto(`/es/portal?invitacion=${token}`);
     await expect(studentPage.getByRole("status").filter({ hasText: es.Portal.notices.inviteOtherAccount })).toBeVisible();
+    await expect(studentPage.getByText(
+      "Tu cuenta ya está vinculada. Si esta invitación es para otra cuenta, salí y entrá con esa.",
+      { exact: true },
+    )).toBeVisible();
     await expect(purchases(studentPage)).toHaveCount(1);
     await expect.poll(() => new URL(studentPage.url()).search).toBe("");
     await expect(alerts(studentPage)).toHaveCount(0);
