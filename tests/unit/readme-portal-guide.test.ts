@@ -185,12 +185,21 @@ describe("the portal guide of the README", () => {
     expect(invite).toContain("https://developers.google.com/identity/protocols/oauth2/policies");
   });
 
-  test("the test purchase of the smoke test does not claim it adds to no number of the panel", () => {
+  test("the test purchase of the smoke test says it is not income and names the field that makes it show in Sesiones and «para marcar»", () => {
     const smoke = subsectionOf("Probarlo después de desplegar");
+    // El campo que mueve Sesiones y «para marcar» es el `dueAt` del formulario de venta, no la fecha de cobro.
+    const saleForm = readFileSync(new URL("../../src/admin/sales/sale-form.tsx", import.meta.url), "utf8");
+    const dueAtLabel = /<Field id="sale-due-at" label="([^"]+)"/.exec(saleForm)?.[1];
 
+    expect(dueAtLabel).toBe("Entrega o sesión comprometida");
     expect(smoke).not.toContain("no suma en ningún número del panel");
     expect(smoke).toMatch(/no cuenta como ingreso/);
-    expect(smoke).toMatch(/sin fecha/);
+    expect(smoke).toContain(`«${dueAtLabel}»`);
+    expect(smoke).toMatch(/Sesiones/);
+    expect(smoke).toMatch(/«para marcar»/);
+    expect(smoke).toMatch(/vac[ií]o/);
+    // La fecha de cobro no es lo que la hace aparecer ahí.
+    expect(smoke).not.toMatch(/fecha de cobro/i);
   });
 
   test("teaches the development sign-in with the mock server, and says it never goes to Vercel", () => {
