@@ -179,6 +179,24 @@ describe("the portal guide of the README", () => {
     expect(data).not.toMatch(/no guarda nada fuera de esta lista/);
   });
 
+  test("tells students to open the link in the real browser of the phone, not in the in-app browser of a social network, with Google's own pages", () => {
+    const invite = subsectionOf("Invitar a un alumno");
+
+    expect(invite).toMatch(/Chrome/);
+    expect(invite).toMatch(/Safari/);
+    for (const app of ["Instagram", "TikTok", "Discord"]) expect(invite, app).toContain(app);
+    expect(invite).toContain("https://support.google.com/accounts/answer/7675428");
+    expect(invite).toContain("https://developers.google.com/identity/protocols/oauth2/policies");
+  });
+
+  test("the test purchase of the smoke test does not claim it adds to no number of the panel", () => {
+    const smoke = subsectionOf("Probarlo después de desplegar");
+
+    expect(smoke).not.toContain("no suma en ningún número del panel");
+    expect(smoke).toMatch(/no cuenta como ingreso/);
+    expect(smoke).toMatch(/sin fecha/);
+  });
+
   test("teaches the development sign-in with the mock server, and says it never goes to Vercel", () => {
     const local = subsectionOf("Probarlo en tu compu");
 
