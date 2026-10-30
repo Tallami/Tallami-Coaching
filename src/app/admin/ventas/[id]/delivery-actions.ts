@@ -62,7 +62,9 @@ export async function addDeliveryAction(saleId: string, formData: FormData): Pro
     case "link":
       return addLinkDelivery(db, saleId, title, textField(formData, "url"));
     case "pdf": {
-      // El tamaño se mira antes de leer el archivo: uno enorme no se carga en memoria para rechazarlo.
+      // Next ya leyó el cuerpo del pedido (hasta 5 MB, `experimental.serverActions.bodySizeLimit` en
+      // `next.config.ts`) y armó el formulario: el archivo ya está en memoria. Lo que se evita acá es
+      // copiarlo a bytes (`arrayBuffer()`) y seguir con él para rechazarlo después.
       // `addPdfDelivery` vuelve a exigir el tamaño y los bytes (`%PDF-`) de lo que se leyó.
       const file = fileField(formData);
       if (file && file.size > DELIVERY_PDF_MAX_BYTES) return { ok: false, error: "too-large" };
