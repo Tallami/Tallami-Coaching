@@ -161,7 +161,8 @@
       "linked": "Listo, tu cuenta quedó vinculada.",
       "alreadyLinked": "Tu cuenta ya está vinculada.",
       "inviteInvalid": "Esa invitación no sirve: venció o ya se usó. Pedile otra a Tallami.",
-      "inviteTaken": "No pudimos usar esa invitación: ese alumno ya tiene otra cuenta, o la tuya ya está vinculada a otro alumno. Escribile a Tallami."
+      "inviteTaken": "No pudimos usar esa invitación: ese alumno ya tiene otra cuenta, o la tuya ya está vinculada a otro alumno. Escribile a Tallami.",
+      "inviteOtherAccount": "Entraste con otra cuenta. Salí para usar esta invitación."
     },
     "unlinked": {
       "title": "Falta un paso",

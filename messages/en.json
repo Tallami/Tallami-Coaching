@@ -161,7 +161,8 @@
       "linked": "Done, your account is linked.",
       "alreadyLinked": "Your account is already linked.",
       "inviteInvalid": "That invitation doesn't work: it expired or was already used. Ask Tallami for a new one.",
-      "inviteTaken": "We couldn't use that invitation: that student already has another account, or yours is already linked to another student. Message Tallami."
+      "inviteTaken": "We couldn't use that invitation: that student already has another account, or yours is already linked to another student. Message Tallami.",
+      "inviteOtherAccount": "You're signed in with another account. Sign out to use this invitation."
     },
     "unlinked": {
       "title": "One step left",

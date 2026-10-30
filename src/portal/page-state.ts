@@ -32,6 +32,7 @@ export const NOTICE_KEYS = [
   "alreadyLinked",
   "inviteInvalid",
   "inviteTaken",
+  "inviteOtherAccount",
 ] as const;
 export type NoticeKey = (typeof NOTICE_KEYS)[number];
 
@@ -69,12 +70,14 @@ const NOTICES = {
   alreadyLinked: { key: "alreadyLinked", tone: "info" },
   inviteInvalid: { key: "inviteInvalid", tone: "error" },
   inviteTaken: { key: "inviteTaken", tone: "error" },
+  inviteOtherAccount: { key: "inviteOtherAccount", tone: "info" },
 } as const satisfies Record<NoticeKey, PortalNotice>;
 
 /**
  * El aviso que corresponde a la dirección y al estado de la sesión, o `null`. Un solo aviso, el más
  * importante. Una cuenta sin vincular que abre el link de una invitación no recibe un aviso: la
- * vista misma le dice que entre de nuevo para usarla.
+ * vista misma le dice que entre de nuevo para usarla. Una cuenta ya vinculada que la abre sí: entró
+ * con otra cuenta y tiene que salir para usarla.
  */
 export function portalNotice(query: PortalQuery, view: PortalView): PortalNotice | null {
   if (query.signInFailed) return NOTICES.signInFailed;
@@ -84,7 +87,9 @@ export function portalNotice(query: PortalQuery, view: PortalView): PortalNotice
     if (query.inviteOutcome === "vinculada") return NOTICES.linked;
     // Reintentar con una invitación ya usada, con la cuenta vinculada, no es un problema.
     if (query.inviteOutcome === "invalida") return NOTICES.alreadyLinked;
-    return null;
+    // El link de una invitación (con su token) abierto con una cuenta que ya es de un alumno: sin este
+    // aviso vería sus propias compras sin saber por qué no pasó nada con la invitación.
+    return query.inviteToken ? NOTICES.inviteOtherAccount : null;
   }
   return query.inviteOutcome === "invalida" ? NOTICES.inviteInvalid : null;
 }

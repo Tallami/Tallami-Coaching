@@ -81,8 +81,18 @@ describe("portalNotice", () => {
     expect(notice({ inviteToken: TOKEN }, "signedOut")).toEqual({ key: "inviteToSignIn", tone: "info" });
   });
 
-  test("a student that is already linked does not need to be told about the token of the link", () => {
-    expect(notice({ inviteToken: TOKEN }, "linked")).toBeNull();
+  test("a linked account that opens the link of an invitation is told it is signed in with another account", () => {
+    expect(notice({ inviteToken: TOKEN }, "linked")).toEqual({ key: "inviteOtherAccount", tone: "info" });
+  });
+
+  test("the token of a link says nothing to a linked account when the sign-in already answered about an invitation", () => {
+    // Una dirección trae una sola cosa en `invitacion`: un token o una respuesta del ingreso, nunca las dos.
+    expect(notice({ inviteOutcome: "vinculada" }, "linked")?.key).toBe("linked");
+    expect(notice({ inviteOutcome: "invalida" }, "linked")?.key).toBe("alreadyLinked");
+  });
+
+  test("a failed sign-in still comes before the notice about the other account", () => {
+    expect(notice({ signInFailed: true, inviteToken: TOKEN }, "linked")?.key).toBe("signInFailed");
   });
 
   test("an account without a link that opens the link of an invitation is answered by the view itself, not by a notice", () => {
@@ -120,6 +130,7 @@ describe("portalNotice", () => {
     const keys = [
       notice({ signInFailed: true }, "signedOut"),
       notice({ inviteToken: TOKEN }, "signedOut"),
+      notice({ inviteToken: TOKEN }, "linked"),
       notice({ inviteOutcome: "vinculada" }, "linked"),
       notice({ inviteOutcome: "invalida" }, "linked"),
       notice({ inviteOutcome: "invalida" }, "unlinked"),

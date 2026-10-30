@@ -340,6 +340,14 @@ test.describe("signing in from the page", () => {
     await expect(studentPage.getByText(es.Portal.notices.alreadyLinked, { exact: true })).toBeVisible();
     await expect(alerts(studentPage)).toHaveCount(0);
     await expect(purchases(studentPage)).toHaveCount(1);
+
+    // Ya vinculada, abrir el link de una invitación (con su token) avisa que entró con otra cuenta, sin tocar
+    // lo suyo, y saca el token de la barra.
+    await studentPage.goto(`/es/portal?invitacion=${token}`);
+    await expect(studentPage.getByRole("status").filter({ hasText: es.Portal.notices.inviteOtherAccount })).toBeVisible();
+    await expect(purchases(studentPage)).toHaveCount(1);
+    await expect.poll(() => new URL(studentPage.url()).search).toBe("");
+    await expect(alerts(studentPage)).toHaveCount(0);
     await context.close();
   });
 

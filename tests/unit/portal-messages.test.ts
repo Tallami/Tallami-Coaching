@@ -122,6 +122,14 @@ describe("Portal messages", () => {
     expect(portalOf(es).get("notices.alreadyLinked")).toBe("Tu cuenta ya está vinculada.");
   });
 
+  test("the notice for a linked account that opens someone else's invitation says it is another account and to sign out, in every language", () => {
+    expect(portalOf(es).get("notices.inviteOtherAccount")).toBe("Entraste con otra cuenta. Salí para usar esta invitación.");
+    expect(portalOf(pt).get("notices.inviteOtherAccount")).toMatch(/outra conta/);
+    expect(portalOf(pt).get("notices.inviteOtherAccount")).toMatch(/Saia/);
+    expect(portalOf(en).get("notices.inviteOtherAccount")).toMatch(/another account/);
+    expect(portalOf(en).get("notices.inviteOtherAccount")).toMatch(/[Ss]ign out/);
+  });
+
   test("the empty state of a purchase says what happens", () => {
     expect(portalOf(es).get("deliveries.empty")).toBe("Tallami todavía no subió entregas para esta compra.");
   });
