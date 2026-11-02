@@ -54,7 +54,7 @@
       },
       "tournamentReview": {
         "name": "Full tournament VOD review",
-        "description": "Send me the replay codes for the whole tournament and I'll send back the full video analysis.",
+        "description": "Send me the replay codes for the whole tournament and I'll send back the full video analysis within 96 hours.",
         "cta": "Book tournament VOD"
       },
       "vodLive": {

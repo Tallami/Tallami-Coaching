@@ -106,6 +106,8 @@ test.describe("services menu", () => {
     ]);
     await expect(services).toContainText("Me pasás los códigos de replay de 3 partidas");
     await expect(services).toContainText("en 72 horas");
+    await expect(services).toContainText("Me pasás los códigos de replay de todo el torneo");
+    await expect(services).toContainText("en 96 horas");
   });
 
   for (const path of LOCALE_PATHS) {

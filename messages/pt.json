@@ -54,7 +54,7 @@
       },
       "tournamentReview": {
         "name": "VOD review de torneio completo",
-        "description": "Você me passa os códigos de replay do torneio inteiro e eu devolvo a análise completa em vídeo.",
+        "description": "Você me passa os códigos de replay do torneio inteiro e eu devolvo a análise completa em vídeo em 96 horas.",
         "cta": "Reservar VOD de torneio"
       },
       "vodLive": {

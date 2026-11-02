@@ -25,7 +25,7 @@ Mercado Pago (Argentina), el primero · Takenos (Pix, a confirmar con ellos) · 
 | Servicio | Precio |
 | --- | --- |
 | VOD review de 3 partidas (códigos de replay, entrega 72 h desde que llegan) | 30 |
-| VOD review de torneo completo (códigos de replay) | 60 |
+| VOD review de torneo completo (códigos de replay, entrega 96 h desde que llegan) | 60 |
 | VOD review en vivo (60 min) | 45 |
 | Plan de juego personalizado | 120 |
 | Temporada Pro | 2500 por equipo, toda la temporada (por aplicación) |
