@@ -1,6 +1,8 @@
-/* Tarjeta de tweet. Maqueta reviews-y-franja.html, opción C (.tw). */
-
 /*
+ * Tarjeta de tweet: una ficha de resultado. La foto va arriba, de borde a borde,
+ * y se funde con la tarjeta; el jugador se monta sobre ella y abajo manda el
+ * puesto, con la misma letra de la sección Resultados.
+ *
  * `position: relative`: el texto oculto para el lector de pantalla (`sr-only`)
  * es absoluto. Sin un ancestro posicionado cae sobre la página y, con "reducir
  * movimiento" (sin la animación que mueve la pista), la ensancha: las filas
@@ -8,17 +10,24 @@
  */
 .card {
   --mention-color: #9db2ff;
+  --card-surface: var(--color-stage-2);
+  --card-inset: 16px;
+  --card-radius: 8px;
+  /* Cuánto se monta el avatar sobre la foto; el `gap` de la tarjeta se descuenta aparte. */
+  --avatar-overlap: 26px;
+  --card-gap: 12px;
 
   position: relative;
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--card-gap);
   min-width: 0;
-  padding: 14px;
+  padding-block-end: 14px;
   border: 1px solid var(--color-stage-line);
-  border-radius: 6px;
-  background: var(--color-stage-2);
+  border-radius: var(--card-radius);
+  background: var(--card-surface);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
   color: var(--color-on-stage);
   /*
    * Saira no trae la marca 𝕏 ni emojis: respaldo con la fuente de emojis del
@@ -32,10 +41,63 @@
   transition: border-color 0.15s ease;
 }
 
+/* Sin foto: el encabezado arranca arriba. */
+.card:not(.withPhoto) {
+  padding-block-start: 14px;
+}
+
+/*
+ * El filo dorado de arriba: una marca corta en reposo que recorre toda la
+ * tarjeta al pasar el mouse o con el foco del teclado.
+ */
+.card::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: -1px -1px auto;
+  height: 3px;
+  border-radius: var(--card-radius) var(--card-radius) 0 0;
+  background: var(--color-gold);
+  transform: scaleX(0.14);
+  transform-origin: left;
+}
+
 /* Borde dorado al pasar el mouse y con el foco del teclado (el aro de foco ya es dorado). */
 .card:hover,
 .card:focus-visible {
   border-color: var(--color-gold);
+}
+
+.card:hover::before,
+.card:focus-visible::before {
+  transform: scaleX(1);
+}
+
+/* La foto, de borde a borde. Va última en el HTML: `order` la sube. */
+.media {
+  position: relative;
+  display: block;
+  order: -1;
+  overflow: hidden;
+  border-radius: calc(var(--card-radius) - 1px) calc(var(--card-radius) - 1px) 0 0;
+  background: var(--color-stage-line);
+}
+
+/* Se funde con la tarjeta: el texto de abajo nunca compite con la captura. */
+.media::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgb(11 20 51 / 0.05) 35%, var(--card-surface) 100%);
+}
+
+/* 16:9 aunque la foto no haya cargado: la tarjeta no cambia de alto al llegar. */
+.photo {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -48,19 +110,45 @@
   .card:hover {
     transform: translateY(-2px);
   }
+
+  .card::before {
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .photo {
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .card:hover .photo {
+    transform: scale(1.04);
+  }
 }
 
+/* `position: relative` y `z-index`: sobre la foto y su fundido. */
 .head {
+  position: relative;
+  z-index: 1;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 10px;
+  margin-inline: var(--card-inset);
+}
+
+.withPhoto .head {
+  margin-block-start: calc(-1 * (var(--card-gap) + var(--avatar-overlap)));
+}
+
+.avatar,
+.initials {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 2px solid var(--card-surface);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--color-gold);
 }
 
 .avatar {
-  flex: none;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
   object-fit: cover;
   background: var(--color-stage-line);
 }
@@ -68,11 +156,7 @@
 /* Sin foto local del jugador: sus iniciales sobre el círculo azul, como en la franja "Trabajé con". */
 .initials {
   display: grid;
-  flex: none;
-  width: 40px;
-  height: 40px;
   place-items: center;
-  border-radius: 50%;
   background: var(--color-beam);
   color: var(--color-on-stage);
   font-size: 0.9375rem;
@@ -80,12 +164,14 @@
   line-height: 1;
 }
 
+/* `padding-inline-end`: un nombre largo se corta con puntos suspensivos antes de la marca de X. */
 .who {
   display: flex;
   flex: 1;
   flex-direction: column;
   min-width: 0;
-  font-size: 0.875rem;
+  padding-inline-end: 36px;
+  font-size: 0.9375rem;
   line-height: 1.2;
 }
 
@@ -95,23 +181,54 @@
   white-space: nowrap;
 }
 
+.who > b {
+  font-stretch: 90%;
+}
+
 .who > span {
   color: var(--color-on-stage-2);
   font-size: 0.8125rem;
 }
 
+/* La marca de X, a la altura de arriba del avatar. */
 .mark {
-  flex: none;
-  color: var(--color-on-stage-2);
-  font-size: 1.125rem;
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-end: 0;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 50%;
+  background: rgb(11 20 51 / 0.78);
+  color: var(--color-on-stage);
+  font-size: 0.9375rem;
+  line-height: 1;
 }
 
 .text {
+  margin-inline: var(--card-inset);
   font-size: 0.9375rem;
   line-height: 1.45;
   overflow-wrap: break-word;
   /* Respeta los saltos de línea del tweet sin dejar espacios de más. */
   white-space: pre-line;
+}
+
+/* El puesto, con la letra angosta de la sección Resultados. */
+.place {
+  color: var(--color-gold);
+  font-size: 2.5rem;
+  font-stretch: 68%;
+  font-weight: 800;
+  line-height: 0.9;
+  text-transform: uppercase;
+}
+
+.prize {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 /*
@@ -136,22 +253,14 @@
   color: var(--mention-color);
 }
 
-/* 16:9 aunque la foto no haya cargado: la tarjeta no cambia de alto al llegar. */
-.photo {
-  display: block;
-  width: 100%;
-  height: auto;
-  aspect-ratio: 16 / 9;
-  border-radius: 4px;
-  object-fit: cover;
-  background: var(--color-stage-line);
-}
-
+/* `margin-top: auto`: el pie queda abajo aunque el tweet de al lado sea más largo. */
 .foot {
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  margin-top: auto;
+  margin: auto var(--card-inset) 0;
+  padding-block-start: 10px;
+  border-top: 1px solid var(--color-stage-line);
   color: var(--color-on-stage-2);
   font-size: 0.8125rem;
 }

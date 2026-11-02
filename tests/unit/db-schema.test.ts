@@ -254,12 +254,13 @@ describe("database schema", () => {
   test("suggested prices come from the site catalog", () => {
     const expected: Record<SaleItem, number | null> = {
       vodRecorded: 30,
+      tournamentReview: 60,
       vodLive: 45,
+      gamePlan: 120,
+      proSeason: 2500,
       lesson: 40,
       lessonPack: 140,
-      gamePlan: 120,
       tournament: 150,
-      proSeason: 2500,
       other: null,
     };
 

@@ -267,7 +267,7 @@ describe("pending work", () => {
       }),
       sale({ id: "undated", item: "lesson", dueAt: null }),
       sale({ id: "unpaid-undated", item: "lesson", status: "pending", paidOn: null, dueAt: null }),
-      // Los VOD grabados y planes de juego son entregas, no sesiones.
+      // Los VOD reviews para entregar y los planes de juego son entregas, no sesiones.
       sale({ id: "delivery", item: "vodRecorded", dueAt: past }),
       sale({ id: "unpaid-delivery", item: "vodRecorded", status: "pending", paidOn: null, dueAt: past }),
       sale({ id: "other", item: "other", dueAt: past }),

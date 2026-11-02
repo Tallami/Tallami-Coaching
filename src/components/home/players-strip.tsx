@@ -11,18 +11,15 @@ const LOOP_SECONDS = 40;
 /**
  * Franja "Trabajé con", justo debajo de la portada: jugadores que entrenó
  * Tallami, pasando solos en loop. El lector de pantalla los lee una vez, como
- * lista; la copia del loop la arma `MarqueeRow`.
+ * lista; la copia del loop la arma `MarqueeRow`. Sin botón de pausa: se frena
+ * con el puntero encima y queda quieta con "reducir movimiento".
  */
 export async function PlayersStrip() {
   const t = await getTranslations("Players");
 
   return (
     <section className={`${styles.strip} stage`} aria-labelledby={LABEL_ID}>
-      <MarqueeGroup
-        className={styles.group}
-        pauseLabel={t("pause")}
-        resumeLabel={t("resume")}
-      >
+      <MarqueeGroup className={styles.group}>
         <p id={LABEL_ID} className={styles.label}>
           {t("label")}
         </p>

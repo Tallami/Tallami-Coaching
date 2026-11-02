@@ -9,10 +9,8 @@
 }
 
 /*
- * Grilla de ancho completo: la etiqueta y el botón de pausa se alinean con el
- * contenido de la página (`max-w-wrap` + `px-gutter`); la banda va de borde a
- * borde. El botón es el primer hijo del grupo (llega antes el teclado), pero
- * se ve a la derecha de la etiqueta.
+ * Grilla de ancho completo: la etiqueta se alinea con el contenido de la página
+ * (`max-w-wrap` + `px-gutter`); la banda va de borde a borde.
  */
 .group {
   --edge: max(
@@ -20,20 +18,11 @@
     (100% - var(--container-wrap)) / 2 + var(--spacing-gutter)
   );
   display: grid;
-  grid-template-columns: var(--edge) minmax(0, 1fr) auto var(--edge);
-  align-items: center;
+  grid-template-columns: var(--edge) minmax(0, 1fr) var(--edge);
   row-gap: 6px;
 }
 
-/* La separación va en el botón: un `column-gap` correría la etiqueta del borde del contenido. */
-.group > button {
-  grid-row: 1;
-  grid-column: 3;
-  margin-inline-start: 16px;
-}
-
 .label {
-  grid-row: 1;
   grid-column: 2;
   margin: 0;
   color: var(--color-gold);
@@ -48,7 +37,6 @@
  * más ancha que esa ventana y el loop nunca deja huecos, ni en pantallas grandes.
  */
 .band {
-  grid-row: 2;
   grid-column: 1 / -1;
   padding-block: 6px;
   border-block: 1px solid var(--color-stage-line);

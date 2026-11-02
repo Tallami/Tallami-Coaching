@@ -8,10 +8,9 @@ const ZONE = "rgb(36, 87, 197)";
 /** Precios del CLAUDE.md en el orden del menú; Temporada Pro va última. */
 const SERVICE_PRICE_STARTS = [
   /^USD 30\b/,
+  /^USD 60\b/,
   /^USD 45\b/,
-  /^USD 40\b/,
   /^USD 120\b/,
-  /^USD 150\b/,
 ];
 
 /** Temporada Pro: precio fijo por equipo; el separador de miles cambia en inglés. */
@@ -32,9 +31,9 @@ const LOCALIZED_SERVICES = [
     path: "/pt",
     locale: "pt",
     texts: [
-      "por dupla ou trio",
+      "VOD review de 3 partidas",
+      "VOD review de torneio completo",
       "por equipe, toda a temporada",
-      "Pacote de 4 aulas: USD 140, você economiza USD 20.",
       "Tem menos de 18 anos?",
     ],
   },
@@ -42,9 +41,9 @@ const LOCALIZED_SERVICES = [
     path: "/en",
     locale: "en",
     texts: [
-      "per duo or trio",
+      "3-game VOD review",
+      "Full tournament VOD review",
       "per team, for the whole season",
-      "Pack of 4 lessons: USD 140, you save USD 20.",
       "Under 18?",
     ],
   },
@@ -67,7 +66,7 @@ function columnCount(gridTemplateColumns: string): number {
 }
 
 test.describe("services menu", () => {
-  test("services list five prices and the pro season last", async ({
+  test("services list four prices and the pro season last", async ({
     page,
   }) => {
     await page.goto("/es");
@@ -75,7 +74,7 @@ test.describe("services menu", () => {
     const prices = page.locator("#services [data-testid=price]");
 
     await expect(prices).toHaveText(priceStarts("es"));
-    await expect(prices).toHaveCount(6);
+    await expect(prices).toHaveCount(5);
     // Sin porcentaje de premios en ninguna parte de la pizarra.
     await expect(page.locator("#services")).not.toContainText("%");
 
@@ -93,19 +92,33 @@ test.describe("services menu", () => {
     });
   }
 
-  test("price units and lesson pack are shown", async ({ page }) => {
+  test("the two offline reviews come first, in the order and with the promise Tallami asked for", async ({ page }) => {
     await page.goto("/es");
 
     const services = page.locator("#services");
 
-    for (const text of [
-      "por dúo o trío",
-      "por equipo, toda la temporada",
-      "Pack de 4 clases: USD 140, ahorrás USD 20.",
-    ]) {
-      await expect(services).toContainText(text);
-    }
+    await expect(services.getByRole("heading", { level: 3 })).toHaveText([
+      "VOD review de 3 partidas",
+      "VOD review de torneo completo",
+      "VOD review en vivo",
+      "Plan de juego personalizado",
+      "Temporada Pro",
+    ]);
+    await expect(services).toContainText("Me pasás los códigos de replay de 3 partidas");
+    await expect(services).toContainText("en 72 horas");
   });
+
+  for (const path of LOCALE_PATHS) {
+    test(`the services no longer sold are gone at ${path}`, async ({ page }) => {
+      await page.goto(path);
+
+      const body = page.locator("body");
+
+      for (const name of ["Clase 1 a 1", "Aula 1 a 1", "1-on-1", "Coaching de torneo", "Coaching de torneio", "Tournament coaching", "Pack de 4"]) {
+        await expect(body, name).not.toContainText(name);
+      }
+    });
+  }
 
   test("pro season shows the team unit and the faq answer", async ({ page }) => {
     await page.goto("/es");
@@ -145,7 +158,7 @@ test.describe("services menu", () => {
       .locator("#services")
       .getByRole("link", { name: BOOKING_LINK_NAME });
 
-    await expect(links).toHaveCount(6);
+    await expect(links).toHaveCount(5);
     const hrefs = await links.evaluateAll((anchors) =>
       anchors.map((anchor) => anchor.getAttribute("href")),
     );
@@ -192,7 +205,7 @@ test.describe("services menu", () => {
   });
 
   for (const { path, locale, texts } of LOCALIZED_SERVICES) {
-    test(`units, pack and minors note are localized at ${path}`, async ({
+    test(`services and minors note are localized at ${path}`, async ({
       page,
     }) => {
       await page.goto(path);

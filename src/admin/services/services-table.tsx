@@ -90,14 +90,7 @@ function ServiceTableRow({ row, today }: { row: ServiceRow; today: string }) {
         {row.conversionPct === null ? (
           <Dash reason={row.clicks === null ? "sin botón en el sitio" : "sin clics en el período"} />
         ) : (
-          <>
-            {formatPercent(row.conversionPct)}{" "}
-            {row.includedPackSales > 0 ? (
-              <span className="ml-auto block max-w-[10rem] text-[0.8125rem] leading-snug font-normal whitespace-normal text-balance text-ink-2">
-                incluye {row.includedPackSales} {row.includedPackSales === 1 ? "venta" : "ventas"} del pack
-              </span>
-            ) : null}
-          </>
+          formatPercent(row.conversionPct)
         )}
       </TableCell>
     </TableRow>

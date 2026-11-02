@@ -566,7 +566,7 @@ test.describe("a student with purchases and deliveries", () => {
     const ana = uniqueName("Ana de las entregas");
     await createSale(page, { student: ana, item: "vodRecorded", currency: "USD", amount: "30", status: "paid", paidOn: "2026-10-05" });
     await createSaleForExisting(page, { student: ana, item: "gamePlan", currency: "ARS", amount: "50000", status: "pending", paidOn: "" });
-    await openSale(page, ana, "VOD review grabado");
+    await openSale(page, ana, "VOD review de 3 partidas");
     await addDelivery(page, { kind: "youtube", title: "Review de tu partida", url: YOUTUBE });
     await addDelivery(page, { kind: "link", title: "Guía en Drive", url: DRIVE });
     await openSale(page, ana, "Plan de juego personalizado");
@@ -595,7 +595,7 @@ test.describe("a student with purchases and deliveries", () => {
     await expect(pending).toContainText(es.Portal.status.pending);
     await expect(pending).toContainText(es.Portal.purchases.unpaid);
     await expect(pending).toContainText("ARS 50.000");
-    await expect(paid.getByRole("heading", { level: 3, name: "VOD review grabado" })).toBeVisible();
+    await expect(paid.getByRole("heading", { level: 3, name: "VOD review de 3 partidas" })).toBeVisible();
     await expect(paid).toContainText(es.Portal.status.paid);
     await expect(paid).toContainText("Cobro: 5 oct 2026");
     await expect(paid).toContainText("USD 30");

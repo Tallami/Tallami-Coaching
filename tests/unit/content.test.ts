@@ -4,13 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 import { PLAYERS, playerByHandle } from "@/content/players";
 import { FNCS_TITLES, LAN_RESULTS, WINS } from "@/content/results";
-import {
-  LESSON_PACK,
-  PRO_SEASON,
-  SERVICES,
-  bookingHref,
-  lessonPackSavingsUsd,
-} from "@/content/services";
+import { PRO_SEASON, SERVICES, bookingHref } from "@/content/services";
 import { SOCIAL_LINKS } from "@/content/social";
 import { readPlayerEntries } from "../helpers/players-source";
 
@@ -61,16 +55,10 @@ describe("services", () => {
   test("service prices match CLAUDE.md", () => {
     expect(SERVICES).toEqual([
       { id: "vodRecorded", priceUsd: 30 },
+      { id: "tournamentReview", priceUsd: 60 },
       { id: "vodLive", priceUsd: 45 },
-      { id: "lesson", priceUsd: 40 },
       { id: "gamePlan", priceUsd: 120 },
-      { id: "tournament", priceUsd: 150, unit: "perTeam" },
     ]);
-  });
-
-  test("lesson pack savings", () => {
-    expect(LESSON_PACK).toEqual({ sessions: 4, priceUsd: 140 });
-    expect(lessonPackSavingsUsd()).toBe(20);
   });
 
   test("pro season is a flat team price", () => {

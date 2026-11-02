@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { SALE_ITEMS, SITE_BOOKING_ITEMS, type SaleItem } from "@/admin/catalog";
+import { SALE_ITEMS, SITE_BOOKING_ITEMS, isRetiredItem, type SaleItem } from "@/admin/catalog";
 import type { ItemClicks } from "@/admin/interest/query";
 import { buildServicesReport, type ServiceRow } from "@/admin/services/report";
 import { NOW, sale } from "../helpers/metric-sales";
@@ -19,10 +19,10 @@ function rowOf(rows: readonly ServiceRow[], item: SaleItem): ServiceRow {
 }
 
 describe("buildServicesReport", () => {
-  test("has one row per catalog item, in catalog order, even with no data at all", () => {
+  test("has one row per item on sale, in catalog order, even with no data at all", () => {
     const report = buildServicesReport([], clicks(), "thisMonth", NOW);
 
-    expect(report.rows.map((row) => row.item)).toEqual([...SALE_ITEMS]);
+    expect(report.rows.map((row) => row.item)).toEqual(SALE_ITEMS.filter((item) => !isRetiredItem(item)));
     expect(report.hasActivity).toBe(false);
     expect(report.totals).toEqual({ sales: 0, incomeUsdMinor: 0, clicks: 0 });
     for (const row of report.rows) {
@@ -34,6 +34,18 @@ describe("buildServicesReport", () => {
       expect(row.conversionPct).toBeNull();
       expect(row.trend).toHaveLength(6);
     }
+  });
+
+  test("a service no longer sold only has a row if it has income, however old, and never has clicks", () => {
+    const old = sale({ item: "lesson", dollars: 40, paidOn: "2024-03-10" });
+    const report = buildServicesReport([old], clicks({ lesson: 7 }), "thisMonth", NOW);
+
+    expect(rowOf(report.rows, "lesson").lastSaleOn).toBe("2024-03-10");
+    expect(rowOf(report.rows, "lesson").clicks).toBeNull();
+    expect(report.rows.map((row) => row.item)).not.toContain("tournament");
+    // Una venta que no es ingreso no alcanza para traer la fila.
+    const cancelled = sale({ item: "tournament", status: "cancelled", paidOn: null });
+    expect(buildServicesReport([cancelled], clicks(), "thisMonth", NOW).rows.map((row) => row.item)).not.toContain("tournament");
   });
 
   test("carries the clicks the registry dropped for being over the ceiling, zero by default", () => {
@@ -58,16 +70,16 @@ describe("buildServicesReport", () => {
 
   test("counts only income sales paid inside the range", () => {
     const sales = [
-      sale({ item: "lesson", paidOn: "2026-10-05" }),
-      sale({ item: "lesson", paidOn: "2026-10-10", status: "delivered" }),
-      sale({ item: "lesson", paidOn: null, status: "pending" }),
-      sale({ item: "lesson", paidOn: null, status: "cancelled" }),
-      sale({ item: "lesson", paidOn: "2026-10-06", status: "refunded" }),
-      sale({ item: "lesson", paidOn: "2026-09-30" }),
-      sale({ item: "lesson", paidOn: "2026-10-20" }),
+      sale({ item: "vodRecorded", paidOn: "2026-10-05" }),
+      sale({ item: "vodRecorded", paidOn: "2026-10-10", status: "delivered" }),
+      sale({ item: "vodRecorded", paidOn: null, status: "pending" }),
+      sale({ item: "vodRecorded", paidOn: null, status: "cancelled" }),
+      sale({ item: "vodRecorded", paidOn: "2026-10-06", status: "refunded" }),
+      sale({ item: "vodRecorded", paidOn: "2026-09-30" }),
+      sale({ item: "vodRecorded", paidOn: "2026-10-20" }),
     ];
 
-    const row = rowOf(buildServicesReport(sales, clicks(), "thisMonth", NOW).rows, "lesson");
+    const row = rowOf(buildServicesReport(sales, clicks(), "thisMonth", NOW).rows, "vodRecorded");
 
     expect(row.sales).toBe(2);
     expect(row.incomeUsdMinor).toBe(8000);
@@ -92,7 +104,7 @@ describe("buildServicesReport", () => {
 
   test("shares of the total add up to exactly 100,0", () => {
     const sales = [
-      sale({ item: "lesson", dollars: 100 }),
+      sale({ item: "vodRecorded", dollars: 100 }),
       sale({ item: "gamePlan", dollars: 100 }),
       sale({ item: "vodLive", dollars: 100 }),
     ];
@@ -102,24 +114,24 @@ describe("buildServicesReport", () => {
     const tenths = report.rows.map((row) => Math.round(row.sharePct * 10)).sort((a, b) => b - a);
     expect(tenths.reduce((total, value) => total + value, 0)).toBe(1000);
     expect(tenths.slice(0, 3)).toEqual([334, 333, 333]);
-    expect(rowOf(report.rows, "tournament").sharePct).toBe(0);
+    expect(rowOf(report.rows, "tournamentReview").sharePct).toBe(0);
   });
 
   describe("conversion", () => {
     test("is sales divided by clicks of the same period, with one decimal", () => {
-      const sales = [sale({ item: "lesson" }), sale({ item: "lesson" })];
+      const sales = [sale({ item: "vodRecorded" }), sale({ item: "vodRecorded" })];
 
-      const row = rowOf(buildServicesReport(sales, clicks({ lesson: 8 }), "thisMonth", NOW).rows, "lesson");
+      const row = rowOf(buildServicesReport(sales, clicks({ vodRecorded: 8 }), "thisMonth", NOW).rows, "vodRecorded");
 
       expect(row.clicks).toBe(8);
       expect(row.conversionPct).toBe(25);
-      expect(rowOf(buildServicesReport([sale({ item: "lesson" })], clicks({ lesson: 3 }), "thisMonth", NOW).rows, "lesson").conversionPct).toBe(33.3);
+      expect(rowOf(buildServicesReport([sale({ item: "vodRecorded" })], clicks({ vodRecorded: 3 }), "thisMonth", NOW).rows, "vodRecorded").conversionPct).toBe(33.3);
     });
 
     test("is empty (never a division by zero) when nobody clicked", () => {
-      const sales = [sale({ item: "lesson" })];
+      const sales = [sale({ item: "vodRecorded" })];
 
-      const row = rowOf(buildServicesReport(sales, clicks({ lesson: 0 }), "thisMonth", NOW).rows, "lesson");
+      const row = rowOf(buildServicesReport(sales, clicks({ vodRecorded: 0 }), "thisMonth", NOW).rows, "vodRecorded");
 
       expect(row.clicks).toBe(0);
       expect(row.sales).toBe(1);
@@ -129,8 +141,8 @@ describe("buildServicesReport", () => {
     test("is 0 with clicks and no sales, and can pass 100 when sales also come from outside the site", () => {
       const none = rowOf(buildServicesReport([], clicks({ vodLive: 5 }), "thisMonth", NOW).rows, "vodLive");
       const outside = rowOf(
-        buildServicesReport([sale({ item: "tournament" }), sale({ item: "tournament" }), sale({ item: "tournament" })], clicks({ tournament: 2 }), "thisMonth", NOW).rows,
-        "tournament",
+        buildServicesReport([sale({ item: "tournamentReview" }), sale({ item: "tournamentReview" }), sale({ item: "tournamentReview" })], clicks({ tournamentReview: 2 }), "thisMonth", NOW).rows,
+        "tournamentReview",
       );
 
       expect(none.conversionPct).toBe(0);
@@ -151,71 +163,20 @@ describe("buildServicesReport", () => {
       expect(report.totals.clicks).toBe(0);
     });
 
-    test("Clase 1 a 1 also counts the pack sales: the pack is requested from that button", () => {
-      const sales = [
-        sale({ item: "lesson", dollars: 40 }),
-        sale({ item: "lesson", dollars: 40 }),
-        sale({ item: "lessonPack", dollars: 140 }),
-      ];
-
-      const report = buildServicesReport(sales, clicks({ lesson: 12 }), "thisMonth", NOW);
-      const lesson = rowOf(report.rows, "lesson");
-      const pack = rowOf(report.rows, "lessonPack");
-
-      // (2 clases + 1 pack) ÷ 12 clics del botón.
-      expect(lesson.conversionPct).toBe(25);
-      expect(lesson.conversionSales).toBe(3);
-      expect(lesson.includedPackSales).toBe(1);
-      // Las columnas propias de cada fila no se mezclan.
-      expect(lesson.sales).toBe(2);
-      expect(lesson.incomeUsdMinor).toBe(8000);
-      expect(pack.sales).toBe(1);
-      expect(pack.incomeUsdMinor).toBe(14_000);
-      expect(pack.conversionPct).toBeNull();
-      expect(pack.includedPackSales).toBe(0);
-      expect(pack.conversionSales).toBe(1);
-    });
-
-    test("pack sales that are not income, or outside the period, do not count for Clase 1 a 1", () => {
-      const sales = [
-        sale({ item: "lesson" }),
-        sale({ item: "lessonPack", status: "pending", paidOn: null }),
-        sale({ item: "lessonPack", status: "cancelled", paidOn: null }),
-        sale({ item: "lessonPack", status: "refunded", paidOn: "2026-10-06" }),
-        sale({ item: "lessonPack", paidOn: "2026-09-30" }),
-        sale({ item: "lessonPack", paidOn: "2026-10-20" }),
-      ];
-
-      const lesson = rowOf(buildServicesReport(sales, clicks({ lesson: 4 }), "thisMonth", NOW).rows, "lesson");
-
-      expect(lesson.includedPackSales).toBe(0);
-      expect(lesson.conversionSales).toBe(1);
-      expect(lesson.conversionPct).toBe(25);
-    });
-
-    test("pack sales with no clicks on Clase 1 a 1 still leave the conversion empty", () => {
-      const report = buildServicesReport([sale({ item: "lessonPack" })], clicks({ lesson: 0 }), "thisMonth", NOW);
-
-      expect(rowOf(report.rows, "lesson").conversionPct).toBeNull();
-      expect(rowOf(report.rows, "lesson").includedPackSales).toBe(1);
-    });
-
-    test("every other row keeps its own sales as the numerator", () => {
+    test("every row has its own sales as the numerator", () => {
       const sales = [sale({ item: "gamePlan" }), sale({ item: "lessonPack" })];
 
       const report = buildServicesReport(sales, clicks({ gamePlan: 4 }), "thisMonth", NOW);
 
-      expect(rowOf(report.rows, "gamePlan").conversionSales).toBe(1);
       expect(rowOf(report.rows, "gamePlan").conversionPct).toBe(25);
-      expect(rowOf(report.rows, "gamePlan").includedPackSales).toBe(0);
     });
 
     test("only counts the clicks it is given for the period (the loader filters by date)", () => {
-      const march = buildServicesReport([sale({ item: "lesson" })], clicks({ lesson: 2 }), "lastMonth", NOW);
+      const march = buildServicesReport([sale({ item: "vodRecorded" })], clicks({ vodRecorded: 2 }), "lastMonth", NOW);
 
-      expect(rowOf(march.rows, "lesson").clicks).toBe(2);
-      expect(rowOf(march.rows, "lesson").sales).toBe(0);
-      expect(rowOf(march.rows, "lesson").conversionPct).toBe(0);
+      expect(rowOf(march.rows, "vodRecorded").clicks).toBe(2);
+      expect(rowOf(march.rows, "vodRecorded").sales).toBe(0);
+      expect(rowOf(march.rows, "vodRecorded").conversionPct).toBe(0);
     });
 
     test("ignores clicks for items that do not exist", () => {
@@ -240,23 +201,23 @@ describe("buildServicesReport", () => {
 
     expect(rowOf(report.rows, "gamePlan").lastSaleOn).toBe("2026-08-21");
     expect(rowOf(report.rows, "gamePlan").sales).toBe(0);
-    expect(rowOf(report.rows, "lesson").lastSaleOn).toBeNull();
+    expect(rowOf(report.rows, "vodRecorded").lastSaleOn).toBeNull();
   });
 
   test("the six-month trend goes from the oldest month to the current one, in dollars", () => {
     const sales = [
-      sale({ item: "lesson", dollars: 40, paidOn: "2026-05-02" }),
-      sale({ item: "lesson", dollars: 40, paidOn: "2026-05-31" }),
-      sale({ item: "lesson", dollars: 80, paidOn: "2026-07-15" }),
-      sale({ item: "lesson", dollars: 40, paidOn: "2026-10-01" }),
-      sale({ item: "lesson", dollars: 40, paidOn: "2026-04-30" }),
-      sale({ item: "lesson", dollars: 40, paidOn: "2026-10-30" }),
-      sale({ item: "lesson", dollars: 40, paidOn: "2026-09-10", status: "cancelled" }),
+      sale({ item: "vodRecorded", dollars: 40, paidOn: "2026-05-02" }),
+      sale({ item: "vodRecorded", dollars: 40, paidOn: "2026-05-31" }),
+      sale({ item: "vodRecorded", dollars: 80, paidOn: "2026-07-15" }),
+      sale({ item: "vodRecorded", dollars: 40, paidOn: "2026-10-01" }),
+      sale({ item: "vodRecorded", dollars: 40, paidOn: "2026-04-30" }),
+      sale({ item: "vodRecorded", dollars: 40, paidOn: "2026-10-30" }),
+      sale({ item: "vodRecorded", dollars: 40, paidOn: "2026-09-10", status: "cancelled" }),
       sale({ item: "gamePlan", dollars: 120, paidOn: "2026-09-10" }),
     ];
 
     const report = buildServicesReport(sales, clicks(), "thisMonth", NOW);
-    const trend = rowOf(report.rows, "lesson").trend;
+    const trend = rowOf(report.rows, "vodRecorded").trend;
 
     expect(trend.map((month) => month.month)).toEqual(["2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10"]);
     expect(trend.map((month) => month.usdMinor)).toEqual([8000, 0, 8000, 0, 0, 4000]);
@@ -264,10 +225,10 @@ describe("buildServicesReport", () => {
   });
 
   test("the trend does not change with the selected period", () => {
-    const sales = [sale({ item: "lesson", paidOn: "2026-07-15", dollars: 80 })];
+    const sales = [sale({ item: "vodRecorded", paidOn: "2026-07-15", dollars: 80 })];
 
-    const thisMonth = rowOf(buildServicesReport(sales, clicks(), "thisMonth", NOW).rows, "lesson").trend;
-    const thisYear = rowOf(buildServicesReport(sales, clicks(), "thisYear", NOW).rows, "lesson").trend;
+    const thisMonth = rowOf(buildServicesReport(sales, clicks(), "thisMonth", NOW).rows, "vodRecorded").trend;
+    const thisYear = rowOf(buildServicesReport(sales, clicks(), "thisYear", NOW).rows, "vodRecorded").trend;
 
     expect(thisYear).toEqual(thisMonth);
   });
@@ -275,9 +236,9 @@ describe("buildServicesReport", () => {
   test("a sale paid on the last day of a month stays in that month in the trend", () => {
     // El día de cobro ya es el día de Argentina (cobrar el 31 a las 22:00 es el 31):
     // las métricas no vuelven a convertir zonas.
-    const sales = [sale({ item: "lesson", dollars: 40, paidOn: "2026-08-31" })];
+    const sales = [sale({ item: "vodRecorded", dollars: 40, paidOn: "2026-08-31" })];
 
-    const trend = rowOf(buildServicesReport(sales, clicks(), "thisMonth", NOW).rows, "lesson").trend;
+    const trend = rowOf(buildServicesReport(sales, clicks(), "thisMonth", NOW).rows, "vodRecorded").trend;
 
     expect(trend.find((month) => month.month === "2026-08")?.usdMinor).toBe(4000);
     expect(trend.find((month) => month.month === "2026-09")?.usdMinor).toBe(0);
@@ -285,18 +246,18 @@ describe("buildServicesReport", () => {
 
   test("totals add the sales and the income of every row, and the clicks of the buttons", () => {
     const sales = [
-      sale({ item: "lesson", dollars: 40 }),
+      sale({ item: "vodRecorded", dollars: 40 }),
       sale({ item: "gamePlan", dollars: 120 }),
       sale({ item: "other", dollars: 60 }),
     ];
 
-    const report = buildServicesReport(sales, clicks({ lesson: 5, gamePlan: 7, proSeason: 1 }), "thisMonth", NOW);
+    const report = buildServicesReport(sales, clicks({ vodRecorded: 5, gamePlan: 7, proSeason: 1 }), "thisMonth", NOW);
 
     expect(report.totals).toEqual({ sales: 3, incomeUsdMinor: 22_000, clicks: 13 });
     expect(report.hasActivity).toBe(true);
   });
 
   test("clicks alone count as activity", () => {
-    expect(buildServicesReport([], clicks({ lesson: 1 }), "thisMonth", NOW).hasActivity).toBe(true);
+    expect(buildServicesReport([], clicks({ vodRecorded: 1 }), "thisMonth", NOW).hasActivity).toBe(true);
   });
 });

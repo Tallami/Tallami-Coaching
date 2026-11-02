@@ -2,8 +2,7 @@
 // Servicios con números. Se arman a partir de las ventas de ejemplo: cada
 // servicio recibe unos 4 a 9 clics por cada venta de ese mes (una conversión de
 // entre el 11 y el 25 %), con un mínimo para que ningún botón quede en cero
-// salvo Temporada Pro, que solo tuvo clics hace 4 y 5 meses. Las ventas del
-// pack de clases se suman a Clase 1 a 1: el sitio no tiene botón para el pack.
+// salvo Temporada Pro, que solo tuvo clics hace 4 y 5 meses.
 //
 // Es determinístico (mismo día, mismos clics), usa su propio generador al azar
 // para no tocar las ventas de ejemplo y reconoce sus filas por el id (un rango
@@ -68,8 +67,7 @@ function clicksFor(item: InterestItem, monthsAgo: number, sold: Map<string, numb
       ? PRO_SEASON_MIN_CLICKS + Math.floor(random() * PRO_SEASON_EXTRA_CLICKS)
       : 0;
   }
-  // El pack de clases se pide desde el botón de Clase 1 a 1.
-  const sales = (sold.get(item) ?? 0) + (item === "lesson" ? (sold.get("lessonPack") ?? 0) : 0);
+  const sales = sold.get(item) ?? 0;
   const perSale = MIN_CLICKS_PER_SALE + random() * EXTRA_CLICKS_PER_SALE;
   return Math.max(MIN_CLICKS_PER_MONTH, Math.round(sales * perSale));
 }

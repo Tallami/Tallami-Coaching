@@ -81,7 +81,7 @@ describe("StudentsTable", () => {
     expect(markup).toContain("USD 70,00");
     expect(markup).toContain("10/08/2026");
     expect(markup).toContain("05/09/2026");
-    expect(markup).toContain("VOD review grabado");
+    expect(markup).toContain("VOD review de 3 partidas");
     expect(markup).toContain("Clase 1 a 1");
     expect(markup).not.toContain("Plan de juego personalizado");
   });
@@ -125,7 +125,7 @@ describe("StudentSummary", () => {
     expect(markup).toContain("USD 70,00");
     expect(markup).toContain("10/08/2026");
     expect(markup).toContain("05/09/2026");
-    expect(markup).toContain("VOD review grabado");
+    expect(markup).toContain("VOD review de 3 partidas");
     expect(markup).toContain("Clase 1 a 1");
   });
 

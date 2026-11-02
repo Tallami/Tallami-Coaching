@@ -203,6 +203,8 @@ Para que el panel funcione en internet (en Vercel) la base no puede ser la local
 3. Contá con volver a entrar una vez: las cookies de sesión de antes dejan de valer (ahora cada sesión se guarda en la base).
 4. Entrá con la contraseña y registrá la primera llave **enseguida** (hasta que lo hagas, quien conozca la contraseña podría registrar la suya). Hacelo con la dirección definitiva de la web y con `NEXT_PUBLIC_SITE_URL` ya definida (paso 5 de arriba; ver "La dirección de la web"): si después cambia, las llaves dejan de servir.
 
+**Si ya tenías la web en línea, de antes del VOD review de torneo completo,** corré `npm run db:migrate` *antes* de desplegar: la migración `0007_services_review_de_torneo` hace que la base acepte ese servicio nuevo. Sin ella, los clics en su botón se pierden y no se puede guardar una venta de ese servicio.
+
 Tres protecciones más, que se hacen en los paneles de Supabase y Vercel:
 
 - **Exigir SSL en la base (Supabase).** La web y el comando de migración ya cifran su conexión, pero la base también tiene que negarse a las que no vengan cifradas: por defecto Supabase las acepta. En Supabase, Database → Settings, sección «SSL Configuration», activá «Enforce SSL on incoming connections». Reinicia la base y hay unos minutos sin servicio: hacelo cuando no estés usando el panel. Los pasos oficiales están en la guía [SSL Enforcement](https://supabase.com/docs/guides/platform/ssl-enforcement). El cifrado que usa la app (`require`) protege contra quien mira el tráfico, pero no verifica que el servidor sea el de Supabase; esa verificación (`verify-full`) pide bajar el certificado raíz que ofrece esa misma sección y no está activada.
@@ -344,7 +346,7 @@ Los botones de reserva del sitio público (`BookingLink`, `src/components/home/b
 | Privacidad | Se guarda un HMAC de la clave del visitante con la fecha de Argentina (nunca la IP): el mismo visitante tiene otro hash cada día, así que las filas no se pueden vincular entre días ni con `login_attempts`. A medianoche el cupo por minuto vuelve a empezar |
 | Retención | Los clics se borran a los 400 días (más que cualquier período que muestra el panel). La limpieza es oportunista: al guardar un clic, como mucho una vez por hora por proceso (`src/admin/interest/retention.ts`) |
 | País | Del encabezado `x-vercel-ip-country`, solo si son dos letras mayúsculas |
-| Conversión | En Servicios: ventas cobradas ÷ clics en "Reservar" del mismo período; vacía (—) sin clics. En Clase 1 a 1 cuentan también las ventas del pack de 4 clases (se pide desde ese botón; la fila lo aclara). Puede pasar de 100 %: también se vende por fuera del sitio |
+| Conversión | En Servicios: ventas cobradas ÷ clics en "Reservar" del mismo período; vacía (—) sin clics. Puede pasar de 100 %: también se vende por fuera del sitio |
 
 ### Tests del panel
 

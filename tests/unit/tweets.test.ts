@@ -215,8 +215,8 @@ describe("authorInitials", () => {
 
 describe("tweetTextParts", () => {
   test("splits mentions and highlights the coach", () => {
-    expect(tweetTextParts("1st @romerofdps @Tallami1 gg")).toEqual([
-      { kind: "text", value: "1st " },
+    expect(tweetTextParts("gg @romerofdps @Tallami1 gg")).toEqual([
+      { kind: "text", value: "gg " },
       { kind: "mention", value: "@romerofdps" },
       { kind: "text", value: " " },
       { kind: "self", value: "@Tallami1" },
@@ -225,10 +225,87 @@ describe("tweetTextParts", () => {
   });
 
   test("returns plain text as a single part and nothing for empty text", () => {
-    expect(tweetTextParts("5th EWC FINALS ($45000)")).toEqual([
-      { kind: "text", value: "5th EWC FINALS ($45000)" },
+    expect(tweetTextParts("jogaram muito")).toEqual([
+      { kind: "text", value: "jogaram muito" },
     ]);
     expect(tweetTextParts("")).toEqual([]);
+  });
+
+  test("sets apart the placement a result tweet starts with and its prize", () => {
+    expect(tweetTextParts("5th EWC FINALS ($45000)")).toEqual([
+      { kind: "place", value: "5th" },
+      { kind: "text", value: " EWC FINALS " },
+      { kind: "prize", value: "($45000)" },
+    ]);
+  });
+
+  // [cómo arranca el tweet, puesto esperado]
+  const PLACES: [string, string][] = [
+    ["Top 14 ($32000) conned", "Top 14"],
+    ["TOP 1 EWC PLAY-INS", "TOP 1"],
+    ["1st ($3000) rompimo la maldicion", "1st"],
+    ["2nd Div Cup", "2nd"],
+    ["3rd place", "3rd"],
+    ["12th FNCS Globals", "12th"],
+    ["6x FNCS CHAMPION", "6x"],
+    ["11th", "11th"],
+  ];
+
+  for (const [text, place] of PLACES) {
+    test(`reads the placement of "${text}"`, () => {
+      expect(tweetTextParts(text)[0]).toEqual({ kind: "place", value: place });
+    });
+  }
+
+  test("a placement only counts at the very start of the tweet", () => {
+    for (const text of ["gg 1st place", "Topo 14 hoy", "1stly", "12thousand", "6xl", "1234"]) {
+      expect(
+        tweetTextParts(text).map((part) => part.kind),
+        text,
+      ).toEqual(["text"]);
+    }
+  });
+
+  // [cómo escribe X el premio]
+  const PRIZES = ["($32000)", "($30.000)", "(6000$)", "$45000", "$ 500", "1,500$", "R$ 3.000", "US$500"];
+
+  for (const prize of PRIZES) {
+    test(`highlights the prize written as ${prize}`, () => {
+      expect(tweetTextParts(`ganamos ${prize} hoy`)).toEqual([
+        { kind: "text", value: "ganamos " },
+        { kind: "prize", value: prize },
+        { kind: "text", value: " hoy" },
+      ]);
+    });
+  }
+
+  test("the period or comma that ends a sentence stays out of the prize", () => {
+    expect(tweetTextParts("ganamos $500. gg")).toEqual([
+      { kind: "text", value: "ganamos " },
+      { kind: "prize", value: "$500" },
+      { kind: "text", value: ". gg" },
+    ]);
+    expect(tweetTextParts("$ 500, gg")).toEqual([
+      { kind: "prize", value: "$ 500" },
+      { kind: "text", value: ", gg" },
+    ]);
+  });
+
+  test("a number or a dollar sign alone is not a prize", () => {
+    for (const text of ["conned 12/12", "(2025)", "US$", "ganamos 500"]) {
+      expect(
+        tweetTextParts(text).map((part) => part.kind),
+        text,
+      ).toEqual(["text"]);
+    }
+  });
+
+  test("every recorded tweet of the wall starts with its placement", () => {
+    for (const id of TWEET_IDS) {
+      const [first] = tweetTextParts(toTweetCard(fixture(id)).text);
+
+      expect(first.kind, `tweet ${id}: ${first.value}`).toBe("place");
+    }
   });
 
   test("handles mentions at the edges and several in a row", () => {
@@ -316,8 +393,8 @@ describe("tweetTextParts emojis", () => {
   }
 
   test("splits mixed text into text, emoji, mentions and emoji, in order", () => {
-    expect(tweetTextParts("1st 🥲 @romerofdps @tallami1 🇦🇷")).toEqual([
-      { kind: "text", value: "1st " },
+    expect(tweetTextParts("gg 🥲 @romerofdps @tallami1 🇦🇷")).toEqual([
+      { kind: "text", value: "gg " },
       { kind: "emoji", value: "🥲", code: "1f972" },
       { kind: "text", value: " " },
       { kind: "mention", value: "@romerofdps" },
@@ -361,14 +438,14 @@ describe("tweetTextParts emojis", () => {
   });
 
   test("a lone regional indicator and keycap look-alikes stay text", () => {
-    for (const text of ["\u{1F1E6} suelto", "#1 *2 3", "12/12 ($32.000) 100%"]) {
+    for (const text of ["\u{1F1E6} suelto", "#1 *2 3", "12/12 100%"]) {
       expect(tweetTextParts(text)).toEqual([{ kind: "text", value: text }]);
     }
   });
 
   test("text without emojis is split exactly as before", () => {
-    expect(tweetTextParts("1st @romerofdps @Tallami1 gg ñandú — ¿qué?")).toEqual([
-      { kind: "text", value: "1st " },
+    expect(tweetTextParts("gg @romerofdps @Tallami1 gg ñandú — ¿qué?")).toEqual([
+      { kind: "text", value: "gg " },
       { kind: "mention", value: "@romerofdps" },
       { kind: "text", value: " " },
       { kind: "self", value: "@Tallami1" },

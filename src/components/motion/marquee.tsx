@@ -30,10 +30,13 @@ const MIN_SHIFT_PX = 0.5;
 const MarqueePausedContext = createContext<boolean | null>(null);
 
 export interface MarqueeGroupProps {
-  /** Texto del botón mientras se mueve ("Pausar"). */
-  pauseLabel: string;
-  /** Texto del botón con el movimiento pausado ("Reanudar"). */
-  resumeLabel: string;
+  /** Textos del botón de pausa. Sin ellos, el grupo no tiene botón. */
+  pauseButton?: {
+    /** Texto mientras se mueve ("Pausar"). */
+    pauseLabel: string;
+    /** Texto con el movimiento pausado ("Reanudar"). */
+    resumeLabel: string;
+  };
   children: ReactNode;
   className?: string;
 }
@@ -68,7 +71,8 @@ function PlayIcon() {
 }
 
 /**
- * Grupo de filas en movimiento con un único botón de pausa. Las filas se
+ * Grupo de filas en movimiento, con un único botón de pausa si se le pasan sus
+ * textos (la franja de jugadores no lo lleva: lo pidió Tallami). Las filas se
  * frenan con el botón, mientras el puntero está sobre alguna y mientras el
  * foco del teclado está en un elemento de alguna fila (WCAG 2.2.2). El foco
  * en el botón no las frena: si no, quien lo usa con el teclado no vería
@@ -80,25 +84,22 @@ function PlayIcon() {
  * texto que cambia, el lector anunciaría "Reanudar, presionado", que se
  * entiende al revés.
  */
-export function MarqueeGroup({
-  pauseLabel,
-  resumeLabel,
-  children,
-  className,
-}: MarqueeGroupProps) {
+export function MarqueeGroup({ pauseButton, children, className }: MarqueeGroupProps) {
   const [paused, setPaused] = useState(false);
 
   return (
     <div className={className ? `${styles.group} ${className}` : styles.group}>
-      <button
-        type="button"
-        className={styles.toggle}
-        data-paused={paused || undefined}
-        onClick={() => setPaused((current) => !current)}
-      >
-        {paused ? <PlayIcon /> : <PauseIcon />}
-        {paused ? resumeLabel : pauseLabel}
-      </button>
+      {pauseButton && (
+        <button
+          type="button"
+          className={styles.toggle}
+          data-paused={paused || undefined}
+          onClick={() => setPaused((current) => !current)}
+        >
+          {paused ? <PlayIcon /> : <PauseIcon />}
+          {paused ? pauseButton.resumeLabel : pauseButton.pauseLabel}
+        </button>
+      )}
       <MarqueePausedContext value={paused}>{children}</MarqueePausedContext>
     </div>
   );

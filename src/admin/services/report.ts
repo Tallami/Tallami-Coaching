@@ -3,16 +3,14 @@
 // `buildServicesReport` y le pasa el resultado a `ServicesView`, así el armado
 // se prueba sin base de datos.
 //
-// Una fila por ítem del catálogo, en el orden del catálogo. Las ventas son las
-// de ingreso (cobradas o entregadas) por su día de cobro dentro del período; la
-// tendencia y la última venta miran toda la historia que traen las ventas, no
+// Una fila por ítem del catálogo, en el orden del catálogo; los servicios que ya
+// no se venden solo aparecen si tienen alguna venta de ingreso. Las ventas son
+// las de ingreso (cobradas o entregadas) por su día de cobro dentro del período;
+// la tendencia y la última venta miran toda la historia que traen las ventas, no
 // solo el período. La conversión es ventas cobradas ÷ clics en "Reservar" del
-// mismo período, y vacía (`null`) cuando no hubo clics. El pack de 4 clases no
-// tiene botón propio: se pide desde el de Clase 1 a 1, así que la conversión de
-// esa fila suma las ventas de las dos (sus columnas de ventas e ingresos siguen
-// siendo solo las suyas).
+// mismo período, y vacía (`null`) cuando no hubo clics.
 
-import { SALE_ITEMS, SITE_BOOKING_ITEMS, type SaleItem } from "@/admin/catalog";
+import { SALE_ITEMS, SITE_BOOKING_ITEMS, isRetiredItem, type SaleItem } from "@/admin/catalog";
 import type { ItemClicks } from "@/admin/interest/query";
 import { divideRound, percent, sumMinor } from "@/admin/metrics/math";
 import { isIncome, type MetricSale } from "@/admin/metrics/metric-sale";
@@ -23,10 +21,6 @@ import { incomeByItem, monthlyIncome, type MonthlyIncome } from "@/admin/metrics
 export const TREND_MONTHS = 6;
 
 const SITE_BOOKING_SET: ReadonlySet<SaleItem> = new Set(SITE_BOOKING_ITEMS);
-
-/** El ítem sin botón propio y el botón desde el que se pide: el segundo cobra también las ventas del primero. */
-const PACK_ITEM: SaleItem = "lessonPack";
-const PACK_BUTTON_ITEM: SaleItem = "lesson";
 
 export interface ServiceRow {
   item: SaleItem;
@@ -44,11 +38,7 @@ export interface ServiceRow {
   lastSaleOn: string | null;
   /** Clics en el botón del sitio en el período, o `null` si el ítem no tiene botón. */
   clicks: number | null;
-  /** Las ventas que cuentan para la conversión: las propias y, en Clase 1 a 1, también las del pack. */
-  conversionSales: number;
-  /** De `conversionSales`, las que son del pack de 4 clases (solo en Clase 1 a 1; 0 en las demás filas). */
-  includedPackSales: number;
-  /** `conversionSales` ÷ clics, un decimal, o `null` sin clics. Puede pasar de 100. */
+  /** Ventas ÷ clics, un decimal, o `null` sin clics. Puede pasar de 100. */
   conversionPct: number | null;
 }
 
@@ -93,14 +83,13 @@ export function buildServicesReport(
   const periodIncome = new Map(incomeByItem(sales, range).map((entry) => [entry.item, entry]));
   const clicksByItem = new Map<string, number>(clicks.map((entry) => [entry.item, entry.clicks]));
 
-  const rows = SALE_ITEMS.map((item): ServiceRow => {
+  const soldItems = new Set(income.map((sale) => sale.item));
+  const rows = SALE_ITEMS.filter((item) => !isRetiredItem(item) || soldItems.has(item)).map((item): ServiceRow => {
     const own = income.filter((sale) => sale.item === item);
     const inPeriod = periodIncome.get(item);
     const count = inPeriod?.count ?? 0;
     const incomeUsdMinor = inPeriod?.usdMinor ?? 0;
     const itemClicks = SITE_BOOKING_SET.has(item) ? (clicksByItem.get(item) ?? 0) : null;
-    const includedPackSales = item === PACK_BUTTON_ITEM ? (periodIncome.get(PACK_ITEM)?.count ?? 0) : 0;
-    const conversionSales = count + includedPackSales;
     return {
       item,
       sales: count,
@@ -110,9 +99,7 @@ export function buildServicesReport(
       trend: monthlyIncome(own, TREND_MONTHS, now),
       lastSaleOn: lastSaleDay(own, today),
       clicks: itemClicks,
-      conversionSales,
-      includedPackSales,
-      conversionPct: itemClicks === null || itemClicks === 0 ? null : percent(conversionSales, itemClicks),
+      conversionPct: itemClicks === null || itemClicks === 0 ? null : percent(count, itemClicks),
     };
   });
 

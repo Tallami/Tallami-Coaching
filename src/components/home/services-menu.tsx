@@ -1,13 +1,6 @@
 import { getLocale, getTranslations } from "next-intl/server";
 import { Button } from "@/components/ui/button";
-import {
-  LESSON_PACK,
-  PRO_SEASON,
-  SERVICES,
-  bookingHref,
-  lessonPackSavingsUsd,
-  type Service,
-} from "@/content/services";
+import { PRO_SEASON, SERVICES, bookingHref, type Service } from "@/content/services";
 import { formatUsd } from "@/lib/format";
 import { BookingLink } from "./booking-link";
 import styles from "./services-menu.module.css";
@@ -15,7 +8,7 @@ import styles from "./services-menu.module.css";
 interface PriceRowProps {
   name: string;
   price: string;
-  /** Aclaración junto al precio: "por dúo o trío", "por equipo, toda la temporada". */
+  /** Aclaración junto al precio: "por equipo, toda la temporada". */
   unit?: string;
 }
 
@@ -43,23 +36,10 @@ async function ServiceItem({ service }: { service: Service }) {
   const locale = await getLocale();
   const { id } = service;
 
-  const description =
-    id === "lesson"
-      ? t("items.lesson.description", {
-          sessions: LESSON_PACK.sessions,
-          packPrice: formatUsd(LESSON_PACK.priceUsd, locale),
-          savings: formatUsd(lessonPackSavingsUsd(), locale),
-        })
-      : t(`items.${id}.description`);
-
   return (
     <li>
-      <PriceRow
-        name={t(`items.${id}.name`)}
-        price={formatUsd(service.priceUsd, locale)}
-        unit={service.unit ? t(`units.${service.unit}`) : undefined}
-      />
-      <p>{description}</p>
+      <PriceRow name={t(`items.${id}.name`)} price={formatUsd(service.priceUsd, locale)} />
+      <p>{t(`items.${id}.description`)}</p>
       <Button asChild variant="ink-outline" size="sm">
         <BookingLink item={id} locale={locale} href={bookingHref(id)}>
           {t(`items.${id}.cta`)}

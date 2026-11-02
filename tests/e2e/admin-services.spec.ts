@@ -67,6 +67,9 @@ test.describe("without a session", () => {
   });
 });
 
+/** Lo que está a la venta (5), "Otro" y Clase 1 a 1, que ya no se vende pero tiene una venta cargada. */
+const ROWS_WITH_THE_SEEDED_SALES = 7;
+
 test.describe("services", () => {
   test.beforeEach(async ({ page }) => {
     await loginAsAdmin(page);
@@ -151,29 +154,32 @@ test.describe("services", () => {
     );
   });
 
-  test("lists every item of the catalog with its label", async ({ page }) => {
+  test("lists every item on sale with its label, and a retired one only if it has sales", async ({ page }) => {
     await page.goto(SERVICES_PATH);
 
     await expect(page.getByRole("heading", { name: "Servicios", level: 1 })).toBeVisible();
-    await expect(page.getByTestId("service-row")).toHaveCount(8);
+    await expect(page.getByTestId("service-row")).toHaveCount(ROWS_WITH_THE_SEEDED_SALES);
     for (const label of [
-      "VOD review grabado",
+      "VOD review de 3 partidas",
+      "VOD review de torneo completo",
       "VOD review en vivo",
-      "Clase 1 a 1",
-      "Pack de 4 clases",
       "Plan de juego personalizado",
-      "Coaching de torneo",
       "Temporada Pro",
+      // Ya no se vende, pero tiene una venta cargada.
+      "Clase 1 a 1",
       "Otro",
     ]) {
       await expect(page.getByRole("rowheader", { name: label, exact: true })).toBeVisible();
+    }
+    for (const label of ["Pack de 4 clases", "Coaching de torneo"]) {
+      await expect(page.getByRole("rowheader", { name: label, exact: true })).toHaveCount(0);
     }
     await expect(page.getByRole("link", { name: "Servicios", exact: true })).toHaveAttribute("aria-current", "page");
   });
 
   test("the services page is accessible", async ({ page }) => {
     await page.goto(SERVICES_PATH);
-    await expect(page.getByTestId("service-row")).toHaveCount(8);
+    await expect(page.getByTestId("service-row")).toHaveCount(ROWS_WITH_THE_SEEDED_SALES);
 
     const results = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
@@ -189,7 +195,7 @@ test.describe("services", () => {
 
     test("the page never scrolls sideways: the table scrolls inside its own box", async ({ page }) => {
       await page.goto(SERVICES_PATH);
-      await expect(page.getByTestId("service-row")).toHaveCount(8);
+      await expect(page.getByTestId("service-row")).toHaveCount(ROWS_WITH_THE_SEEDED_SALES);
 
       const sideways = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,

@@ -12,8 +12,8 @@ import { INTEREST_PATH as ENDPOINT, watchBeacons } from "../helpers/beacons";
 const BROWSER_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
 
-/** Los cinco botones del menú, en el orden de la pizarra. Temporada Pro lo prueba `admin-services.spec.ts`. */
-const MENU_ITEMS = ["vodRecorded", "vodLive", "lesson", "gamePlan", "tournament"] as const;
+/** Los botones del menú, en el orden de la pizarra. Temporada Pro lo prueba `admin-services.spec.ts`. */
+const MENU_ITEMS = ["vodRecorded", "tournamentReview", "vodLive", "gamePlan"] as const;
 const LOCALES = ["es", "pt", "en"] as const;
 
 const bodyOf = (item: string, locale: string) => JSON.stringify({ item, locale });
@@ -61,7 +61,7 @@ test.describe("the service buttons of the public site", () => {
     await page.goto("/es");
 
     const links = page.locator("#services li a, #services .stage a");
-    await expect(links).toHaveCount(6);
+    await expect(links).toHaveCount(5);
     for (const href of await links.evaluateAll((nodes) => nodes.map((node) => node.getAttribute("href")))) {
       expect(href).toBe("#services");
     }
@@ -86,7 +86,7 @@ test.describe("the service buttons of the public site", () => {
     await expect(opened).toHaveURL(/\/es#services$/);
     // La pestaña de origen no se movió.
     expect(new URL(page.url()).hash).toBe("");
-    await expect.poll(() => watch.bodies()).toEqual([bodyOf("lesson", "es")]);
+    await expect.poll(() => watch.bodies()).toEqual([bodyOf("vodLive", "es")]);
     expect(watch.requests()).toHaveLength(1);
   });
 
@@ -107,14 +107,14 @@ test.describe("the service buttons of the public site", () => {
   test("the keyboard works: Enter on a focused button follows the link and counts once", async ({ page }) => {
     const watch = await watchBeacons(page);
     await page.goto("/en");
-    const link = menuLink(page, 4);
+    const link = menuLink(page, 1);
     await whenInteractive(link);
 
     await link.focus();
     await page.keyboard.press("Enter");
 
     await expect(page).toHaveURL(/\/en#services$/);
-    await expect.poll(() => watch.bodies()).toEqual([bodyOf("tournament", "en")]);
+    await expect.poll(() => watch.bodies()).toEqual([bodyOf("tournamentReview", "en")]);
     expect(watch.requests()).toHaveLength(1);
   });
 
@@ -133,7 +133,7 @@ test.describe("the service buttons of the public site", () => {
     const request = await sent;
     expect(request.method()).toBe("POST");
     expect(request.headers()["content-type"]).toBe("application/json");
-    expect(request.postData()).toBe(bodyOf("vodLive", "pt"));
+    expect(request.postData()).toBe(bodyOf("tournamentReview", "pt"));
     expect((await answered).status()).toBe(204);
     await expect(page).toHaveURL(/\/pt#services$/);
   });

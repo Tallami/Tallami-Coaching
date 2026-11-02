@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { SALE_ITEMS } from "@/admin/catalog";
+import { RETIRED_ITEMS } from "@/admin/catalog";
 import {
   NO_COUNTRY_LABEL,
   incomeByCountry,
@@ -100,7 +100,7 @@ describe("income by service, payment method and country", () => {
     ];
     const rows = incomeByItem(sales, THIS_MONTH);
     expect(rows.map((row) => row.sharePct)).toEqual([33.4, 33.3, 33.3]);
-    expect(rows.map((row) => row.item)).toEqual(["lesson", "gamePlan", "tournament"]);
+    expect(rows.map((row) => row.item)).toEqual(["gamePlan", "lesson", "tournament"]);
   });
 
   test("a single service has the whole share", () => {
@@ -180,39 +180,37 @@ describe("income by service, payment method and country", () => {
       sale({ item: "vodLive", paidOn: "2026-07-15" }),
     ];
 
-    expect(itemsWithoutSales(sales, 90, NOW)).toEqual([
-      "vodLive",
-      "lessonPack",
-      "gamePlan",
-      "tournament",
-      "proSeason",
-    ]);
+    expect(itemsWithoutSales(sales, 90, NOW)).toEqual(["tournamentReview", "vodLive", "gamePlan", "proSeason"]);
     expect(itemsWithoutSales(sales, undefined, NOW)).toEqual(itemsWithoutSales(sales, 90, NOW));
   });
 
-  test("with no sales at all every service but other is without sales", () => {
-    expect(itemsWithoutSales([], 90, NOW)).toEqual(SALE_ITEMS.filter((item) => item !== "other"));
+  test("with no sales at all every service on sale is without sales", () => {
+    expect(itemsWithoutSales([], 90, NOW)).toEqual(["vodRecorded", "tournamentReview", "vodLive", "gamePlan", "proSeason"]);
+  });
+
+  test("a service that is no longer sold is never listed as without sales", () => {
+    for (const item of RETIRED_ITEMS) expect(itemsWithoutSales([], 90, NOW)).not.toContain(item);
   });
 
   test("the window of items without sales follows the days asked", () => {
     const sales = [
-      sale({ item: "lesson", paidOn: "2026-10-04" }),
+      sale({ item: "vodLive", paidOn: "2026-10-04" }),
       sale({ item: "gamePlan", paidOn: "2026-09-20" }),
     ];
     // 10 días: del 4/10 al 13/10.
-    expect(itemsWithoutSales(sales, 10, NOW)).not.toContain("lesson");
-    expect(itemsWithoutSales(sales, 9, NOW)).toContain("lesson");
+    expect(itemsWithoutSales(sales, 10, NOW)).not.toContain("vodLive");
+    expect(itemsWithoutSales(sales, 9, NOW)).toContain("vodLive");
     // 24 días: del 20/9 al 13/10.
     expect(itemsWithoutSales(sales, 24, NOW)).not.toContain("gamePlan");
     expect(itemsWithoutSales(sales, 23, NOW)).toContain("gamePlan");
   });
 
   test("a sale dated in the future does not count as a sale of that service yet", () => {
-    const sales = [sale({ item: "tournament", paidOn: "2026-10-14" })];
-    expect(itemsWithoutSales(sales, 90, NOW)).toContain("tournament");
+    const sales = [sale({ item: "tournamentReview", paidOn: "2026-10-14" })];
+    expect(itemsWithoutSales(sales, 90, NOW)).toContain("tournamentReview");
     // Mañana ya es una venta del servicio.
     expect(itemsWithoutSales(sales, 90, new Date("2026-10-14T15:00:00.000Z"))).not.toContain(
-      "tournament",
+      "tournamentReview",
     );
   });
 

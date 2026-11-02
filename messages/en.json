@@ -1,7 +1,7 @@
 {
   "Metadata": {
     "title": "Tallami Coaching · Competitive Fortnite coaching",
-    "description": "Competitive Fortnite coaching with Tallami, the coach behind {count} FNCS titles. VOD reviews, 1-on-1 lessons, game plans and tournament coaching."
+    "description": "Competitive Fortnite coaching with Tallami, the coach behind {count} FNCS titles. VOD reviews, game plans and Temporada Pro."
   },
   "Common": {
     "skipLink": "Skip to content"
@@ -25,9 +25,7 @@
     "role": "Competitive Fortnite coach, Argentina"
   },
   "Players": {
-    "label": "Worked with",
-    "pause": "Pause",
-    "resume": "Play"
+    "label": "Worked with"
   },
   "Results": {
     "title": "Results as a coach",
@@ -47,36 +45,28 @@
     "title": "Services and prices",
     "payments": "Prices in US dollars. You pay with Mercado Pago, Pix, PayPal or crypto, depending on your country.",
     "minors": "Under 18? You can still train: a responsible adult makes the payment.",
-    "tip": "First time? Start with a recorded VOD review.",
+    "tip": "First time? Start with a 3-game VOD review.",
     "items": {
       "vodRecorded": {
-        "name": "Recorded VOD review",
-        "description": "You send me a game and I send back the video analysis within 72 hours.",
-        "cta": "Book recorded VOD"
+        "name": "3-game VOD review",
+        "description": "Send me the replay codes for 3 games and I'll send back the video analysis within 72 hours.",
+        "cta": "Book 3-game VOD"
+      },
+      "tournamentReview": {
+        "name": "Full tournament VOD review",
+        "description": "Send me the replay codes for the whole tournament and I'll send back the full video analysis.",
+        "cta": "Book tournament VOD"
       },
       "vodLive": {
         "name": "Live VOD review",
         "description": "We watch your game together for 60 minutes and I correct you in the moment.",
         "cta": "Book live VOD"
       },
-      "lesson": {
-        "name": "1-on-1 lesson",
-        "description": "60 minutes on what you struggle with most. Pack of {sessions} lessons: {packPrice}, you save {savings}.",
-        "cta": "Book a lesson"
-      },
       "gamePlan": {
         "name": "Custom game plan",
         "description": "A plan built around how you play and your upcoming tournaments.",
         "cta": "Request my plan"
-      },
-      "tournament": {
-        "name": "Tournament coaching",
-        "description": "I'm with your duo or trio during the tournament. The price is per duo or trio.",
-        "cta": "Book for my duo or trio"
       }
-    },
-    "units": {
-      "perTeam": "per duo or trio"
     },
     "pro": {
       "name": "Temporada Pro",
@@ -181,7 +171,8 @@
       "unpaid": "Awaiting payment"
     },
     "items": {
-      "vodRecorded": "Recorded VOD review",
+      "vodRecorded": "3-game VOD review",
+      "tournamentReview": "Full tournament VOD review",
       "vodLive": "Live VOD review",
       "lesson": "1-on-1 lesson",
       "lessonPack": "1-on-1 lesson pack",

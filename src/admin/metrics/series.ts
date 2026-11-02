@@ -6,6 +6,7 @@
 import {
   PAYMENT_METHODS,
   SALE_ITEMS,
+  isRetiredItem,
   type PaymentMethod,
   type SaleItem,
 } from "@/admin/catalog";
@@ -179,8 +180,8 @@ export function incomeByCountry(sales: readonly MetricSale[], range: DateRange):
 }
 
 /**
- * Los servicios del catálogo (sin "Otro") que no vendieron en los últimos
- * `days` días, en el orden del catálogo. La ventana son los `days` días que
+ * Los servicios que se venden hoy (sin "Otro" ni los que ya no se venden) y no
+ * vendieron en los últimos `days` días, en el orden del catálogo. La ventana son los `days` días que
  * terminan hoy (90 días contando hoy); una venta con fecha futura todavía no
  * cuenta como venta del servicio.
  */
@@ -200,5 +201,5 @@ export function itemsWithoutSales(
       .filter((sale) => isInRange(sale.paidOn, window))
       .map((sale) => sale.item),
   );
-  return SALE_ITEMS.filter((item) => item !== "other" && !sold.has(item));
+  return SALE_ITEMS.filter((item) => item !== "other" && !isRetiredItem(item) && !sold.has(item));
 }

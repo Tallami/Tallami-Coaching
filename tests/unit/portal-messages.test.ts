@@ -48,6 +48,7 @@ const SAME_IN_EVERY_LANGUAGE = new Set([
 
 /** Textos que en portugués se escriben igual que en español. */
 const SAME_IN_PORTUGUESE = new Set([
+  "items.vodRecorded",
   "deliveries.title",
   "deliveries.openLink",
   "signIn.providersLabel",

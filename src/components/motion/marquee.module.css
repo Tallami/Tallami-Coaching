@@ -97,8 +97,8 @@
 }
 
 /*
- * Pausa: el botón (`data-paused`), el puntero sobre cualquier fila del grupo y
- * el foco del teclado en un elemento de alguna fila. Ni el puntero ni el foco
+ * Pausa: el botón si el grupo lo tiene (`data-paused`), el puntero sobre cualquier
+ * fila del grupo y el foco del teclado en un elemento de alguna fila. Ni el puntero ni el foco
  * sobre el botón frenan nada: al tocar "Reanudar", con el mouse o con el
  * teclado, el movimiento tiene que arrancar ya. `:focus-visible` y no
  * `:focus-within`: un clic en una tarjeta ya cae en algo que se ve.

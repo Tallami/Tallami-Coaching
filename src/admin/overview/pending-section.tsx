@@ -122,7 +122,7 @@ function Deliveries({ deliveries, today }: { deliveries: readonly PendingDeliver
       testId="pending-deliveries"
       title="Entregas por hacer"
       count={deliveries.length}
-      hint="VOD grabados y planes de juego cobrados que todavía no entregaste."
+      hint="VOD reviews y planes de juego cobrados que todavía no entregaste."
     >
       {deliveries.length === 0 ? (
         <NothingPending />

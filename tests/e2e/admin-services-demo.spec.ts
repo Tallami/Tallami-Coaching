@@ -6,10 +6,9 @@
 
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
-import { ITEM_LABELS, INTEREST_ITEMS, SALE_ITEMS, SITE_BOOKING_ITEMS } from "../../src/admin/catalog";
+import { ITEM_LABELS, INTEREST_ITEMS, SITE_BOOKING_ITEMS } from "../../src/admin/catalog";
 import { dateToArgentinaLocal, formatDay } from "../../src/admin/dates";
 import { buildServicesReport, type ServicesReport } from "../../src/admin/services/report";
-import { percent } from "../../src/admin/metrics/math";
 import { incomeByItem } from "../../src/admin/metrics/series";
 import { PERIODS, PERIOD_LABELS, periodRange, type Period } from "../../src/admin/metrics/period";
 import { formatPercent, formatRangeLabel, monthLabels } from "../../src/admin/overview/labels";
@@ -56,7 +55,7 @@ test.describe("the services table matches the demo data in every period", () => 
       await openServices(page, period);
       const report = expectedReport(period);
 
-      await expect(page.getByTestId("service-row")).toHaveCount(SALE_ITEMS.length);
+      await expect(page.getByTestId("service-row")).toHaveCount(report.rows.length);
       for (const [index, row] of report.rows.entries()) {
         await expect(page.getByTestId("service-row").nth(index), row.item).toHaveAttribute("data-item", row.item);
         await expect(cell(page, row.item, "item")).toHaveText(ITEM_LABELS[row.item]);
@@ -69,13 +68,8 @@ test.describe("the services table matches the demo data in every period", () => 
         await expect(cell(page, row.item, "clicks"), `${row.item} clicks`).toHaveText(
           row.clicks === null ? "—" : String(row.clicks),
         );
-        // Clase 1 a 1 aclara cuántas ventas del pack incluye.
-        const packNote =
-          row.includedPackSales > 0 && row.conversionPct !== null
-            ? ` incluye ${row.includedPackSales} ${row.includedPackSales === 1 ? "venta" : "ventas"} del pack`
-            : "";
         await expect(cell(page, row.item, "conversion"), `${row.item} conversion`).toHaveText(
-          row.conversionPct === null ? "—" : `${formatPercent(row.conversionPct)}${packNote}`,
+          row.conversionPct === null ? "—" : formatPercent(row.conversionPct),
         );
         await expect(cell(page, row.item, "last"), `${row.item} last`).toContainText(
           row.lastSaleOn === null ? "—" : formatDay(row.lastSaleOn),
@@ -114,33 +108,7 @@ test("clicks and sales are consistent with the overview and with the raw demo ev
   }
 });
 
-test("Clase 1 a 1 converts its own sales plus the pack's, because the pack is requested from that button", async ({ page }) => {
-  await openServices(page, "last12");
-  const range = periodRange("last12", new Date());
-  const counts = new Map(incomeByItem(sales, range).map((entry) => [entry.item, entry.count]));
-  const lessonSales = counts.get("lesson") ?? 0;
-  const packSales = counts.get("lessonPack") ?? 0;
-  const lessonClicks = data.interest.filter((event) => {
-    const day = dayOf(event.createdAt as Date);
-    return event.item === "lesson" && day >= range.from && day <= range.to;
-  }).length;
-  expect(packSales).toBeGreaterThan(0);
-  expect(lessonClicks).toBeGreaterThan(0);
-
-  // Las columnas propias quedan como estaban: la fila de Clase 1 a 1 no suma las ventas del pack.
-  await expect(cell(page, "lesson", "sales")).toHaveText(String(lessonSales));
-  await expect(cell(page, "lessonPack", "sales")).toHaveText(String(packSales));
-  await expect(cell(page, "lesson", "conversion")).toContainText(
-    formatPercent(percent(lessonSales + packSales, lessonClicks)),
-  );
-  await expect(cell(page, "lesson", "conversion")).toContainText(
-    `incluye ${packSales} ${packSales === 1 ? "venta" : "ventas"} del pack`,
-  );
-  await expect(page.getByText("la conversión de Clase 1 a 1 cuenta también las ventas del pack")).toBeVisible();
-  await expect(page.getByRole("columnheader", { name: "Últimos 6 meses (escala propia)" })).toBeVisible();
-});
-
-test("a button nobody clicked this month shows 0 clicks and a dash for conversion; the pack and 'other' show dashes", async ({ page }) => {
+test("a button nobody clicked this month shows 0 clicks and a dash for conversion; 'other' and the services no longer sold show dashes", async ({ page }) => {
   await openServices(page, "thisMonth");
 
   await expect(cell(page, "proSeason", "clicks")).toHaveText("0");
@@ -158,6 +126,7 @@ test("each row draws six months of income with a text alternative", async ({ pag
   await openServices(page, "thisMonth");
   const report = expectedReport("thisMonth");
 
+  await expect(page.getByRole("columnheader", { name: "Últimos 6 meses (escala propia)" })).toBeVisible();
   for (const row of report.rows) {
     const chart = page.locator(`[data-testid="service-row"][data-item="${row.item}"] [data-col="trend"]`).getByRole("img");
     await expect(chart).toHaveCount(1);
@@ -187,7 +156,7 @@ test.describe("layout", () => {
     test(`the page never scrolls sideways at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await openServices(page, "last12");
-      await expect(page.getByTestId("service-row")).toHaveCount(SALE_ITEMS.length);
+      await expect(page.getByTestId("service-row")).toHaveCount(expectedReport("last12").rows.length);
 
       const sideways = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,

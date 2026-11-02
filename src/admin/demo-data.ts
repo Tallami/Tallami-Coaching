@@ -195,6 +195,7 @@ function scheduleFor(item: SaleItem, paidOn: string, random: Random): Date {
   const hour = SESSION_HOURS[Math.floor(random() * SESSION_HOURS.length)];
   switch (item) {
     case "vodRecorded":
+    case "tournamentReview":
       return argentinaTime(addDays(paidOn, 3), 18);
     case "gamePlan":
       return argentinaTime(addDays(paidOn, 7), 18);
@@ -257,13 +258,18 @@ function toDraft(spec: SaleSpec, random: Random): SaleDraft {
 }
 
 const ITEM_WEIGHTS = [
+  ["vodRecorded", 30],
+  ["tournamentReview", 20],
+  ["vodLive", 24],
+  ["gamePlan", 18],
+] as const satisfies readonly (readonly [SaleItem, number])[];
+/** Lo que ya no se vende aparece solo en los meses viejos de la historia. */
+const RETIRED_ITEM_WEIGHTS = [
   ["lesson", 22],
-  ["vodRecorded", 12],
-  ["vodLive", 14],
-  ["gamePlan", 16],
   ["lessonPack", 14],
   ["tournament", 14],
 ] as const satisfies readonly (readonly [SaleItem, number])[];
+const RETIRED_SOLD_UNTIL_MONTHS_AGO = 6;
 const DISCOUNT_CHANCE = 0.12;
 const DISCOUNT_FACTOR = 0.9;
 
@@ -275,7 +281,10 @@ function historySpec(
   today: string,
   monthsAgo: number,
 ): SaleSpec {
-  const item = pickWeighted<SaleItem>(random, ITEM_WEIGHTS);
+  const item = pickWeighted<SaleItem>(
+    random,
+    monthsAgo >= RETIRED_SOLD_UNTIL_MONTHS_AGO ? [...ITEM_WEIGHTS, ...RETIRED_ITEM_WEIGHTS] : ITEM_WEIGHTS,
+  );
   const listPrice = suggestedPriceUsd(item) ?? 50;
   const priceUsd = random() < DISCOUNT_CHANCE ? Math.round(listPrice * DISCOUNT_FACTOR) : listPrice;
   const dueAt = scheduleFor(item, paidOn, random);
@@ -392,26 +401,24 @@ function scenarioSpecs(today: string): SaleSpec[] {
     // Entregas: dos vencidas, dos por venir, una sin fecha.
     paid(3, "vodRecorded", 5, -2),
     paid(7, "gamePlan", 9, -1),
-    paid(12, "vodRecorded", 1, 2),
+    paid(12, "tournamentReview", 1, 2),
     paid(15, "gamePlan", 2, 5),
     paid(21, "gamePlan", 0, null),
     // Sesiones de los próximos 7 días (una sin cobrar, una para hoy a la noche).
-    paid(2, "lesson", 2, 1),
+    paid(2, "vodLive", 2, 1),
     paid(9, "vodLive", 1, 2, 21),
-    paid(5, "tournament", 3, 4, 20),
-    unpaid(14, "lesson", 3, 17),
-    paid(18, "lessonPack", 0, 6, 19),
-    paid(22, "lesson", 0, 0, 21),
-    // Sesiones ya dadas que faltan marcar (el pack no entra) y dos sin cobrar.
-    paid(1, "lesson", 6, -2, 19),
+    paid(5, "vodLive", 3, 4, 20),
+    unpaid(14, "vodLive", 3, 17),
+    paid(22, "vodLive", 0, 0, 21),
+    // Sesiones ya dadas que faltan marcar y dos sin cobrar.
+    paid(1, "vodLive", 6, -2, 19),
     paid(4, "vodLive", 8, -4, 20),
-    paid(6, "lesson", 10, -6),
-    paid(8, "tournament", 14, -9, 21),
-    paid(10, "lesson", 18, -12, 17),
+    paid(6, "vodLive", 10, -6),
+    paid(8, "vodLive", 14, -9, 21),
+    paid(10, "vodLive", 18, -12, 17),
     paid(13, "vodLive", 24, -17, 20),
-    unpaid(16, "lesson", -5, 19),
+    unpaid(16, "vodLive", -5, 19),
     unpaid(20, "vodLive", -15, 18),
-    paid(11, "lessonPack", 30, -20, 19),
     // Temporada Pro: la última hace más de 90 días, y una venta de "Otro".
     {
       student: 1,
@@ -433,9 +440,9 @@ function scenarioSpecs(today: string): SaleSpec[] {
       monthsAgo: 2,
     },
     // Canceladas, reembolsada y una que quedó en pagar sin fecha.
-    { student: 4, item: "lesson", status: "cancelled", paidOn: null, dueAt: at(-20, LATE_HOURS[0]), monthsAgo: 1 },
+    { student: 4, item: "vodLive", status: "cancelled", paidOn: null, dueAt: at(-20, LATE_HOURS[0]), monthsAgo: 1 },
     { student: 11, item: "gamePlan", status: "cancelled", paidOn: null, monthsAgo: 2 },
-    { student: 19, item: "tournament", status: "cancelled", paidOn: null, dueAt: at(-130, 20), monthsAgo: 4 },
+    { student: 19, item: "vodLive", status: "cancelled", paidOn: null, dueAt: at(-130, 20), monthsAgo: 4 },
     { student: 13, item: "vodLive", status: "refunded", paidOn: ago(40), monthsAgo: 1 },
     { student: 17, item: "vodRecorded", status: "pending", paidOn: null, monthsAgo: 0 },
   ];

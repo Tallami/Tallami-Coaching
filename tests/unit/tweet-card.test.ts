@@ -59,7 +59,7 @@ describe("TweetCard", () => {
     const markup = render(CARD);
 
     const label = markup.indexOf(LABEL);
-    const text = markup.indexOf("Top 14 ($32000)");
+    const text = markup.indexOf("conned 12/12");
     const date = markup.indexOf("27 sept 2026");
     expect(label).toBeGreaterThan(-1);
     expect(text).toBeGreaterThan(label);
@@ -76,13 +76,19 @@ describe("TweetCard", () => {
     const hidden = markup.indexOf('aria-hidden="true"');
     const handle = markup.indexOf("@LewaFn");
     const mark = markup.indexOf("𝕏");
-    const text = markup.indexOf("Top 14 ($32000)");
+    const text = markup.indexOf("conned 12/12");
 
     expect(label).toBeGreaterThan(-1);
     expect(hidden).toBeGreaterThan(label);
     expect(handle).toBeGreaterThan(hidden);
     expect(mark).toBeGreaterThan(handle);
     expect(text).toBeGreaterThan(mark);
+  });
+
+  test("sets the placement and the prize apart, in the order of the tweet", () => {
+    const markup = render(CARD);
+
+    expect(markup).toMatch(/<span class="[^"]*">Top 14<\/span> <span class="[^"]*">\(\$32000\)<\/span> conned 12\/12/);
   });
 
   test("hands the browser two photo sizes (1x and 2x), not the whole size list", () => {
@@ -180,7 +186,7 @@ describe("TweetCard", () => {
 
     // Solo el avatar y el emoji del texto.
     expect(pictureImagesOf(markup)).toHaveLength(1);
-    expect(markup).toContain("Top 14 ($32000)");
+    expect(markup).toContain("($32000)");
   });
 
   test("shows an emoji as a Twemoji image that falls back to the emoji itself", () => {
@@ -208,7 +214,7 @@ describe("TweetCard", () => {
     expect(markup).toContain(`${TWEMOJI_BASE_URL}/1f1f8-1f1e6.svg`);
     expect(markup).toContain('alt="🇦🇷"');
     expect(markup).toContain('alt="🇸🇦"');
-    expect(markup).toContain("12th ($30.000)");
+    expect(markup).toContain("($30.000)");
     expect(markup).toContain("qualed ");
     expect(markup).toContain("@tallami1");
   });

@@ -19,17 +19,18 @@ Español (principal), portugués de Brasil e inglés. Rutas `/es`, `/pt`, `/en` 
 Next.js (App Router) + TypeScript + Tailwind + shadcn/ui · Vercel · Supabase (DB, login con Discord y Google, storage) · Sanity (CMS) · Cal.com · Resend · bot de Discord.
 
 ## Pagos (fase posterior)
-Mercado Pago (Argentina) · dLocal Go (Pix y resto de LATAM) · PayPal (exterior) · NOWPayments (cripto). Todos los proveedores escriben en una sola tabla de pedidos; un pedido pagado dispara email, rol en Discord, link para agendar y entrega en el portal.
+Mercado Pago (Argentina), el primero · Takenos (Pix, a confirmar con ellos) · PayPal (exterior) · cripto. Todos los proveedores escriben en una sola tabla de pedidos; un pedido pagado dispara email, rol en Discord, link para agendar y entrega en el portal.
 
 ## Servicios y precios (USD)
 | Servicio | Precio |
 | --- | --- |
-| VOD review grabado (entrega 72 h) | 30 |
+| VOD review de 3 partidas (códigos de replay, entrega 72 h desde que llegan) | 30 |
+| VOD review de torneo completo (códigos de replay) | 60 |
 | VOD review en vivo (60 min) | 45 |
-| Clase 1 a 1 (60 min) | 40 · pack de 4: 140 |
 | Plan de juego personalizado | 120 |
-| Coaching de torneo (dúo/trío) | 150 por equipo |
 | Temporada Pro | 2500 por equipo, toda la temporada (por aplicación) |
+
+Ya no se venden (quedan en el panel para las ventas viejas): Clase 1 a 1, pack de 4 clases, Coaching de torneo.
 
 ## Cómo trabajar en este proyecto
 1. Antes de construir, usá el flujo de Superpowers: brainstorming → plan → ejecución por subagentes → tests.

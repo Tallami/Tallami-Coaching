@@ -27,7 +27,7 @@ export type TweetCard = {
 };
 
 export type TweetTextPart =
-  | { kind: "text" | "mention" | "self"; value: string }
+  | { kind: "text" | "mention" | "self" | "place" | "prize"; value: string }
   /** `code` es el nombre del archivo de Twemoji (`<code>.svg`). */
   | { kind: "emoji"; value: string; code: string };
 
@@ -69,6 +69,14 @@ const X_REQUEST_TIMEOUT_MS = 5_000;
 
 const TRAILING_SHORT_LINK = /\s*https:\/\/t\.co\/\w+\s*$/;
 const MENTION = /@\w+/g;
+/** El puesto con que arranca un tweet de resultado: "Top 14", "1st", "12th", "6x". */
+const PLACE_AT_START = /^(?:top\s*\d+|\d+(?:st|nd|rd|th)|\d+x)(?![\p{L}\p{N}])/iu;
+/**
+ * El premio, con el signo adelante o atrás y con paréntesis o sin ellos: "($30.000)",
+ * "(6000$)", "$ 500", "R$ 3.000". El número termina en un dígito: un punto o una coma
+ * después de él son de la oración.
+ */
+const PRIZE = /\(?(?:(?:R|US)?\$\s?\d(?:[\d.,]*\d)?|\d(?:[\d.,]*\d)?\$)\)?/g;
 const WHITESPACE = /\s+/;
 /** Una letra o un número de cualquier idioma: lo que cuenta como inicial. */
 const LETTER_OR_NUMBER = /[\p{L}\p{N}]/u;
@@ -200,12 +208,27 @@ function twemojiCode(emoji: string): string {
   return codePoints.join("-");
 }
 
+/** Parte un tramo sin menciones ni emojis en `text` y `prize`, sin dejar partes vacías. */
+function textAndPrizeParts(text: string): TweetTextPart[] {
+  const parts: TweetTextPart[] = [];
+  let cursor = 0;
+
+  for (const match of text.matchAll(PRIZE)) {
+    if (match.index > cursor) parts.push({ kind: "text", value: text.slice(cursor, match.index) });
+    parts.push({ kind: "prize", value: match[0] });
+    cursor = match.index + match[0].length;
+  }
+
+  if (cursor < text.length) parts.push({ kind: "text", value: text.slice(cursor) });
+  return parts;
+}
+
 /**
- * Parte un tramo de texto sin menciones en `text` y `emoji`. Recorre por
+ * Parte un tramo de texto sin menciones en emojis y lo demás. Recorre por
  * grafemas (un emoji con tono de piel, bandera o familia es un solo grafema) y
  * junta los que no son emoji, así no queda ninguna parte vacía.
  */
-function textAndEmojiParts(text: string): TweetTextPart[] {
+function plainTextParts(text: string): TweetTextPart[] {
   const parts: TweetTextPart[] = [];
   let plain = "";
 
@@ -214,33 +237,33 @@ function textAndEmojiParts(text: string): TweetTextPart[] {
       plain += segment;
       continue;
     }
-    if (plain) {
-      parts.push({ kind: "text", value: plain });
-      plain = "";
-    }
+    parts.push(...textAndPrizeParts(plain));
+    plain = "";
     parts.push({ kind: "emoji", value: segment, code: twemojiCode(segment) });
   }
 
-  if (plain) parts.push({ kind: "text", value: plain });
+  parts.push(...textAndPrizeParts(plain));
   return parts;
 }
 
 /**
- * Parte el texto en tramos para resaltarlo: `self` es @tallami1 (sin importar
+ * Parte el texto en tramos para resaltarlo: `place` es el puesto con que arranca
+ * un tweet de resultado, `prize` lo que ganaron, `self` es @tallami1 (sin importar
  * mayúsculas), `mention` cualquier otro @usuario, `emoji` cada emoji (para
  * mostrarlo como imagen) y `text` el resto. Unidos en orden dan el texto
  * original.
  */
 export function tweetTextParts(text: string): TweetTextPart[] {
-  const parts: TweetTextPart[] = [];
-  let cursor = 0;
+  const place = PLACE_AT_START.exec(text)?.[0];
+  const parts: TweetTextPart[] = place ? [{ kind: "place", value: place }] : [];
+  let cursor = place?.length ?? 0;
 
   for (const match of text.matchAll(MENTION)) {
     const start = match.index;
     // "coach@tallami1.com" no es una mención: el @ va pegado a otra palabra.
     if (start > 0 && WORD_CHARACTER.test(text[start - 1])) continue;
 
-    parts.push(...textAndEmojiParts(text.slice(cursor, start)));
+    parts.push(...plainTextParts(text.slice(cursor, start)));
     const mention = match[0];
     parts.push({
       kind: mention.toLowerCase() === COACH_MENTION ? "self" : "mention",
@@ -249,7 +272,7 @@ export function tweetTextParts(text: string): TweetTextPart[] {
     cursor = start + mention.length;
   }
 
-  parts.push(...textAndEmojiParts(text.slice(cursor)));
+  parts.push(...plainTextParts(text.slice(cursor)));
   return parts;
 }
 

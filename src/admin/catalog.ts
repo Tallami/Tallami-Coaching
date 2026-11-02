@@ -4,41 +4,61 @@
 // en español. Los precios sugeridos salen de `src/content/services.ts`, la
 // misma fuente que el sitio público.
 
-import { LESSON_PACK, PRO_SEASON, SERVICES } from "@/content/services";
+import { PRO_SEASON, SERVICES } from "@/content/services";
 
 export const SALE_ITEMS = [
   "vodRecorded",
+  "tournamentReview",
   "vodLive",
+  "gamePlan",
+  "proSeason",
   "lesson",
   "lessonPack",
-  "gamePlan",
   "tournament",
-  "proSeason",
   "other",
 ] as const;
 export type SaleItem = (typeof SALE_ITEMS)[number];
 
 /**
+ * Servicios que ya no se venden: el sitio no los ofrece, pero siguen en el
+ * catálogo para que las ventas viejas conserven su nombre y sus números.
+ */
+export const RETIRED_ITEMS = ["lesson", "lessonPack", "tournament"] as const satisfies readonly SaleItem[];
+export type RetiredItem = (typeof RETIRED_ITEMS)[number];
+
+export function isRetiredItem(item: SaleItem): item is RetiredItem {
+  return (RETIRED_ITEMS as readonly SaleItem[]).includes(item);
+}
+
+/** Los precios que tenían los servicios que ya no se venden. */
+const RETIRED_PRICES_USD: Record<RetiredItem, number> = {
+  lesson: 40,
+  lessonPack: 140,
+  tournament: 150,
+};
+
+/**
  * Lo que el sitio público puede avisar con un clic en "Reservar" (`/api/interest`):
- * todo lo que se vende menos "Otro", que no es un servicio con botón. El pack de
- * clases está en la lista porque es un ítem del catálogo, aunque hoy el sitio no
- * tenga un botón propio para él (ver `SITE_BOOKING_ITEMS`).
+ * todo el catálogo menos "Otro", que no es un servicio con botón. Los servicios
+ * que ya no se venden siguen en la lista porque la base guarda sus clics viejos,
+ * aunque el sitio ya no tenga su botón (ver `SITE_BOOKING_ITEMS`).
  */
 export const INTEREST_ITEMS = [
   "vodRecorded",
+  "tournamentReview",
   "vodLive",
+  "gamePlan",
+  "proSeason",
   "lesson",
   "lessonPack",
-  "gamePlan",
   "tournament",
-  "proSeason",
 ] as const satisfies readonly Exclude<SaleItem, "other">[];
 export type InterestItem = (typeof INTEREST_ITEMS)[number];
 
 /**
- * Los ítems que tienen un botón de reserva en el sitio público: los cinco
- * servicios del menú y Temporada Pro (`src/components/home/services-menu.tsx`).
- * Los demás ítems del catálogo no tienen clics que contar.
+ * Los ítems que tienen un botón de reserva en el sitio público: los servicios
+ * del menú y Temporada Pro (`src/components/home/services-menu.tsx`). Los demás
+ * ítems del catálogo no tienen clics que contar.
  */
 export const SITE_BOOKING_ITEMS: readonly InterestItem[] = [
   ...SERVICES.map((service) => service.id),
@@ -112,13 +132,14 @@ export const RATE_SOURCE_LABELS: Record<RateSource, string> = {
 };
 
 export const ITEM_LABELS: Record<SaleItem, string> = {
-  vodRecorded: "VOD review grabado",
+  vodRecorded: "VOD review de 3 partidas",
+  tournamentReview: "VOD review de torneo completo",
   vodLive: "VOD review en vivo",
+  gamePlan: "Plan de juego personalizado",
+  proSeason: "Temporada Pro",
   lesson: "Clase 1 a 1",
   lessonPack: "Pack de 4 clases",
-  gamePlan: "Plan de juego personalizado",
   tournament: "Coaching de torneo",
-  proSeason: "Temporada Pro",
   other: "Otro",
 };
 
@@ -152,9 +173,8 @@ export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
  * se puede editar.
  */
 export function suggestedPriceUsd(item: SaleItem): number | null {
+  if (isRetiredItem(item)) return RETIRED_PRICES_USD[item];
   switch (item) {
-    case "lessonPack":
-      return LESSON_PACK.priceUsd;
     case "proSeason":
       return PRO_SEASON.priceUsd;
     case "other":

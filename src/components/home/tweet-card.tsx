@@ -6,11 +6,11 @@ import styles from "./tweet-card.module.css";
 
 const AVATAR_SIZE = 40;
 /**
- * Ancho de la foto en pantalla: la tarjeta de 250 px menos relleno y borde.
+ * Ancho de la foto en pantalla: la tarjeta de 300 px menos su borde.
  * Con este ancho (y no el de la foto original) `next/image` pide solo dos
  * archivos, para pantallas 1x y 2x, en vez de una lista de 15 tamaños.
  */
-const PHOTO_WIDTH = 220;
+const PHOTO_WIDTH = 298;
 
 /**
  * Los emojis del texto se muestran como imágenes de Twemoji (los mismos que
@@ -71,9 +71,10 @@ function Emoji({ value, code }: { value: string; code: string }) {
 }
 
 /**
- * Texto del tweet como texto de React (nunca como HTML). @tallami1 va en dorado
- * y negrita, las demás menciones en azul claro y los emojis son imágenes; los
- * saltos de línea se respetan por CSS (`white-space: pre-line`).
+ * Texto del tweet como texto de React (nunca como HTML). El puesto va grande y en
+ * dorado, como en la sección Resultados; el premio, en negrita; @tallami1, en
+ * dorado y negrita; las demás menciones, en azul claro; y los emojis son imágenes.
+ * Los saltos de línea se respetan por CSS (`white-space: pre-line`).
  */
 function TweetText({ text }: { text: string }) {
   return (
@@ -101,6 +102,10 @@ function TweetText({ text }: { text: string }) {
  * que abre en otra pestaña. Es un Server Component que se muestra dos veces por
  * fila (la copia del loop la arma `MarqueeRow`), por eso no lleva `id`.
  *
+ * Arriba va la foto, de borde a borde, y abajo el resultado: así todas las fotos
+ * de una fila quedan alineadas, sea cual sea el largo del tweet. La foto es
+ * decoración (`alt=""`) y por eso puede ir última en el HTML: el CSS la sube.
+ *
  * El nombre del link empieza con `label` y sigue con el texto del tweet y la
  * fecha, así el lector de pantalla también lee el tweet. El encabezado con el
  * autor y la marca de X se ocultan al lector: `label` ya dice quién es.
@@ -111,7 +116,7 @@ export function TweetCard({ card, label, date, viewOnX }: TweetCardProps) {
 
   return (
     <a
-      className={styles.card}
+      className={image ? `${styles.card} ${styles.withPhoto}` : styles.card}
       href={card.url}
       target="_blank"
       rel="noopener noreferrer"
@@ -127,14 +132,16 @@ export function TweetCard({ card, label, date, viewOnX }: TweetCardProps) {
       </span>
       {text && <TweetText text={text} />}
       {image && (
-        <Image
-          className={styles.photo}
-          src={image.url}
-          alt=""
-          width={PHOTO_WIDTH}
-          height={Math.round((PHOTO_WIDTH * image.height) / image.width)}
-          loading="lazy"
-        />
+        <span className={styles.media}>
+          <Image
+            className={styles.photo}
+            src={image.url}
+            alt=""
+            width={PHOTO_WIDTH}
+            height={Math.round((PHOTO_WIDTH * image.height) / image.width)}
+            loading="lazy"
+          />
+        </span>
       )}
       <span className={styles.foot}>
         <time dateTime={card.createdAt}>{date}</time>

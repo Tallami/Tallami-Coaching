@@ -118,13 +118,7 @@ describe("only paid and delivered sales are income", () => {
   });
 
   test("a cancelled sale does not take a service off the list of services without sales", () => {
-    expect(itemsWithoutSales(sales, 90, NOW)).toEqual([
-      "vodRecorded",
-      "lessonPack",
-      "gamePlan",
-      "tournament",
-      "proSeason",
-    ]);
+    expect(itemsWithoutSales(sales, 90, NOW)).toEqual(["vodRecorded", "tournamentReview", "gamePlan", "proSeason"]);
   });
 
   test("they do not add to the monotributo", () => {
@@ -535,7 +529,7 @@ describe("cards", () => {
   test("a sale dated in the future counts nowhere until that day", () => {
     const sales = [
       sale({ id: "today", paidOn: "2026-10-13", dollars: 10, item: "lesson", invoiceStatus: "pending" }),
-      sale({ id: "tomorrow", paidOn: "2026-10-14", dollars: 640, item: "tournament", invoiceStatus: "pending" }),
+      sale({ id: "tomorrow", paidOn: "2026-10-14", dollars: 640, item: "tournamentReview", invoiceStatus: "pending" }),
       sale({ id: "next-month", paidOn: "2026-11-02", dollars: 640, item: "proSeason", invoiceStatus: "pending" }),
     ];
     const settings = { category: "A", annualCapArsMinor: 100_000_000, validFrom: "2026-08-01" };
@@ -555,10 +549,9 @@ describe("cards", () => {
     });
     expect(itemsWithoutSales(sales, 90, NOW)).toEqual([
       "vodRecorded",
+      "tournamentReview",
       "vodLive",
-      "lessonPack",
       "gamePlan",
-      "tournament",
       "proSeason",
     ]);
     expect(monotributoStatus(sales, settings, NOW).last12ArsMinor).toBe(1_500_000);

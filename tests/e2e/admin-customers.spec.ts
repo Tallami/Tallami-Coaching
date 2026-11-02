@@ -66,7 +66,7 @@ test.describe("students", () => {
     await expect(row).not.toContainText("USD 190,00");
     await expect(row).toContainText("10/08/2026");
     await expect(row).toContainText("05/09/2026");
-    await expect(row).toContainText("VOD review grabado");
+    await expect(row).toContainText("VOD review de 3 partidas");
     await expect(row).toContainText("Clase 1 a 1");
     await expect(row).not.toContainText("Plan de juego personalizado");
     await expect(
@@ -87,7 +87,7 @@ test.describe("students", () => {
     const cancelled = history.getByRole("row").filter({ hasText: "Plan de juego personalizado" });
     await expect(cancelled).toContainText("Cancelada");
     await expect(cancelled).toContainText("USD 120,00");
-    await expect(history.getByRole("row").filter({ hasText: "VOD review grabado" })).toContainText(
+    await expect(history.getByRole("row").filter({ hasText: "VOD review de 3 partidas" })).toContainText(
       "Entregada",
     );
     await expect(history.getByRole("row").filter({ hasText: "Clase 1 a 1" })).toContainText("Cobrada");

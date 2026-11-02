@@ -1,7 +1,7 @@
 {
   "Metadata": {
     "title": "Tallami Coaching · Coaching de Fortnite competitivo",
-    "description": "Coaching de Fortnite competitivo com o Tallami, o coach por trás de {count} títulos da FNCS. VOD reviews, aulas 1 a 1, planos de jogo e coaching de torneio."
+    "description": "Coaching de Fortnite competitivo com o Tallami, o coach por trás de {count} títulos da FNCS. VOD reviews, planos de jogo e Temporada Pro."
   },
   "Common": {
     "skipLink": "Ir para o conteúdo"
@@ -25,9 +25,7 @@
     "role": "Coach de Fortnite competitivo, Argentina"
   },
   "Players": {
-    "label": "Trabalhei com",
-    "pause": "Pausar",
-    "resume": "Continuar"
+    "label": "Trabalhei com"
   },
   "Results": {
     "title": "Resultados como coach",
@@ -47,36 +45,28 @@
     "title": "Serviços e preços",
     "payments": "Preços em dólares. Você paga com Mercado Pago, Pix, PayPal ou cripto, conforme o seu país.",
     "minors": "Tem menos de 18 anos? Você pode treinar do mesmo jeito: o pagamento é feito por um adulto responsável.",
-    "tip": "Primeira vez? Comece com um VOD review gravado.",
+    "tip": "Primeira vez? Comece com um VOD review de 3 partidas.",
     "items": {
       "vodRecorded": {
-        "name": "VOD review gravado",
-        "description": "Você me manda uma partida e eu devolvo a análise em vídeo em 72 horas.",
-        "cta": "Reservar VOD gravado"
+        "name": "VOD review de 3 partidas",
+        "description": "Você me passa os códigos de replay de 3 partidas e eu devolvo a análise em vídeo em 72 horas.",
+        "cta": "Reservar VOD de 3 partidas"
+      },
+      "tournamentReview": {
+        "name": "VOD review de torneio completo",
+        "description": "Você me passa os códigos de replay do torneio inteiro e eu devolvo a análise completa em vídeo.",
+        "cta": "Reservar VOD de torneio"
       },
       "vodLive": {
         "name": "VOD review ao vivo",
         "description": "Assistimos à sua partida juntos por 60 minutos e eu corrijo você na hora.",
         "cta": "Reservar VOD ao vivo"
       },
-      "lesson": {
-        "name": "Aula 1 a 1",
-        "description": "60 minutos sobre aquilo em que você tem mais dificuldade. Pacote de {sessions} aulas: {packPrice}, você economiza {savings}.",
-        "cta": "Reservar aula"
-      },
       "gamePlan": {
         "name": "Plano de jogo personalizado",
         "description": "Um plano montado para o seu jeito de jogar e para os seus próximos torneios.",
         "cta": "Pedir meu plano"
-      },
-      "tournament": {
-        "name": "Coaching de torneio",
-        "description": "Acompanho a sua dupla ou trio durante o torneio. O preço é por dupla ou trio.",
-        "cta": "Reservar para minha dupla ou trio"
       }
-    },
-    "units": {
-      "perTeam": "por dupla ou trio"
     },
     "pro": {
       "name": "Temporada Pro",
@@ -181,7 +171,8 @@
       "unpaid": "Pagamento pendente"
     },
     "items": {
-      "vodRecorded": "VOD review gravado",
+      "vodRecorded": "VOD review de 3 partidas",
+      "tournamentReview": "VOD review de torneio completo",
       "vodLive": "VOD review ao vivo",
       "lesson": "Aula 1 a 1",
       "lessonPack": "Pacote de aulas 1 a 1",

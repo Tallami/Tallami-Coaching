@@ -1,7 +1,7 @@
 /* Muro de Reviews. Maqueta reviews-y-franja.html, opción C (.wall). */
 
 .reviews {
-  --marquee-gap: 14px;
+  --marquee-gap: 16px;
   --marquee-inset: var(--spacing-gutter);
   padding-top: clamp(48px, 6vw, 80px);
   padding-bottom: clamp(56px, 8vw, 104px);
@@ -46,7 +46,7 @@
 }
 
 /*
- * Cinco tarjetas de 250 px más su separación miden más que los 1180 px del
+ * Cinco tarjetas de 300 px más su separación miden más que los 1180 px del
  * contenido: una copia siempre es más ancha que la ventana y el loop no deja
  * un hueco al dar la vuelta, ni en pantallas grandes.
  */
@@ -68,5 +68,5 @@
 .item {
   display: flex;
   flex: none;
-  width: 250px;
+  width: min(300px, 80vw);
 }

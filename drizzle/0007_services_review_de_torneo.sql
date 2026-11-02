@@ -1,0 +1,4 @@
+ALTER TABLE "interest_events" DROP CONSTRAINT "interest_events_item_valid";--> statement-breakpoint
+ALTER TABLE "sales" DROP CONSTRAINT "sales_item_valid";--> statement-breakpoint
+ALTER TABLE "interest_events" ADD CONSTRAINT "interest_events_item_valid" CHECK ("interest_events"."item" in ('vodRecorded', 'tournamentReview', 'vodLive', 'gamePlan', 'proSeason', 'lesson', 'lessonPack', 'tournament'));--> statement-breakpoint
+ALTER TABLE "sales" ADD CONSTRAINT "sales_item_valid" CHECK ("sales"."item" in ('vodRecorded', 'tournamentReview', 'vodLive', 'gamePlan', 'proSeason', 'lesson', 'lessonPack', 'tournament', 'other'));

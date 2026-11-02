@@ -2,7 +2,7 @@
 // y de los próximos 7 días, sesiones pasadas que faltan marcar como hechas y
 // ventas cobradas sin facturar.
 //
-// - Entregas: ventas cobradas (`paid`) de VOD grabado o plan de juego a las que
+// - Entregas: ventas cobradas (`paid`) de VOD review para entregar o plan de juego a las que
 //   todavía les falta la entrega (`deliveredAt` vacío).
 // - Sesiones: las de servicios en vivo, cobradas o sin cobrar (`pending`), desde
 //   las 00:00 de hoy en Argentina hasta dentro de 7 días. Una sesión sin cobrar
@@ -21,7 +21,7 @@ import { isIncome, type MetricSale } from "./metric-sale";
 import { todayInArgentina } from "./period";
 
 /** Servicios que se entregan: un trabajo hecho a distancia con fecha de entrega. */
-const DELIVERY_ITEMS: ReadonlySet<SaleItem> = new Set(["vodRecorded", "gamePlan"]);
+const DELIVERY_ITEMS: ReadonlySet<SaleItem> = new Set(["vodRecorded", "tournamentReview", "gamePlan"]);
 /** Servicios que se dan en vivo, en un día y una hora. */
 const SESSION_ITEMS: ReadonlySet<SaleItem> = new Set([
   "vodLive",
@@ -75,7 +75,7 @@ export interface UninvoicedTotals {
 
 export interface PendingWork {
   /**
-   * VOD grabado y plan de juego cobrados y sin entregar, por fecha (los vencidos
+   * VOD reviews para entregar y planes de juego cobrados y sin entregar, por fecha (los vencidos
    * quedan primero) y, al final, los que no tienen fecha.
    */
   deliveries: PendingDelivery[];

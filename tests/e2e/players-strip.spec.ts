@@ -21,7 +21,6 @@ const PHONE_VIEWPORT = { width: 375, height: 812 };
 const WIDE_VIEWPORT = { width: 1440, height: 900 };
 /** Redondeo de Chrome al ubicar el contenido centrado. */
 const ALIGNMENT_TOLERANCE_PX = 1;
-const MIN_TARGET_SIZE = 44;
 /** Intervalo corto y acotado para comprobar que la fila no se mueve. */
 const STILL_INTERVAL_MS = 500;
 /** Menos de medio píxel: lo que Chrome puede variar al redondear sin moverse. */
@@ -89,27 +88,6 @@ async function expectMoving(list: Locator) {
   await expect
     .poll(() => listX(list), { timeout: MOVING_TIMEOUT_MS })
     .not.toBeCloseTo(start, 0);
-}
-
-/**
- * Activa el botón hasta que su texto pasa a `expected`: una activación antes
- * de que React hidrate la página se pierde, y repetirla no lo alterna dos
- * veces porque solo se vuelve a activar si el texto todavía no cambió.
- */
-async function toggleTo(
-  button: Locator,
-  expected: string,
-  activate: () => Promise<void> = () => button.click(),
-) {
-  await expect(async () => {
-    if ((await button.textContent()) !== expected) {
-      await activate();
-    }
-    await expect(button).toHaveText(expected, { timeout: 1_000 });
-  }).toPass();
-  // Es un botón de acción, no de estado: el nombre dice qué hace al tocarlo.
-  await expect(button).toHaveAccessibleName(expected);
-  await expect(button).not.toHaveAttribute("aria-pressed");
 }
 
 /** Tab hasta que el foco cae en `target`; falla si no llega en el tope. */
@@ -284,53 +262,15 @@ test.describe("players strip", () => {
     ).toBe(false);
   });
 
-  test("pause button stops the motion and is easy to tap", async ({ page }) => {
-    await page.goto("/es");
+  test("has no pause button, in any language", async ({ page }) => {
+    for (const [path] of STRIP_LABELS) {
+      await page.goto(path);
 
-    const strip = stripOf(page);
-    const list = playerListOf(page);
-    const button = strip.getByRole("button");
-
-    await expect(button).toHaveText("Pausar");
-    await expect(button).toHaveAccessibleName("Pausar");
-    await expect(button).not.toHaveAttribute("aria-pressed");
-    const box = await button.boundingBox();
-    expect(box).not.toBeNull();
-    if (!box) return;
-    expect(box.width).toBeGreaterThanOrEqual(MIN_TARGET_SIZE);
-    expect(box.height).toBeGreaterThanOrEqual(MIN_TARGET_SIZE);
-
-    expect(await animationNames(strip)).not.toEqual([]);
-    await expectMoving(list);
-
-    await toggleTo(button, "Reanudar");
-    // Sin el puntero sobre la fila, lo único que la frena es el botón.
-    await page.mouse.move(0, 0);
-    await expectStill(list);
-
-    await toggleTo(button, "Pausar");
-    await expectMoving(list);
-  });
-
-  test("keyboard users can pause and resume with the button", async ({
-    page,
-  }) => {
-    await page.goto("/es");
-
-    const button = stripOf(page).getByRole("button");
-    const list = playerListOf(page);
-    const pressSpace = () => page.keyboard.press("Space");
-
-    await tabTo(page, button);
-    // El foco en el botón no frena nada: si no, no se vería reanudar.
-    await expectMoving(list);
-
-    await toggleTo(button, "Reanudar", pressSpace);
-    await expectStill(list);
-
-    await toggleTo(button, "Pausar", pressSpace);
-    await expect(button).toBeFocused();
-    await expectMoving(list);
+      await expect(stripOf(page).getByRole("button")).toHaveCount(0);
+      expect(await animationNames(stripOf(page))).not.toEqual([]);
+      // La lista visible: la primera, porque la segunda es la copia del loop.
+      await expectMoving(stripOf(page).locator("ul").first());
+    }
   });
 
   test("hover and keyboard focus pause the motion", async ({ page }) => {
@@ -358,7 +298,6 @@ test.describe("players strip", () => {
     const item = list.getByRole("listitem").first();
 
     await tabTo(page, item);
-    await expect(strip.getByRole("button")).toHaveText("Pausar");
     await expectStill(list);
   });
 
@@ -439,8 +378,7 @@ test.describe("players strip", () => {
     expect(await animationNames(strip)).toEqual([]);
     await expectStill(list);
 
-    // Sin movimiento no hace falta botón ni copia del loop.
-    await expect(strip.getByRole("button")).toBeHidden();
+    // Sin movimiento no hace falta la copia del loop.
     await expect(strip.locator("[inert]")).toBeHidden();
 
     // La fila se desliza a mano, también con el teclado.
@@ -548,9 +486,10 @@ test.describe("players strip", () => {
 
     const row = rowOf(page);
 
-    // El botón responde cuando la página ya se hidrató: recién ahí se decide
-    // si la fila se vuelve focusable.
-    await toggleTo(stripOf(page).getByRole("button"), "Reanudar");
+    // Recién con la página hidratada se decide si la fila se vuelve focusable.
+    await expect
+      .poll(() => row.evaluate((node) => Object.keys(node).some((key) => key.startsWith("__reactFiber"))))
+      .toBe(true);
     await expect(row).not.toHaveAttribute("role");
     await expect(row).not.toHaveAttribute("tabindex");
     await expect(row).not.toHaveAttribute("aria-labelledby");

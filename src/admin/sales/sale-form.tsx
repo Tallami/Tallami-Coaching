@@ -16,10 +16,12 @@ import {
   ITEM_LABELS,
   PAYMENT_LABELS,
   PAYMENT_METHODS,
+  RETIRED_ITEMS,
   SALE_ITEMS,
   SALE_STATUSES,
   STATUS_LABELS,
   isDollarCurrency,
+  isRetiredItem,
   type Currency,
   type SaleItem,
 } from "@/admin/catalog";
@@ -37,7 +39,7 @@ import { Notice } from "@/admin/ui/notice";
 import { useHydrated } from "@/admin/ui/use-hydrated";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { NativeSelect, NativeSelectOptGroup, NativeSelectOption } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { formatMoney } from "@/lib/money";
 
@@ -210,11 +212,18 @@ export function SaleForm({ mode, draftKey, action, initialValues, priceListUsd, 
                 onChange={(event) => updateSuggesting({ item: event.target.value })}
               >
                 <NativeSelectOption value="">Elegí un servicio</NativeSelectOption>
-                {SALE_ITEMS.map((item) => (
+                {SALE_ITEMS.filter((item) => !isRetiredItem(item)).map((item) => (
                   <NativeSelectOption key={item} value={item}>
                     {ITEM_LABELS[item]}
                   </NativeSelectOption>
                 ))}
+                <NativeSelectOptGroup label="Ya no se venden (para ventas viejas)">
+                  {RETIRED_ITEMS.map((item) => (
+                    <NativeSelectOption key={item} value={item}>
+                      {ITEM_LABELS[item]}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelectOptGroup>
               </NativeSelect>
             )}
           </Field>

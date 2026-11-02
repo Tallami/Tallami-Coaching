@@ -8,9 +8,9 @@ import { TweetCard } from "./tweet-card";
 const TITLE_ID = "reviews-title";
 /**
  * Segundos que una fila gasta por tarjeta en cada vuelta: con tarjetas de
- * 250 px y 14 px de separación, unos 37 px por segundo.
+ * 300 px y 16 px de separación, unos 37 px por segundo.
  */
-const SECONDS_PER_CARD = 7.2;
+const SECONDS_PER_CARD = 8.5;
 /** Con menos tarjetas la copia se estira al ancho de la fila; la velocidad no sube de ahí. */
 const MIN_CARDS_PER_LOOP = 5;
 /** Los tweets se fechan en hora de Buenos Aires: la que vieron la mayoría de sus jugadores. */
@@ -83,8 +83,7 @@ export async function ReviewsWall({ cards }: ReviewsWallProps) {
       </div>
       <MarqueeGroup
         className={styles.wall}
-        pauseLabel={t("pause")}
-        resumeLabel={t("resume")}
+        pauseButton={{ pauseLabel: t("pause"), resumeLabel: t("resume") }}
       >
         <MarqueeRow
           direction="left"

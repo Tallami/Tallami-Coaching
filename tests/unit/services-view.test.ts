@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
-import { SALE_ITEMS, SITE_BOOKING_ITEMS, type SaleItem } from "@/admin/catalog";
+import { RETIRED_ITEMS, SALE_ITEMS, SITE_BOOKING_ITEMS, type SaleItem } from "@/admin/catalog";
 import { MiniBars } from "@/admin/charts/mini-bars";
 import type { ItemClicks } from "@/admin/interest/query";
 import { buildServicesReport } from "@/admin/services/report";
@@ -13,14 +13,14 @@ function clicks(counts: Partial<Record<SaleItem, number>> = {}): ItemClicks[] {
 }
 
 const SALES = [
-  sale({ item: "lesson", dollars: 40, paidOn: "2026-10-05" }),
-  sale({ item: "lesson", dollars: 40, paidOn: "2026-10-05" }),
-  sale({ item: "lesson", dollars: 40, paidOn: "2026-07-05" }),
+  sale({ item: "vodRecorded", dollars: 40, paidOn: "2026-10-05" }),
+  sale({ item: "vodRecorded", dollars: 40, paidOn: "2026-10-05" }),
+  sale({ item: "vodRecorded", dollars: 40, paidOn: "2026-07-05" }),
   sale({ item: "gamePlan", dollars: 120, paidOn: "2026-10-12" }),
   sale({ item: "lessonPack", dollars: 140, paidOn: "2026-10-01" }),
 ];
 
-function render(sales = SALES, counts: Partial<Record<SaleItem, number>> = { lesson: 8, vodLive: 3 }): string {
+function render(sales = SALES, counts: Partial<Record<SaleItem, number>> = { vodRecorded: 8, vodLive: 3 }): string {
   const report = buildServicesReport(sales, clicks(counts), "thisMonth", NOW);
   return renderToStaticMarkup(createElement(ServicesView, { report }));
 }
@@ -59,7 +59,8 @@ describe("ServicesView", () => {
     ]) {
       expect(markup, header).toContain(`>${header}</th>`);
     }
-    expect(markup.match(/data-testid="service-row"/g)).toHaveLength(SALE_ITEMS.length);
+    // Los servicios que ya no se venden aparecen solo si tienen ventas: acá, el pack.
+    expect(markup.match(/data-testid="service-row"/g)).toHaveLength(SALE_ITEMS.length - RETIRED_ITEMS.length + 1);
   });
 
   test("explains how conversion is computed", () => {
@@ -67,46 +68,24 @@ describe("ServicesView", () => {
   });
 
   test("writes each number of a row", () => {
-    const lesson = rowOf(render(), "lesson");
+    const lesson = rowOf(render(), "vodRecorded");
 
-    expect(cellOf(lesson, "item")).toBe("Clase 1 a 1");
+    expect(cellOf(lesson, "item")).toBe("VOD review de 3 partidas");
     expect(cellOf(lesson, "sales")).toBe("2");
     expect(cellOf(lesson, "income")).toBe("USD 80,00");
     expect(cellOf(lesson, "avg")).toBe("USD 40,00");
     expect(cellOf(lesson, "share")).toBe("23,5 %");
     expect(cellOf(lesson, "last")).toContain("05/10/2026");
     expect(cellOf(lesson, "clicks")).toBe("8");
-    // 8 clics y 3 ventas contando la del pack: 2 de Clase 1 a 1 y 1 del pack (que se pide desde ese botón).
-    expect(cellOf(lesson, "conversion")).toBe("37,5 % incluye 1 venta del pack");
+    expect(cellOf(lesson, "conversion")).toBe("25 %");
   });
 
-  test("the pack note only shows in Clase 1 a 1, and only when the pack sold", () => {
-    const markup = render();
-
-    expect(markup.match(/incluye \d+ ventas? del pack/g)).toHaveLength(1);
-    expect(cellOf(rowOf(markup, "lessonPack"), "conversion")).toBe("—");
-    expect(cellOf(rowOf(markup, "gamePlan"), "conversion")).toBe("—");
-    const withoutPack = render([sale({ item: "lesson", paidOn: "2026-10-05" })], { lesson: 4 });
-    expect(withoutPack).not.toMatch(/incluye \d+ ventas? del pack/);
-    expect(cellOf(rowOf(withoutPack, "lesson"), "conversion")).toBe("25 %");
-    const twoPacks = render(
-      [sale({ item: "lessonPack", paidOn: "2026-10-05" }), sale({ item: "lessonPack", paidOn: "2026-10-06" })],
-      { lesson: 4 },
-    );
-    expect(cellOf(rowOf(twoPacks, "lesson"), "conversion")).toBe("50 % incluye 2 ventas del pack");
-  });
-
-  test("the footnote says Clase 1 a 1 counts the pack sales", () => {
-    expect(render()).toContain("la conversión de Clase 1 a 1 cuenta también las ventas del pack");
-  });
-
-  test("the notes under the table, the pack one included, keep a line length that reads well", () => {
+  test("the notes under the table keep a line length that reads well", () => {
     const markup = render();
     const notes = /<ul class="([^"]*)">\s*<li>\s*<strong[^>]*>Más de 100 %\./.exec(markup)?.[1] ?? "";
 
     expect(notes).toContain("max-w-prose");
-    // El pack y la conversión de Clase 1 a 1 están en esa misma lista.
-    expect(markup.indexOf("El pack de 4 clases y Otro no tienen botón propio")).toBeGreaterThan(markup.indexOf(notes));
+    expect(markup.indexOf("Otro y los servicios que ya no se venden no tienen botón propio")).toBeGreaterThan(markup.indexOf(notes));
   });
 
   test("the trend column says right in its header that each row has its own scale", () => {
@@ -115,7 +94,7 @@ describe("ServicesView", () => {
 
   test("shows a dash, never NaN or Infinity, when there is nothing to divide by", () => {
     const markup = render();
-    const tournament = rowOf(markup, "tournament");
+    const tournament = rowOf(markup, "tournamentReview");
 
     expect(cellOf(tournament, "sales")).toBe("0");
     expect(cellOf(tournament, "avg")).toBe("—");
@@ -141,16 +120,16 @@ describe("ServicesView", () => {
   });
 
   test("conversion over 100 % is written as it is and the page explains why", () => {
-    const sales = [sale({ item: "tournament" }), sale({ item: "tournament" }), sale({ item: "tournament" })];
+    const sales = [sale({ item: "tournamentReview" }), sale({ item: "tournamentReview" }), sale({ item: "tournamentReview" })];
 
-    const markup = render(sales, { tournament: 2 });
+    const markup = render(sales, { tournamentReview: 2 });
 
-    expect(cellOf(rowOf(markup, "tournament"), "conversion")).toBe("150 %");
+    expect(cellOf(rowOf(markup, "tournamentReview"), "conversion")).toBe("150 %");
     expect(markup).toContain("puede pasar de 100 %");
   });
 
   test("each row has a six-bar chart with a text alternative", () => {
-    const lesson = rowOf(render(), "lesson");
+    const lesson = rowOf(render(), "vodRecorded");
 
     expect(lesson.match(/data-testid="mini-bar"/g)).toHaveLength(6);
     expect(lesson).toContain('role="img"');
@@ -164,7 +143,7 @@ describe("ServicesView", () => {
     const gamePlan = cellOf(rowOf(render(), "gamePlan"), "last");
 
     expect(gamePlan).toBe("12/10/2026 ayer");
-    expect(cellOf(rowOf(render(), "lesson"), "last")).toBe("05/10/2026 hace 8 días");
+    expect(cellOf(rowOf(render(), "vodRecorded"), "last")).toBe("05/10/2026 hace 8 días");
   });
 
   test("a summary line gives the period, the sales and the clicks", () => {
@@ -178,7 +157,7 @@ describe("ServicesView", () => {
 
   describe("clicks dropped for being over the ceiling", () => {
     function renderWithDropped(dropped: number): string {
-      const report = buildServicesReport(SALES, clicks({ lesson: 8, vodLive: 3 }), "thisMonth", NOW, dropped);
+      const report = buildServicesReport(SALES, clicks({ vodRecorded: 8, vodLive: 3 }), "thisMonth", NOW, dropped);
       return renderToStaticMarkup(createElement(ServicesView, { report }));
     }
 
@@ -243,11 +222,11 @@ describe("ServicesView", () => {
   });
 
   test("with clicks but no sales it still shows the table", () => {
-    const report = buildServicesReport([], clicks({ lesson: 4 }), "thisMonth", NOW);
+    const report = buildServicesReport([], clicks({ vodRecorded: 4 }), "thisMonth", NOW);
     const markup = renderToStaticMarkup(createElement(ServicesView, { report }));
 
     expect(markup).toContain("<table");
-    expect(cellOf(rowOf(markup, "lesson"), "conversion")).toBe("0 %");
+    expect(cellOf(rowOf(markup, "vodRecorded"), "conversion")).toBe("0 %");
   });
 });
 

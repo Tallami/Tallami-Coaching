@@ -415,7 +415,7 @@ test.describe("exports", () => {
     expect(response.status()).toBe(200);
     const rows = parseCsv(await response.text());
     expect(rows).toHaveLength(2);
-    expect(rows[1][3]).toBe("VOD review grabado");
+    expect(rows[1][3]).toBe("VOD review de 3 partidas");
   });
 
   test("the file name carries the date range of the filter", async ({ page }) => {
