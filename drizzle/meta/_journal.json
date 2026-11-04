@@ -57,6 +57,13 @@
       "when": 1793636912661,
       "tag": "0007_services_review_de_torneo",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793819866829,
+      "tag": "0008_payments_mercadopago",
+      "breakpoints": true
     }
   ]
 }

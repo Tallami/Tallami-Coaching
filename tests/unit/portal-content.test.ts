@@ -51,6 +51,7 @@ const ACCOUNT: PortalAccount = {
   displayName: "Ana",
   email: null,
   customerId: CUSTOMER_ID,
+  handle: null,
 };
 const UNLINKED: PortalAccount = { ...ACCOUNT, customerId: null };
 

@@ -47,6 +47,7 @@ describe("getCurrentStudent", () => {
       displayName: "Ana",
       email: "ana@example.com",
       customerId: null,
+      handle: null,
     });
   });
 

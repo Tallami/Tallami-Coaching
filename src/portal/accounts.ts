@@ -21,6 +21,8 @@ export type PortalAccount = {
   email: string | null;
   /** El alumno del panel al que está vinculada, o `null` si todavía no se vinculó. */
   customerId: string | null;
+  /** El usuario público en el proveedor (el de Discord), o `null` (Google, prueba). */
+  handle: string | null;
 };
 
 /** Lo que dice un proveedor de quien ingresó. */
@@ -30,6 +32,8 @@ export type ProviderIdentity = {
   displayName: string;
   /** El email, solo si el proveedor lo da y está verificado. */
   email: string | null;
+  /** El usuario público del proveedor (el `username` de Discord), o `null` si no lo hay. */
+  handle: string | null;
 };
 
 /** Cómo termina `linkAccountToCustomer`. */
@@ -41,6 +45,7 @@ const ACCOUNT_COLUMNS = {
   displayName: portalAccounts.displayName,
   email: portalAccounts.email,
   customerId: portalAccounts.customerId,
+  handle: portalAccounts.providerHandle,
 };
 
 /**
@@ -78,12 +83,18 @@ export async function upsertAccountFromIdentity(
       providerUserId: identity.providerUserId,
       displayName: identity.displayName,
       email: identity.email,
+      providerHandle: identity.handle,
       createdAt: now,
       lastLoginAt: now,
     })
     .onConflictDoUpdate({
       target: [portalAccounts.provider, portalAccounts.providerUserId],
-      set: { displayName: identity.displayName, email: identity.email, lastLoginAt: now },
+      set: {
+        displayName: identity.displayName,
+        email: identity.email,
+        providerHandle: identity.handle,
+        lastLoginAt: now,
+      },
     })
     .returning(ACCOUNT_COLUMNS);
   return toAccount(account);

@@ -257,6 +257,7 @@ describe("exchangeAndFetchIdentity", () => {
       providerUserId: "80351110224678912",
       displayName: "Nelly",
       email: "nelly@discord.com",
+      handle: "nelly",
     });
     expect(calls).toHaveLength(2);
 

@@ -223,7 +223,14 @@ describe("profileToIdentity", () => {
         providerUserId: "80351110224678912",
         displayName: "Nelly",
         email: "nelly@discord.com",
+        handle: "nelly",
       });
+    });
+
+    test("keeps the Discord username as the handle, even when the email is not verified", () => {
+      expect(
+        profileToIdentity("discord", { id: "1", username: "lewa_fn", global_name: "Lewa", verified: false, email: "x" }),
+      ).toEqual({ provider: "discord", providerUserId: "1", displayName: "Lewa", email: null, handle: "lewa_fn" });
     });
 
     test("falls back to the username when there is no global name", () => {
@@ -261,6 +268,7 @@ describe("profileToIdentity", () => {
         providerUserId: "110169484474386276334",
         displayName: "Ana Pérez",
         email: "ana@gmail.com",
+        handle: null,
       });
     });
 
@@ -284,7 +292,7 @@ describe("profileToIdentity", () => {
     test("takes the sub, the name and the email", () => {
       expect(
         profileToIdentity("test", { sub: "alumno-1", name: "Alumno Uno", email: "alumno-1@example.com" }),
-      ).toEqual({ provider: "test", providerUserId: "alumno-1", displayName: "Alumno Uno", email: "alumno-1@example.com" });
+      ).toEqual({ provider: "test", providerUserId: "alumno-1", displayName: "Alumno Uno", email: "alumno-1@example.com", handle: null });
     });
   });
 

@@ -227,16 +227,17 @@ function identity(
   providerUserId: string | null,
   displayName: string | null,
   email: string | null,
+  handle: string | null = null,
 ): ProviderIdentity | null {
   if (!providerUserId || !displayName) return null;
-  return { provider, providerUserId, displayName, email };
+  return { provider, providerUserId, displayName, email, handle };
 }
 
-/** Discord: `id`, `global_name` (o `username`) y el email solo si `verified` es `true`. */
+/** Discord: `id`, `global_name` (o `username`), el `username` como usuario y el email solo si `verified` es `true`. */
 function discordIdentity(profile: Profile): ProviderIdentity | null {
   const email = profile.verified === true ? cleanEmail(profile.email) : null;
   const name = cleanName(profile.global_name) ?? cleanName(profile.username);
-  return identity("discord", cleanId(profile.id), name, email);
+  return identity("discord", cleanId(profile.id), name, email, cleanName(profile.username));
 }
 
 /** Google: `sub`, `name` y el email solo si `email_verified` es `true`. Sin nombre, se muestra el email. */

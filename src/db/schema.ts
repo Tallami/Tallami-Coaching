@@ -50,6 +50,13 @@ import {
   SALE_ITEMS,
   SALE_STATUSES,
 } from "@/admin/catalog";
+import {
+  ORDER_STATUSES,
+  PAYMENT_PROVIDERS,
+  PRO_APPLICATION_STATUSES,
+  SITE_REQUEST_KINDS,
+  SITE_REQUEST_STATUSES,
+} from "@/payments/policy";
 import { DELIVERY_KINDS, DELIVERY_TITLE_MAX_LENGTH, PORTAL_PROVIDERS } from "@/portal/policy";
 import { bytea } from "./bytea";
 
@@ -111,6 +118,10 @@ export const sales = pgTable(
     /** "manual" o el proveedor de pagos que creó la venta. */
     source: text("source").notNull().default("manual"),
     notes: text("notes"),
+    /** Los códigos de replay que mandó el alumno al comprar un VOD review (`REPLAY_CODES_MAX_LENGTH`). */
+    replayCodes: text("replay_codes"),
+    /** Cuándo llegaron los códigos: desde ahí corren las 72 o 96 horas de entrega. */
+    replayCodesSentAt: timestamptz("replay_codes_sent_at"),
     createdAt: timestamptz("created_at").notNull().defaultNow(),
     updatedAt: timestamptz("updated_at")
       .notNull()
@@ -362,6 +373,8 @@ export const portalAccounts = pgTable(
     providerUserId: text("provider_user_id").notNull(),
     displayName: text("display_name").notNull(),
     email: text("email"),
+    /** El usuario público en el proveedor (el `username` de Discord), para que Tallami encuentre al alumno; `null` en Google. */
+    providerHandle: text("provider_handle"),
     customerId: uuid("customer_id").references(() => customers.id, { onDelete: "set null" }),
     createdAt: timestamptz("created_at").notNull().defaultNow(),
     lastLoginAt: timestamptz("last_login_at").notNull().defaultNow(),
@@ -474,6 +487,139 @@ export const deliveries = pgTable(
     check("deliveries_url_is_https", sql`${t.url} is null or ${t.url} like 'https://%'`),
     index("deliveries_sale_id_idx").on(t.saleId),
     index("deliveries_file_id_idx").on(t.fileId),
+  ],
+).enableRLS();
+
+// Pagos en la web (`src/payments/`): pedidos, aplicaciones a la Temporada Pro, links de
+// pago de esa temporada y pedidos del sitio (desistimiento, baja, contacto). Las
+// listas y los plazos viven en `src/payments/policy.ts`.
+
+/**
+ * Una aplicación a la Temporada Pro. Tallami la lee, habla con el equipo y, si la
+ * acepta, le genera un link de pago. Se borra a los 24 meses.
+ */
+export const proApplications = pgTable(
+  "pro_applications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    discord: text("discord").notNull(),
+    teamMembers: text("team_members").notNull(),
+    results: text("results").notNull(),
+    message: text("message"),
+    status: text("status").notNull().default("new"),
+    locale: text("locale").notNull(),
+    /** HMAC de la IP, como en el resto del sitio: nunca la IP. */
+    ipHash: text("ip_hash"),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+    updatedAt: timestamptz("updated_at")
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [
+    check("pro_applications_status_valid", oneOf(t.status, PRO_APPLICATION_STATUSES)),
+    check("pro_applications_locale_valid", oneOf(t.locale, INTEREST_LOCALES)),
+  ],
+).enableRLS();
+
+/**
+ * El link de pago de una aplicación aceptada: de un solo uso, vence a los 14 días y se
+ * guarda solo su hash. `paidAt` lo marca como usado.
+ */
+export const proPaymentLinks = pgTable(
+  "pro_payment_links",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    applicationId: uuid("application_id")
+      .notNull()
+      .references(() => proApplications.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull().unique(),
+    amountUsdMinor: bigint("amount_usd_minor", { mode: "number" }).notNull(),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+    expiresAt: timestamptz("expires_at").notNull(),
+    paidAt: timestamptz("paid_at"),
+  },
+  (t) => [
+    check("pro_payment_links_amount_positive", sql`${t.amountUsdMinor} > 0`),
+    index("pro_payment_links_application_id_idx").on(t.applicationId),
+  ],
+).enableRLS();
+
+/**
+ * Un pedido: lo que alguien quiso comprar en la web y cómo va su pago. El monto en
+ * pesos y el valor del dólar quedan fijados al armarlo. El proveedor avisa y se
+ * consulta su API: el estado nunca sale del navegador. Un pedido pagado crea la venta
+ * (`saleId`). Los que nunca se pagaron se borran a los 90 días.
+ */
+export const orders = pgTable(
+  "orders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    provider: text("provider").notNull(),
+    /** La cuenta del portal con la que se compró; `null` si la cuenta se borró. */
+    accountId: uuid("account_id").references(() => portalAccounts.id, { onDelete: "set null" }),
+    buyerName: text("buyer_name").notNull(),
+    buyerEmail: text("buyer_email"),
+    buyerHandle: text("buyer_handle"),
+    item: text("item").notNull(),
+    amountUsdMinor: bigint("amount_usd_minor", { mode: "number" }).notNull(),
+    arsPerUsd: numeric("ars_per_usd", { precision: 14, scale: 4 }).notNull(),
+    amountArsMinor: bigint("amount_ars_minor", { mode: "number" }).notNull(),
+    status: text("status").notNull().default("created"),
+    providerPaymentId: text("provider_payment_id"),
+    /** Cuándo se tildó "soy mayor de edad o pago un adulto responsable". */
+    adultConfirmedAt: timestamptz("adult_confirmed_at").notNull(),
+    locale: text("locale").notNull(),
+    saleId: uuid("sale_id").references(() => sales.id, { onDelete: "set null" }),
+    proPaymentLinkId: uuid("pro_payment_link_id").references(() => proPaymentLinks.id, { onDelete: "set null" }),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+    updatedAt: timestamptz("updated_at")
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+    expiresAt: timestamptz("expires_at").notNull(),
+  },
+  (t) => [
+    check("orders_provider_valid", oneOf(t.provider, PAYMENT_PROVIDERS)),
+    check("orders_item_valid", oneOf(t.item, SALE_ITEMS)),
+    check("orders_status_valid", oneOf(t.status, ORDER_STATUSES)),
+    check("orders_locale_valid", oneOf(t.locale, INTEREST_LOCALES)),
+    check("orders_amounts_positive", sql`${t.amountUsdMinor} > 0 and ${t.amountArsMinor} > 0`),
+    unique("orders_provider_payment_unique").on(t.provider, t.providerPaymentId),
+    index("orders_account_id_idx").on(t.accountId),
+    index("orders_sale_id_idx").on(t.saleId),
+    index("orders_pro_payment_link_id_idx").on(t.proPaymentLinkId),
+    index("orders_status_created_at_idx").on(t.status, t.createdAt),
+  ],
+).enableRLS();
+
+/**
+ * Lo que alguien pide desde el sitio sin entrar: arrepentimiento, baja o contacto.
+ * `code` es el número de seguimiento que ve quien escribe. Se borra a los 24 meses.
+ */
+export const siteRequests = pgTable(
+  "site_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    kind: text("kind").notNull(),
+    code: text("code").notNull().unique(),
+    name: text("name").notNull(),
+    email: text("email").notNull(),
+    orderReference: text("order_reference"),
+    message: text("message"),
+    locale: text("locale").notNull(),
+    status: text("status").notNull().default("new"),
+    /** Cuándo salió el email de constancia, si salió. */
+    emailSentAt: timestamptz("email_sent_at"),
+    ipHash: text("ip_hash"),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+    handledAt: timestamptz("handled_at"),
+  },
+  (t) => [
+    check("site_requests_kind_valid", oneOf(t.kind, SITE_REQUEST_KINDS)),
+    check("site_requests_status_valid", oneOf(t.status, SITE_REQUEST_STATUSES)),
+    check("site_requests_locale_valid", oneOf(t.locale, INTEREST_LOCALES)),
   ],
 ).enableRLS();
 

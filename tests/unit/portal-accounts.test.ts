@@ -34,6 +34,7 @@ const ANA = {
   providerUserId: "1234567890",
   displayName: "Ana",
   email: "ana@example.com",
+  handle: "ana_fn",
 } as const;
 
 describe("upsertAccountFromIdentity", () => {
@@ -46,7 +47,21 @@ describe("upsertAccountFromIdentity", () => {
       displayName: "Ana",
       email: "ana@example.com",
       customerId: null,
+      handle: "ana_fn",
     });
+  });
+
+  test("stores the provider handle and updates it when the user renames", async () => {
+    await upsertAccountFromIdentity(db, ANA, START);
+    const [row] = await db.select().from(portalAccounts);
+    expect(row.providerHandle).toBe("ana_fn");
+
+    const renamed = await upsertAccountFromIdentity(db, { ...ANA, handle: "ana_pro" }, START);
+    expect(renamed.handle).toBe("ana_pro");
+    expect((await getAccount(db, renamed.id))?.handle).toBe("ana_pro");
+
+    const none = await upsertAccountFromIdentity(db, { ...ANA, handle: null }, START);
+    expect(none.handle).toBeNull();
   });
 
   test("stores the identity, the creation hour and the first login hour", async () => {
@@ -291,6 +306,7 @@ describe("accountForCustomer", () => {
       displayName: "Ana",
       email: "ana@example.com",
       customerId: linked,
+      handle: null,
     });
     expect(await accountForCustomer(db, alone)).toBeNull();
   });

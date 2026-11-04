@@ -32,6 +32,9 @@ const PORTAL_TABLES = [
   "delivery_files",
 ];
 
+/** Las tablas de los pagos en la web: pedidos, aplicaciones a la Temporada Pro, sus links y los pedidos del sitio. */
+const PAYMENT_TABLES = ["orders", "pro_applications", "pro_payment_links", "site_requests"];
+
 /** Las tablas que exporta el schema de Drizzle. */
 function schemaTables(): PgTable[] {
   const tables: PgTable[] = [];
@@ -83,6 +86,12 @@ describe("row level security", () => {
     const names = schemaTables().map(getTableName);
 
     expect(names).toEqual(expect.arrayContaining(PORTAL_TABLES));
+  });
+
+  test("the four tables of the web payments are in the schema", () => {
+    const names = schemaTables().map(getTableName);
+
+    expect(names).toEqual(expect.arrayContaining(PAYMENT_TABLES));
   });
 
   test("every table of the schema declares row level security, so a new table cannot skip it", () => {
@@ -170,6 +179,24 @@ describe("row level security at work", () => {
       sql`insert into deliveries (sale_id, kind, title, file_id)
           select id, 'pdf', 'Plan de juego', '22222222-2222-4222-8222-222222222222' from sales limit 1`,
     );
+    // Y una en cada tabla de los pagos en la web.
+    await db.execute(
+      sql`insert into pro_applications (id, name, discord, team_members, results, locale)
+          values ('33333333-3333-4333-8333-333333333333', 'Equipo RLS', 'equipo', 'A, B, C', 'FNCS', 'es')`,
+    );
+    await db.execute(
+      sql`insert into pro_payment_links (token_hash, application_id, amount_usd_minor, expires_at)
+          values ('hash-link-pro-rls', '33333333-3333-4333-8333-333333333333', 250000, now() + interval '14 days')`,
+    );
+    await db.execute(
+      sql`insert into orders (provider, buyer_name, item, amount_usd_minor, ars_per_usd, amount_ars_minor,
+                              adult_confirmed_at, locale, expires_at)
+          values ('mercadopago', 'Comprador RLS', 'vodRecorded', 3000, 1500, 4500000, now(), 'es', now() + interval '1 hour')`,
+    );
+    await db.execute(
+      sql`insert into site_requests (kind, code, name, email, locale)
+          values ('contact', 'TAL-RLS', 'Persona RLS', 'persona@example.com', 'es')`,
+    );
   });
 
   async function asApiRole<T>(run: () => Promise<T>): Promise<T> {
@@ -222,6 +249,14 @@ describe("row level security at work", () => {
 
   test("the owner sees the rows of the student portal tables that the Data API role will not", async () => {
     for (const name of PORTAL_TABLES) {
+      const result = await db.execute(sql`select count(*)::int as total from ${sql.identifier(name)}`);
+
+      expect(Number(rowsOf(result)[0].total), name).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  test("the owner sees the rows of the web payments tables that the Data API role will not", async () => {
+    for (const name of PAYMENT_TABLES) {
       const result = await db.execute(sql`select count(*)::int as total from ${sql.identifier(name)}`);
 
       expect(Number(rowsOf(result)[0].total), name).toBeGreaterThanOrEqual(1);
