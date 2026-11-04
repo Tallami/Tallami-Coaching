@@ -5,6 +5,7 @@ import type { MonotributoSettings } from "@/admin/metrics/monotributo";
 import { settingsToFormValues, type SettingsFormState } from "@/admin/settings/form-state";
 import { ADMIN_ROUTES } from "@/admin/routes";
 import { SettingsForm } from "@/admin/settings/settings-form";
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -21,6 +22,8 @@ interface SettingsViewProps {
   /** Se acaba de guardar: el aviso lo dice y lleva a ver el medidor. */
   justSaved: boolean;
   action: (state: SettingsFormState, formData: FormData) => Promise<SettingsFormState>;
+  /** La tarjeta de pesos por dólar; va entre el monotributo y Seguridad. */
+  pesosPerDollar?: ReactNode;
 }
 
 /** De dónde salen los datos y dónde ver la tabla: lo que nunca debe quedar sin decir. */
@@ -72,7 +75,7 @@ function SecurityLink() {
 }
 
 /** El cuerpo de Configuración (el encabezado lo pone la página): el aviso de guardado, el formulario del monotributo y el paso a Seguridad. */
-export function SettingsView({ current, updatedAt, justSaved, action }: SettingsViewProps) {
+export function SettingsView({ current, updatedAt, justSaved, action, pesosPerDollar }: SettingsViewProps) {
   return (
     <div className="max-w-3xl">
       <SettingsForm
@@ -98,6 +101,7 @@ export function SettingsView({ current, updatedAt, justSaved, action }: Settings
       >
         <SourceNote />
       </SettingsForm>
+      {pesosPerDollar}
       <SecurityLink />
     </div>
   );

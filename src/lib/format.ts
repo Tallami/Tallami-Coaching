@@ -46,3 +46,11 @@ export function formatListParts(
     type: "conjunction",
   }).formatToParts(items);
 }
+
+/** "ARS 45.000" (es, pt) o "ARS 45,000" (en). Centavos de peso en, pesos enteros afuera. */
+export function formatArs(amountMinor: number, locale: Locale): string {
+  const grouped = new Intl.NumberFormat(INTL_TAG[locale], {
+    maximumFractionDigits: 0,
+  }).format(amountMinor / 100);
+  return `ARS ${grouped}`;
+}
