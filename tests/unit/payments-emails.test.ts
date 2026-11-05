@@ -299,6 +299,33 @@ describe("notifyPaymentOutcome: what only Tallami hears about", () => {
   });
 });
 
+describe("notifyPaymentOutcome: several attempts on one order", () => {
+  const OTHER_ATTEMPT = "987654321";
+
+  test("a late rejected attempt on an approved order sends nothing", async () => {
+    const order = await insertTestOrder(db);
+    await outcomeOf(order, {});
+
+    const outcome = await outcomeOf(order, { providerPaymentId: OTHER_ATTEMPT, status: "rejected", approvedAt: null });
+    const { sent } = await notify(order, outcome);
+
+    expect(outcome.kind).toBe("no-change");
+    expect(sent).toEqual([]);
+  });
+
+  test("another approved payment on an approved order sends one email, to Tallami", async () => {
+    const order = await insertTestOrder(db);
+    await outcomeOf(order, {});
+
+    const outcome = await outcomeOf(order, { providerPaymentId: OTHER_ATTEMPT });
+    const { sent, toTallami } = await notify(order, outcome);
+
+    expect(outcome.kind).toBe("mismatch");
+    expect(sent).toHaveLength(1);
+    expect(toTallami).toHaveLength(1);
+  });
+});
+
 describe("notifyPaymentOutcome: what nobody hears about", () => {
   test.each(["no-change", "order-updated"] as const)("%s sends nothing", async (kind) => {
     const order = await insertTestOrder(db);

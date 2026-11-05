@@ -18,7 +18,7 @@ import { customers, orders, portalAccounts, sales } from "@/db/schema";
 import { isUuid } from "@/db/uuid";
 import { linkAccountToCustomer } from "@/portal/accounts";
 import type { OrderStatus } from "./policy";
-import type { ProviderPayment } from "./provider";
+import type { PaymentStatus, ProviderPayment } from "./provider";
 
 export type ApplyOutcome =
   | { kind: "unknown-order" }
@@ -52,10 +52,22 @@ const ARS_PER_ARS = "1.0000";
 /** País de quien paga en pesos con una cuenta argentina; Tallami lo puede corregir. */
 const BUYER_COUNTRY = "AR";
 
-/** Estados de un pedido cuya aprobación ya se procesó: tienen venta, y otro pago no les cabe. */
+/** Estados de un pedido cuya aprobación ya se procesó: tienen venta, y otro pago que cobre no les cabe. */
 const SETTLED_STATUSES: readonly string[] = ["approved", "refunded", "charged_back"] satisfies OrderStatus[];
 /** Estados de los que un pedido ya no vuelve. */
 const CLOSED_STATUSES: readonly string[] = ["refunded", "charged_back"] satisfies OrderStatus[];
+
+/** ¿El pago en este estado le sacó plata a alguien? Un `Record` para que un estado nuevo obligue a decidirlo. */
+const TOOK_MONEY: Record<PaymentStatus, boolean> = {
+  approved: true,
+  partially_refunded: true,
+  refunded: true,
+  in_mediation: true,
+  charged_back: true,
+  pending: false,
+  rejected: false,
+  cancelled: false,
+};
 
 function isSettled(order: Order): boolean {
   return SETTLED_STATUSES.includes(order.status);
@@ -261,14 +273,19 @@ async function applyMediation(application: Application): Promise<ApplyOutcome> {
 }
 
 /**
- * ¿Este pago no le corresponde a este pedido? Un monto o una moneda distintos; otro pago para un
- * pedido que ya tuvo el suyo (se cobró dos veces, y es Tallami quien devuelve); o un pago ya
+ * ¿Este pago no le corresponde a este pedido? Un monto o una moneda distintos, o un pago ya
  * asociado a otro pedido, que la base rechazaría y haría fallar cada reintento.
+ *
+ * Una preferencia permite reintentar, así que un pedido puede tener varios pagos. Si ya tuvo el
+ * suyo, otro que cobró es un cobro doble y es Tallami quien devuelve. Otro que no cobró nada es
+ * un intento viejo que llegó tarde: no es un error, sea cual sea su monto, y `applyUnpaid` lo deja
+ * pasar sin escribir nada.
  */
 async function isMismatch({ tx, provider, order, payment }: Application): Promise<boolean> {
+  const isSamePayment = order.providerPaymentId === payment.providerPaymentId;
+  if (isSettled(order) && !isSamePayment) return TOOK_MONEY[payment.status];
   if (payment.amountMinor !== order.amountArsMinor || payment.currency !== ORDER_CURRENCY) return true;
-  if (order.providerPaymentId === payment.providerPaymentId) return false;
-  if (isSettled(order)) return true;
+  if (isSamePayment) return false;
   const [taken] = await tx
     .select({ id: orders.id })
     .from(orders)

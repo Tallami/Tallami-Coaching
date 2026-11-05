@@ -242,17 +242,6 @@ describe("applyProviderPayment: a payment that is not paid yet", () => {
     expect((await orderRow(order.id)).status).toBe("approved");
   });
 
-  test("a rejected attempt and then another payment that is approved: the second one is the sale", async () => {
-    const order = await insertTestOrder(db);
-
-    await apply(order, "rejected", { providerPaymentId: OTHER_PAYMENT_ID });
-    const outcome = await apply(order);
-
-    expect(outcome.kind).toBe("sale-created");
-    expect(await orderRow(order.id)).toMatchObject({ status: "approved", providerPaymentId: PAYMENT_ID });
-    expect(await db.select().from(sales)).toHaveLength(1);
-  });
-
   test.each(["pending", "rejected", "cancelled"] as const)(
     "%s read late never takes back an approved order",
     async (status) => {
@@ -302,16 +291,6 @@ describe("applyProviderPayment: a payment that does not match its order", () => 
     expect(await db.select().from(sales)).toEqual([]);
   });
 
-  test("another payment for an order that is already approved is a mismatch, without a second sale", async () => {
-    const { order } = await approvedOrder();
-
-    const outcome = await apply(order, "approved", { providerPaymentId: OTHER_PAYMENT_ID });
-
-    expect(outcome).toEqual({ kind: "mismatch", orderId: order.id });
-    expect(await db.select().from(sales)).toHaveLength(1);
-    expect((await orderRow(order.id)).providerPaymentId).toBe(PAYMENT_ID);
-  });
-
   test("a payment already taken by another order is a mismatch, not a failure that repeats forever", async () => {
     await approvedOrder();
     const second = await insertTestOrder(db);
@@ -321,6 +300,111 @@ describe("applyProviderPayment: a payment that does not match its order", () => 
     expect(outcome).toEqual({ kind: "mismatch", orderId: second.id });
     expect(await db.select().from(sales)).toHaveLength(1);
     expect((await orderRow(second.id)).providerPaymentId).toBeNull();
+  });
+});
+
+// Una preferencia de Mercado Pago permite reintentar: un pedido puede tener varios pagos, y sus
+// avisos pueden llegar en cualquier orden. `PAYMENT_ID` es el que se aprueba en cada caso.
+describe("applyProviderPayment: several attempts on one order", () => {
+  test("a rejected attempt and then an approved one: one sale, and the order points to the approved one", async () => {
+    const order = await insertTestOrder(db);
+
+    await apply(order, "rejected", { providerPaymentId: OTHER_PAYMENT_ID, approvedAt: null });
+    const outcome = await apply(order);
+
+    const rows = await db.select().from(sales);
+    expect(rows).toHaveLength(1);
+    expect(outcome).toEqual({ kind: "sale-created", orderId: order.id, saleId: rows[0].id, status: "paid" });
+    expect(await orderRow(order.id)).toMatchObject({
+      status: "approved",
+      saleId: rows[0].id,
+      providerPaymentId: PAYMENT_ID,
+    });
+  });
+
+  test("a pending attempt and then an approved one: one sale", async () => {
+    const order = await insertTestOrder(db);
+
+    await apply(order, "pending", { providerPaymentId: OTHER_PAYMENT_ID, approvedAt: null });
+    const outcome = await apply(order);
+
+    expect(outcome.kind).toBe("sale-created");
+    expect(await db.select().from(sales)).toHaveLength(1);
+    expect(await orderRow(order.id)).toMatchObject({ status: "approved", providerPaymentId: PAYMENT_ID });
+  });
+
+  test.each(["rejected", "cancelled", "pending"] as const)(
+    "a late %s from another attempt on an approved order is a no-change, and nothing is written",
+    async (status) => {
+      const { order, saleId } = await approvedOrder();
+      const orderBefore = await orderRow(order.id);
+      const saleBefore = await saleRow(saleId);
+
+      const outcome = await apply(order, status, { providerPaymentId: OTHER_PAYMENT_ID, approvedAt: null });
+
+      expect(outcome).toEqual({ kind: "no-change", orderId: order.id });
+      // Filas enteras, con `updatedAt`: ni siquiera un `update` que deje lo mismo.
+      expect(await orderRow(order.id)).toEqual(orderBefore);
+      expect(await saleRow(saleId)).toEqual(saleBefore);
+      expect(await db.select().from(sales)).toHaveLength(1);
+    },
+  );
+
+  test("a late rejected attempt is a no-change even with another amount: it charged nothing", async () => {
+    const { order, saleId } = await approvedOrder();
+    const orderBefore = await orderRow(order.id);
+
+    const outcome = await apply(order, "rejected", {
+      providerPaymentId: OTHER_PAYMENT_ID,
+      amountMinor: ORDER_ARS_MINOR + 1,
+      approvedAt: null,
+    });
+
+    expect(outcome).toEqual({ kind: "no-change", orderId: order.id });
+    expect(await orderRow(order.id)).toEqual(orderBefore);
+    expect((await saleRow(saleId)).status).toBe("paid");
+  });
+
+  test.each(["refunded", "charged_back"] as const)(
+    "a late rejected attempt is also a no-change on an order already %s",
+    async (status) => {
+      const { order } = await approvedOrder();
+      await apply(order, status);
+      const orderBefore = await orderRow(order.id);
+
+      const outcome = await apply(order, "rejected", { providerPaymentId: OTHER_PAYMENT_ID, approvedAt: null });
+
+      expect(outcome).toEqual({ kind: "no-change", orderId: order.id });
+      expect(await orderRow(order.id)).toEqual(orderBefore);
+    },
+  );
+
+  test.each(["approved", "partially_refunded", "refunded", "in_mediation", "charged_back"] as const)(
+    "another payment that took money (%s) on an approved order is still a mismatch, without touching anything",
+    async (status) => {
+      const { order, saleId } = await approvedOrder();
+      const orderBefore = await orderRow(order.id);
+      const saleBefore = await saleRow(saleId);
+
+      const outcome = await apply(order, status, { providerPaymentId: OTHER_PAYMENT_ID });
+
+      expect(outcome).toEqual({ kind: "mismatch", orderId: order.id });
+      expect(await orderRow(order.id)).toEqual(orderBefore);
+      expect(await saleRow(saleId)).toEqual(saleBefore);
+      expect(await db.select().from(sales)).toHaveLength(1);
+    },
+  );
+
+  test("an attempt that was pending and then gets approved after another one: charged twice, so a mismatch", async () => {
+    const order = await insertTestOrder(db);
+
+    await apply(order, "pending", { providerPaymentId: OTHER_PAYMENT_ID, approvedAt: null });
+    await apply(order);
+    const outcome = await apply(order, "approved", { providerPaymentId: OTHER_PAYMENT_ID });
+
+    expect(outcome).toEqual({ kind: "mismatch", orderId: order.id });
+    expect(await db.select().from(sales)).toHaveLength(1);
+    expect((await orderRow(order.id)).providerPaymentId).toBe(PAYMENT_ID);
   });
 });
 
