@@ -39,17 +39,23 @@ export const PORTAL_TEST_SESSION_SECRET = "secreto-del-portal-solo-para-los-e2e-
 /**
  * Los puertos de los tres servidores de los e2e: el principal (`playwright.config.ts`),
  * el de los datos de ejemplo (`playwright.demo.config.ts`) y el de la seguridad del
- * ingreso (`playwright.security.config.ts`); y el del servidor OAuth falso que arranca
- * la configuración principal para el ingreso de los alumnos. Nunca el 3000, que es el
- * de desarrollo.
+ * ingreso (`playwright.security.config.ts`); y los de los dos servidores falsos que arranca
+ * la configuración principal: el OAuth, para el ingreso de los alumnos, y el de Mercado
+ * Pago, para la compra. Nunca el 3000, que es el de desarrollo.
  */
-export const E2E_PORTS = { main: 3100, demo: 3101, security: 3102, oauth: 3110 } as const;
+export const E2E_PORTS = { main: 3100, demo: 3101, security: 3102, oauth: 3110, mercadopago: 3111 } as const;
 
 /**
  * El servidor OAuth falso del proveedor de prueba del portal (`mock-oauth-server.mjs`):
  * Node puro, sin dependencias ni `npx`. Lo arranca solo la configuración principal.
  */
 export const MOCK_OAUTH_SERVER_COMMAND = "node tests/helpers/mock-oauth-server.mjs";
+
+/** El servidor falso de Mercado Pago y de Resend (`mock-mercadopago-server.mjs`), como el OAuth. */
+export const MOCK_MERCADOPAGO_SERVER_COMMAND = "node tests/helpers/mock-mercadopago-server.mjs";
+
+/** Con esta clave firma sus avisos el servidor falso, y con esta los verifica el servidor principal. */
+export const MERCADOPAGO_TEST_WEBHOOK_SECRET = "secreto-de-los-avisos-solo-para-los-e2e";
 
 /** La dirección de un servidor de los e2e: también es el origen de sus llaves de acceso. */
 export function e2eBaseUrl(port: number): string {
@@ -112,6 +118,13 @@ async function serverEnv(pgliteDir: string, port: number): Promise<Record<string
     RESEND_API_KEY: "",
     ADMIN_ALERT_EMAIL: "",
     ADMIN_ALERT_FROM: "",
+    // Sin credenciales ni remitente, este servidor no puede cobrar: el principal los pisa con los del
+    // servidor falso (`PAYMENTS_E2E_ENV`), y ninguno habla con el Mercado Pago de verdad.
+    MERCADOPAGO_ACCESS_TOKEN: "",
+    MERCADOPAGO_WEBHOOK_SECRET: "",
+    MERCADOPAGO_API_BASE: "",
+    PUBLIC_EMAIL_FROM: "",
+    RESEND_BASE_URL: "",
     // Con esta marca, Next (`@next/env`) no lee los `.env*` de la carpeta: los servidores de prueba
     // usan solo este entorno, nunca el `.env.local` de quien corre los tests. Ese archivo puede
     // traer una `DATABASE_URL` real, y su hash de contraseña lleva `$` escapados que la expansión
@@ -134,9 +147,22 @@ const PORTAL_E2E_ENV = {
   GOOGLE_CLIENT_SECRET: "",
 } as const;
 
-/** Variables de entorno con las que Playwright arranca el servidor del panel (y del portal del alumno). */
+/**
+ * Los pagos en el servidor principal: Mercado Pago y Resend son el servidor falso. La clave de Resend
+ * solo vale ahí, y `ADMIN_ALERT_EMAIL` sigue vacío: el panel sigue diciendo "sin configurar".
+ */
+const PAYMENTS_E2E_ENV = {
+  MERCADOPAGO_ACCESS_TOKEN: "TEST-token-solo-para-los-e2e",
+  MERCADOPAGO_WEBHOOK_SECRET: MERCADOPAGO_TEST_WEBHOOK_SECRET,
+  MERCADOPAGO_API_BASE: e2eBaseUrl(E2E_PORTS.mercadopago),
+  PUBLIC_EMAIL_FROM: "Tallami <pagos@tallami.example>",
+  RESEND_API_KEY: "re_test",
+  RESEND_BASE_URL: e2eBaseUrl(E2E_PORTS.mercadopago),
+} as const;
+
+/** Variables de entorno con las que Playwright arranca el servidor del panel (y del portal del alumno y de la compra). */
 export async function adminServerEnv(): Promise<Record<string, string>> {
-  return { ...(await serverEnv(E2E_PGLITE_DIR, E2E_PORTS.main)), ...PORTAL_E2E_ENV };
+  return { ...(await serverEnv(E2E_PGLITE_DIR, E2E_PORTS.main)), ...PORTAL_E2E_ENV, ...PAYMENTS_E2E_ENV };
 }
 
 /**

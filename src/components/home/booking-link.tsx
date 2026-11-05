@@ -5,7 +5,7 @@ import type { InterestItem, InterestLocale } from "@/admin/catalog";
 import { sendInterest } from "./send-interest";
 
 type BookingLinkProps = Omit<ComponentProps<"a">, "href"> & {
-  /** Destino del enlace (`bookingHref`): hoy `#services`, mañana el pago o la agenda. */
+  /** Destino del enlace (`bookingHref`): la pantalla de compra del servicio. */
   href: string;
   /** Qué botón de reserva es. */
   item: InterestItem;

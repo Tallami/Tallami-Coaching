@@ -7,6 +7,7 @@ import { PageHeader } from "@/admin/ui/page-header";
 import { firstValue } from "@/admin/ui/search-params";
 import { getDb } from "@/db/client";
 import { PanelShell } from "@/app/admin/panel-shell";
+import { getPaymentAvailability } from "@/payments/availability";
 import { getPesosPerDollar } from "@/payments/pricing";
 import { savePesosPerDollarAction, saveSettingsAction } from "./actions";
 
@@ -28,6 +29,7 @@ export default async function SettingsPage(props: PageProps<"/admin/configuracio
   // Una sola lectura trae lo cargado y cuándo se guardó.
   const record = await getMonotributoRecord(db);
   const pesosPerDollar = await getPesosPerDollar(db);
+  const paymentAvailability = await getPaymentAvailability(db);
 
   return (
     <PanelShell active="settings">
@@ -43,6 +45,7 @@ export default async function SettingsPage(props: PageProps<"/admin/configuracio
         pesosPerDollar={
           <PesosPerDollarCard current={pesosPerDollar} outcome={pesosOutcome} action={savePesosPerDollarAction} />
         }
+        paymentAvailability={paymentAvailability}
       />
     </PanelShell>
   );

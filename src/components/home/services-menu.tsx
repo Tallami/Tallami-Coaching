@@ -37,7 +37,7 @@ async function ServiceItem({ service, rate }: { service: Service; rate: string |
       <PriceRow name={t(`items.${id}.name`)} priceUsd={service.priceUsd} rate={rate} locale={locale} />
       <p>{t(`items.${id}.description`)}</p>
       <Button asChild variant="ink-outline" size="sm">
-        <BookingLink item={id} locale={locale} href={bookingHref(id)}>
+        <BookingLink item={id} locale={locale} href={bookingHref(id, locale)}>
           {t(`items.${id}.cta`)}
         </BookingLink>
       </Button>
@@ -61,7 +61,7 @@ async function ProSeasonCard({ rate }: { rate: string | null }) {
       />
       <p>{t("pro.description")}</p>
       <Button asChild>
-        <BookingLink item="proSeason" locale={locale} href={bookingHref("proSeason")}>
+        <BookingLink item="proSeason" locale={locale} href={bookingHref("proSeason", locale)}>
           {t("pro.cta")}
         </BookingLink>
       </Button>

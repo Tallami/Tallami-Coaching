@@ -3,22 +3,24 @@
 // `fetch` falso y un reloj propio. `/api` queda fuera del `proxy` (ni next-intl ni la
 // guardia del panel): cada ruta hace todas sus verificaciones.
 //
-//   GET  /api/portal/auth/[provider]?locale=es&invitacion=…
+//   GET  /api/portal/auth/[provider]?locale=es&invitacion=…&comprar=…&link=…
 //        404 si el proveedor no existe o no está habilitado, o si el portal no está
 //        configurado. Discord y Google solo empiezan en la dirección pública del sitio
 //        (`canonicalSignInUrl`): en otra, 302 a la misma ruta allá (con la marca `redirigido=1`),
 //        sin cookie; si el pedido ya llega marcado a otra dirección, 404 (sería un bucle). Si no, la
-//        cookie del ingreso y 302 a la autorización del proveedor. La invitación del link
-//        solo viaja en la cookie si el ingreso empezó en el propio sitio (`Sec-Fetch-Site:
+//        cookie del ingreso y 302 a la autorización del proveedor. La invitación y el link de
+//        pago solo viajan en la cookie si el ingreso empezó en el propio sitio (`Sec-Fetch-Site:
 //        same-origin`, o sin ese encabezado un `Referer` del mismo origen): un link de otro
-//        sitio no puede hacer que la cuenta de otro alumno consuma una invitación.
+//        sitio no puede hacer que la cuenta de otro alumno consuma una invitación. `comprar` es
+//        una de las pantallas de compra (`isCheckoutSlug`); cualquier otra cosa se descarta.
 //   GET  /api/portal/auth/[provider]/callback?code=…&state=… (o ?error=…)
 //        Borra la cookie del ingreso SIEMPRE. Si la cookie vale para ese proveedor, el
 //        `state` coincide y el proveedor da la identidad: cuenta, canje de la invitación
 //        (si trajo una), sesión nueva (cierra la anterior de ese navegador), cookie
-//        `tallami_alumno` y 303 a `/{idioma}/portal`, con `?invitacion=vinculada|invalida|ocupada`
-//        si hubo invitación. Cualquier falla: 303 a `/{idioma}/portal?ingreso=fallido`, sin
-//        sesión (nunca un 500).
+//        `tallami_alumno` y 303 a `/{idioma}/comprar/{servicio}` si entró desde una pantalla de
+//        compra, o a `/{idioma}/portal`, con `?invitacion=vinculada|invalida|ocupada` si hubo
+//        invitación. Cualquier falla: 303 a `/{idioma}/portal?ingreso=fallido`, sin sesión
+//        (nunca un 500).
 //   POST /api/portal/auth/logout?locale=es
 //        Cierra la sesión en la base, borra la cookie y 303 a `/{idioma}/portal`. Solo
 //        POST: a un GET Next le contesta 405.
@@ -29,6 +31,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { shouldUseSecureCookie } from "@/admin/auth/request";
+import { checkoutHref } from "@/content/services";
 import type { Db } from "@/db/client";
 import { routing, type Locale } from "@/i18n/routing";
 import { upsertAccountFromIdentity } from "../accounts";
@@ -45,6 +48,7 @@ import {
 import {
   FLOW_COOKIE,
   exchangeAndFetchIdentity,
+  flowCheckoutFrom,
   flowCookieOptions,
   inviteTokenFrom,
   matchesState,
@@ -114,8 +118,9 @@ function startedOnThisSite(request: NextRequest): boolean {
 
 /**
  * `GET /api/portal/auth/[provider]`: empieza el ingreso. `locale` que no es del sitio
- * pasa a `es`; una invitación con otra forma, o que no viene de la página del portal, se
- * descarta (el ingreso sigue, sin invitación).
+ * pasa a `es`; una invitación o un link de pago con otra forma, o que no vienen de una página
+ * del sitio, se descartan (el ingreso sigue, sin ellos). Una pantalla de compra que no se conoce,
+ * también: se vuelve al portal.
  */
 export function handleSignInStart(
   request: NextRequest,
@@ -132,10 +137,12 @@ export function handleSignInStart(
   if (canonical) return redirectTo(canonical, 302);
 
   const { origin, searchParams } = request.nextUrl;
+  const fromThisSite = startedOnThisSite(request);
   const { authorizationUrl, cookieValue } = startFlow({
     provider,
     locale: portalLocale(searchParams.get("locale")),
-    inviteToken: startedOnThisSite(request) ? inviteTokenFrom(searchParams.get("invitacion")) : null,
+    inviteToken: fromThisSite ? inviteTokenFrom(searchParams.get("invitacion")) : null,
+    checkout: flowCheckoutFrom(searchParams.get("comprar"), fromThisSite ? searchParams.get("link") : null),
     redirectUri: redirectUriFor(provider, origin),
     now: now?.(),
   });
@@ -207,9 +214,13 @@ async function completeSignIn(
   }
 }
 
-/** A dónde vuelve el alumno: el portal, con el resultado de la invitación o con el aviso de que el ingreso falló. */
-function portalPathAfterSignIn(locale: Locale, signedIn: SignedIn | null): string {
+/**
+ * A dónde vuelve el alumno: la pantalla de compra desde la que entró o el portal, con el resultado de
+ * la invitación; si el ingreso falló, el portal con el aviso.
+ */
+function pathAfterSignIn(locale: Locale, flow: FlowData | null, signedIn: SignedIn | null): string {
   if (!signedIn) return portalPath(locale, SIGN_IN_FAILED_QUERY);
+  if (flow?.checkout) return checkoutHref(flow.checkout.slug, locale, { link: flow.checkout.linkToken });
   return portalPath(locale, signedIn.invite ? { invitacion: signedIn.invite } : {});
 }
 
@@ -227,7 +238,7 @@ export async function handleCallback(
   const locale = flow?.locale ?? routing.defaultLocale;
   const signedIn = provider && flow ? await completeSignIn(request, provider, flow, deps, now) : null;
 
-  const response = redirectTo(portalPathAfterSignIn(locale, signedIn), 303);
+  const response = redirectTo(pathAfterSignIn(locale, flow, signedIn), 303);
   if (signedIn) response.cookies.set(PORTAL_COOKIE, signedIn.token, portalCookieOptions(secure));
   // De un solo uso: se borra salga bien o mal.
   response.cookies.set(FLOW_COOKIE, "", { ...flowCookieOptions(secure), maxAge: 0 });

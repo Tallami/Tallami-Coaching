@@ -7,6 +7,7 @@ import { ADMIN_ROUTES } from "@/admin/routes";
 import { SettingsForm } from "@/admin/settings/settings-form";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import type { PaymentAvailability, PaymentRequirement } from "@/payments/availability";
 
 /**
  * La tabla de categorías y montos vigentes del Monotributo en ARCA. Verificada
@@ -24,6 +25,31 @@ interface SettingsViewProps {
   action: (state: SettingsFormState, formData: FormData) => Promise<SettingsFormState>;
   /** La tarjeta de pesos por dólar; va entre el monotributo y Seguridad. */
   pesosPerDollar?: ReactNode;
+  /** Si la web puede cobrar y, si no, qué falta. */
+  paymentAvailability?: PaymentAvailability;
+}
+
+const REQUIREMENT_LABELS: Record<PaymentRequirement, string> = {
+  credentials: "las credenciales de Mercado Pago",
+  rate: "los pesos por dólar",
+  sender: "el remitente de los emails",
+};
+
+/** Qué le falta a la web para cobrar: solo nombres, nunca un valor. */
+function PaymentStatusLine({ availability }: { availability: PaymentAvailability }) {
+  const { canPay, missing } = availability;
+  return (
+    <p
+      data-testid="payments-status"
+      className={`mt-6 border-l-4 px-4 py-3 text-[0.9375rem] leading-snug ${
+        canPay ? "border-ok-ink bg-ok-tint text-ok-ink" : "border-warn bg-warn-tint text-warn-ink"
+      }`}
+    >
+      {canPay
+        ? "Pagos en la web: listos."
+        : `Pagos en la web: apagados. Falta: ${missing.map((requirement) => REQUIREMENT_LABELS[requirement]).join(", ")}.`}
+    </p>
+  );
 }
 
 /** De dónde salen los datos y dónde ver la tabla: lo que nunca debe quedar sin decir. */
@@ -75,7 +101,7 @@ function SecurityLink() {
 }
 
 /** El cuerpo de Configuración (el encabezado lo pone la página): el aviso de guardado, el formulario del monotributo y el paso a Seguridad. */
-export function SettingsView({ current, updatedAt, justSaved, action, pesosPerDollar }: SettingsViewProps) {
+export function SettingsView({ current, updatedAt, justSaved, action, pesosPerDollar, paymentAvailability }: SettingsViewProps) {
   return (
     <div className="max-w-3xl">
       <SettingsForm
@@ -102,6 +128,7 @@ export function SettingsView({ current, updatedAt, justSaved, action, pesosPerDo
         <SourceNote />
       </SettingsForm>
       {pesosPerDollar}
+      {paymentAvailability ? <PaymentStatusLine availability={paymentAvailability} /> : null}
       <SecurityLink />
     </div>
   );

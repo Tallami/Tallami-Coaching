@@ -151,7 +151,7 @@ test.describe("services menu", () => {
     );
   });
 
-  test("booking links stay inside the services section until payments exist", async ({
+  test("booking links go to the purchase screen of each service, and Temporada Pro to its application", async ({
     page,
   }) => {
     await page.goto("/es");
@@ -164,9 +164,23 @@ test.describe("services menu", () => {
     const hrefs = await links.evaluateAll((anchors) =>
       anchors.map((anchor) => anchor.getAttribute("href")),
     );
-    for (const href of hrefs) {
-      expect(href).toMatch(/#services$/);
-    }
+    expect(hrefs).toEqual([
+      "/es/comprar/vod-3-partidas",
+      "/es/comprar/vod-torneo",
+      "/es/comprar/vod-en-vivo",
+      "/es/comprar/plan-de-juego",
+      "/es/temporada-pro",
+    ]);
+  });
+
+  test("the buttons of the services are in the language of the page", async ({
+    page,
+  }) => {
+    await page.goto("/pt");
+
+    await expect(
+      page.locator("#services li").first().getByRole("link"),
+    ).toHaveAttribute("href", "/pt/comprar/vod-3-partidas");
   });
 
   test("Temporada Pro is a dark card and the last item", async ({ page }) => {

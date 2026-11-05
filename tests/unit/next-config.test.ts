@@ -1,4 +1,5 @@
 import { hasRemoteMatch } from "next/dist/shared/lib/match-remote-pattern";
+import { getPathMatch } from "next/dist/shared/lib/router/utils/path-match";
 import { describe, expect, test } from "vitest";
 import nextConfig from "../../next.config";
 import { TWEET_SNAPSHOTS } from "@/content/tweet-snapshots";
@@ -71,10 +72,56 @@ describe("next.config headers", () => {
     expect(portal).toBeGreaterThan(baseline);
   });
 
+  test("the purchase screen, in every language, sends no Referer to other sites either: it can carry a payment link in its address", async () => {
+    const rules = await headerRules();
+    const source = `/:locale(${routing.locales.join("|")})/comprar/:path*`;
+    const rule = rules.find((candidate) => candidate.source === source);
+
+    expect(rule?.headers).toEqual([{ key: "Referrer-Policy", value: "same-origin" }]);
+    expect(rules.indexOf(rule as HeaderRule)).toBeGreaterThan(rules.findIndex((candidate) => candidate.source === "/:path*"));
+  });
+
   test("the rest of the site keeps the baseline policy", async () => {
     const baseline = (await headerRules()).find(({ source }) => source === "/:path*");
 
     expect(baseline?.headers).toContainEqual({ key: "Referrer-Policy", value: "strict-origin-when-cross-origin" });
+  });
+});
+
+describe("next.config rewrites", () => {
+  // Con Cache Components, un `notFound()` en la página llega con la respuesta ya empezada: el estado queda
+  // en 200. Por eso lo que no es una pantalla de compra se resuelve antes de la página.
+  async function checkoutRule() {
+    const rewrites = (await nextConfig.rewrites?.()) as { beforeFiles: { source: string; destination: string }[] };
+    const [rule] = rewrites.beforeFiles;
+    return rule;
+  }
+
+  /** Con el mismo comparador que usa Next para sus rutas. */
+  function isCaught(source: string, path: string): boolean {
+    return getPathMatch(source)(path) !== false;
+  }
+
+  test("sends every address under /comprar that is not a purchase screen to a page that does not exist", async () => {
+    const { source, destination } = await checkoutRule();
+
+    expect(destination).toBe("/:locale/no-existe");
+    for (const path of ["/es/comprar/no-existe", "/pt/comprar/vod", "/en/comprar/vod-3-partidas-x", "/es/comprar/x-vod-torneo"]) {
+      expect(isCaught(source, path), path).toBe(true);
+    }
+  });
+
+  test("leaves the purchase screens alone, in every language, and the rest of the site", async () => {
+    const { source } = await checkoutRule();
+
+    for (const slug of ["vod-3-partidas", "vod-torneo", "vod-en-vivo", "plan-de-juego", "temporada-pro"]) {
+      for (const locale of routing.locales) {
+        expect(isCaught(source, `/${locale}/comprar/${slug}`), `${locale}/${slug}`).toBe(false);
+      }
+    }
+    for (const path of ["/es", "/es/portal", "/fr/comprar/no-existe", "/api/portal/auth/test"]) {
+      expect(isCaught(source, path), path).toBe(false);
+    }
   });
 });
 

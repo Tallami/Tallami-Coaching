@@ -1,11 +1,17 @@
 import { unstable_rethrow } from "next/navigation";
-import { connection } from "next/server";
-import { getDb } from "@/db/client";
+import { after, connection } from "next/server";
+import { SERVICES, bookingHref } from "@/content/services";
+import { getDb, type Db } from "@/db/client";
 import type { Locale } from "@/i18n/routing";
-import type { PortalAccount } from "@/portal/accounts";
+import { isSettled } from "@/payments/apply";
+import { reconcileOrder } from "@/payments/checkout";
+import { getMercadoPagoClient } from "@/payments/mercadopago";
+import { hasUnconfirmedOrder, orderForAccount, type Order } from "@/payments/orders";
+import type { OrderStatus } from "@/payments/policy";
+import { getAccount, type PortalAccount } from "@/portal/accounts";
 import { enabledProviders, isPortalConfigured } from "@/portal/config";
 import { getCurrentStudent } from "@/portal/current";
-import { parsePortalQuery, portalNotice, type PortalView } from "@/portal/page-state";
+import { parsePortalQuery, portalNotice, type PortalQuery, type PortalView } from "@/portal/page-state";
 import { listStudentPurchases, type StudentPurchase } from "@/portal/purchases";
 import { AccountBar } from "./account-bar";
 import { MessageView } from "./message-view";
@@ -23,21 +29,51 @@ interface PortalContentProps {
 
 /** Lo que se sabe de quien mira la página: sin sesión, cuenta sin vincular o alumno con sus compras. */
 type Visitor =
-  | { view: "signedOut" }
-  | { view: "unlinked"; account: PortalAccount }
-  | { view: "linked"; account: PortalAccount; purchases: StudentPurchase[] };
+  | { view: "signedOut"; order: null }
+  | { view: "unlinked"; account: PortalAccount; order: Order | null; hasOrder: boolean }
+  | { view: "linked"; account: PortalAccount; order: Order | null; purchases: StudentPurchase[] };
+
+/**
+ * El pedido con el que volvió de pagar, solo si es de esta cuenta. Si todavía no se confirmó, se consulta
+ * el pago una vez, por si el aviso de Mercado Pago no llegó, y se devuelve cómo quedó. Los emails de esa
+ * consulta salen después de responder.
+ */
+async function returningOrder(db: Db, account: PortalAccount, query: PortalQuery): Promise<Order | null> {
+  if (!query.orderId) return null;
+  const order = await orderForAccount(db, query.orderId, account.id);
+  if (!order || isSettled(order)) return order;
+  const client = getMercadoPagoClient();
+  if (!client) return order;
+  await reconcileOrder(db, client, order, query.paymentId, new Date(), (task) => after(task));
+  return orderForAccount(db, order.id, account.id);
+}
 
 /**
  * Lee la sesión y, si la cuenta es de un alumno, sus compras. Es la única puerta a los datos del
  * portal de esta página: sin sesión (o con una que no vale) no se abre ninguna consulta de compras, y
  * las compras que se piden son siempre las del alumno de esa cuenta.
+ *
+ * El pago que se confirma al volver puede crear el alumno y vincular la cuenta: por eso, si hubo un
+ * pedido, la cuenta se lee de nuevo.
  */
-async function loadVisitor(): Promise<Visitor> {
-  const account = await getCurrentStudent();
-  if (!account) return { view: "signedOut" };
-  if (!account.customerId) return { view: "unlinked", account };
-  const purchases = await listStudentPurchases(await getDb(), account.customerId);
-  return { view: "linked", account, purchases };
+async function loadVisitor(query: PortalQuery): Promise<Visitor> {
+  const signedIn = await getCurrentStudent();
+  if (!signedIn) return { view: "signedOut", order: null };
+  const db = await getDb();
+  const order = await returningOrder(db, signedIn, query);
+  const account = order ? ((await getAccount(db, signedIn.id)) ?? signedIn) : signedIn;
+  if (!account.customerId) {
+    const hasOrder = (order !== null && !isSettled(order)) || (await hasUnconfirmedOrder(db, account.id));
+    return { view: "unlinked", account, order, hasOrder };
+  }
+  const purchases = await listStudentPurchases(db, account.customerId);
+  return { view: "linked", account, order, purchases };
+}
+
+/** La pantalla para intentar de nuevo, si es un servicio que se compra solo: Temporada Pro va con su propio link. */
+function retryHrefFor(order: Order | null, locale: Locale): string | undefined {
+  const service = SERVICES.find(({ id }) => id === order?.item);
+  return service ? bookingHref(service.id, locale) : undefined;
 }
 
 /** Solo el nombre del error: el mensaje podría traer la conexión a la base. */
@@ -61,7 +97,7 @@ export async function PortalContent({ locale, searchParams }: PortalContentProps
 
   let visitor: Visitor;
   try {
-    visitor = await loadVisitor();
+    visitor = await loadVisitor(query);
   } catch (error) {
     // Las señales internas de Next (por ejemplo, esperar a que haya un pedido) no son fallas.
     unstable_rethrow(error);
@@ -70,20 +106,30 @@ export async function PortalContent({ locale, searchParams }: PortalContentProps
   }
 
   const view: PortalView = visitor.view;
-  const notice = portalNotice(query, view);
+  const notice = portalNotice(query, view, (visitor.order?.status as OrderStatus | undefined) ?? null);
 
   return (
     <>
       {/* El token ya está en los botones de ingreso: se saca de la barra de direcciones. */}
       {query.inviteToken ? <StripInviteFromUrl /> : null}
-      {notice ? <PortalNotice notice={notice} /> : null}
+      {notice ? (
+        <PortalNotice
+          notice={notice}
+          retryHref={notice.key === "paymentFailed" ? retryHrefFor(visitor.order, locale) : undefined}
+        />
+      ) : null}
       {visitor.view === "signedOut" ? (
         <SignInView providers={enabledProviders()} locale={locale} inviteToken={query.inviteToken} />
       ) : (
         <>
           <AccountBar account={visitor.account} locale={locale} />
           {visitor.view === "unlinked" ? (
-            <UnlinkedView providers={enabledProviders()} locale={locale} inviteToken={query.inviteToken} />
+            <UnlinkedView
+              providers={enabledProviders()}
+              locale={locale}
+              inviteToken={query.inviteToken}
+              hasOrder={visitor.hasOrder}
+            />
           ) : (
             <PurchaseList purchases={visitor.purchases} />
           )}

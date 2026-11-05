@@ -2,7 +2,7 @@
 // `state`. Al empezar se generan al azar el `state` y el verificador de PKCE, y viajan
 // en una cookie corta (`tallami_alumno_oauth`, 10 minutos, solo para las rutas del
 // ingreso) firmada con HMAC-SHA256: así nadie puede armar ni cambiar un ingreso a
-// medio camino (otro `state`, otro idioma, otra invitación, más tiempo). La firma usa
+// medio camino (otro `state`, otro idioma, otra invitación, otra pantalla de compra, más tiempo). La firma usa
 // una clave derivada de `PORTAL_SESSION_SECRET` con un contexto propio, como `hashIp`
 // del panel: el mismo secreto no firma dos cosas distintas.
 //
@@ -13,6 +13,7 @@
 
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
+import { isCheckoutSlug } from "@/content/services";
 import { routing, type Locale } from "@/i18n/routing";
 import type { ProviderIdentity } from "../accounts";
 import { getPortalSecret, type PortalProvider } from "../config";
@@ -33,6 +34,13 @@ const MAX_COOKIE_LENGTH = 1024;
 /** Lo máximo que se espera a Discord o Google en cada pedido. */
 const OAUTH_REQUEST_TIMEOUT_MS = 10_000;
 
+/** La pantalla de compra desde la que se entró: a esa se vuelve, y nunca a una dirección libre. */
+export interface FlowCheckout {
+  slug: string;
+  /** El token del link de pago, o `null`. */
+  linkToken: string | null;
+}
+
 /** Lo que guarda la cookie del ingreso. */
 export interface FlowData {
   provider: PortalProvider;
@@ -42,6 +50,8 @@ export interface FlowData {
   locale: Locale;
   /** La invitación con la que llegó el alumno, para canjearla al volver, o `null`. */
   inviteToken: string | null;
+  /** La pantalla de compra a la que se vuelve, o `null` si se vuelve al portal. */
+  checkout: FlowCheckout | null;
   /** Milisegundos desde 1970: la cookie no vale desde ese momento. */
   expiresAt: number;
 }
@@ -50,6 +60,7 @@ export interface StartFlowInput {
   provider: PortalProvider;
   locale: Locale;
   inviteToken?: string | null;
+  checkout?: FlowCheckout | null;
   /** A dónde vuelve el proveedor (`redirectUriFor`). */
   redirectUri: string;
   now?: Date;
@@ -64,6 +75,9 @@ const flowSchema = z.strictObject({
   codeVerifier: urlSafe32Bytes,
   locale: z.enum(routing.locales),
   inviteToken: urlSafe32Bytes.nullable(),
+  checkout: z
+    .strictObject({ slug: z.string().refine(isCheckoutSlug), linkToken: urlSafe32Bytes.nullable() })
+    .nullable(),
   expiresAt: z.number().int(),
 });
 
@@ -87,6 +101,15 @@ export function portalLocale(value: string | null | undefined): Locale {
 /** La invitación de la dirección si tiene la forma de una (32 bytes en base64url), o `null`. */
 export function inviteTokenFrom(value: string | null | undefined): string | null {
   return typeof value === "string" && URL_SAFE_32_BYTES.test(value) ? value : null;
+}
+
+/**
+ * La pantalla de compra a la que volver, si `slug` es una de las conocidas (nunca una dirección libre).
+ * Un link con otra forma se descarta y la pantalla queda.
+ */
+export function flowCheckoutFrom(slug: string | null | undefined, linkToken: string | null | undefined): FlowCheckout | null {
+  if (typeof slug !== "string" || !isCheckoutSlug(slug)) return null;
+  return { slug, linkToken: inviteTokenFrom(linkToken) };
 }
 
 /** El `code_challenge` S256 de PKCE: el SHA-256 del verificador en base64url sin relleno (RFC 7636). */
@@ -133,6 +156,7 @@ export function startFlow({
   provider,
   locale,
   inviteToken = null,
+  checkout = null,
   redirectUri,
   now = new Date(),
 }: StartFlowInput): { authorizationUrl: string; cookieValue: string } {
@@ -147,6 +171,7 @@ export function startFlow({
     codeVerifier: randomToken(),
     locale: portalLocale(locale),
     inviteToken: inviteTokenFrom(inviteToken),
+    checkout: flowCheckoutFrom(checkout?.slug, checkout?.linkToken),
     expiresAt: now.getTime() + PORTAL_OAUTH_FLOW_MS,
   };
   const payload = Buffer.from(JSON.stringify(flow)).toString("base64url");

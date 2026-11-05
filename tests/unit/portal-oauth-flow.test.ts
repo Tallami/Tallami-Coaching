@@ -103,6 +103,38 @@ describe("startFlow", () => {
     expect(readFlowCookie(start().cookieValue, "discord", NOW)?.inviteToken).toBeNull();
   });
 
+  test("the cookie carries the purchase screen it came from, with its link, and no purchase by default", () => {
+    const checkout = { slug: "vod-torneo", linkToken: INVITE };
+
+    expect(readFlowCookie(start({ checkout }).cookieValue, "discord", NOW)?.checkout).toEqual(checkout);
+    expect(readFlowCookie(start().cookieValue, "discord", NOW)?.checkout).toBeNull();
+  });
+
+  test.each(["vod-3-partidas", "vod-torneo", "vod-en-vivo", "plan-de-juego", "temporada-pro"])(
+    "%s is a purchase screen the cookie accepts",
+    (slug) => {
+      expect(readFlowCookie(start({ checkout: { slug, linkToken: null } }).cookieValue, "discord", NOW)?.checkout).toEqual({
+        slug,
+        linkToken: null,
+      });
+    },
+  );
+
+  test("an address that is not a known purchase screen is dropped before signing, and the sign-in goes on", () => {
+    for (const slug of ["https://mal.example", "//mal.example", "no-existe", "../admin", "__proto__", ""]) {
+      const data = readFlowCookie(start({ checkout: { slug, linkToken: null } }).cookieValue, "discord", NOW);
+
+      expect(data, slug).not.toBeNull();
+      expect(data?.checkout, slug).toBeNull();
+    }
+  });
+
+  test("a link with another shape is dropped, and the screen stays", () => {
+    const data = readFlowCookie(start({ checkout: { slug: "temporada-pro", linkToken: "corto" } }).cookieValue, "discord", NOW);
+
+    expect(data?.checkout).toEqual({ slug: "temporada-pro", linkToken: null });
+  });
+
   test("refuses to start without the portal secret or with a provider that is not enabled", () => {
     vi.stubEnv("PORTAL_SESSION_SECRET", "");
     expect(() => start()).toThrow();
@@ -158,7 +190,12 @@ describe("readFlowCookie", () => {
     const [payload, signature] = cookieValue.split(".");
     const data = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as Record<string, unknown>;
 
-    for (const change of [{ locale: "en" }, { expiresAt: Number(data.expiresAt) + 60 * 60 * 1000 }, { inviteToken: INVITE }]) {
+    for (const change of [
+      { locale: "en" },
+      { expiresAt: Number(data.expiresAt) + 60 * 60 * 1000 },
+      { inviteToken: INVITE },
+      { checkout: { slug: "vod-torneo", linkToken: null } },
+    ]) {
       const altered = Buffer.from(JSON.stringify({ ...data, ...change })).toString("base64url");
       expect(readFlowCookie(`${altered}.${signature}`, "discord", NOW), JSON.stringify(change)).toBeNull();
     }

@@ -87,16 +87,40 @@ describe("environment of the e2e servers", () => {
     expect((await securityServerEnv()).DATABASE_URL).toBe("");
   });
 
-  test("every server blanks the email variables, so no test can send a real email and the panel says 'sin configurar'", async () => {
-    vi.stubEnv("RESEND_API_KEY", "re_una_clave_real");
+  test("every server blanks the alert address and sender, so the panel says 'sin configurar'", async () => {
     vi.stubEnv("ADMIN_ALERT_EMAIL", "alguien@example.com");
     vi.stubEnv("ADMIN_ALERT_FROM", "Panel <avisos@example.com>");
 
     for (const env of [await adminServerEnv(), await demoServerEnv(), await securityServerEnv()]) {
-      expect(env.RESEND_API_KEY).toBe("");
       expect(env.ADMIN_ALERT_EMAIL).toBe("");
       expect(env.ADMIN_ALERT_FROM).toBe("");
     }
+  });
+
+  test("the demo and security servers have no way to send an email or to charge", async () => {
+    for (const env of [await demoServerEnv(), await securityServerEnv()]) {
+      for (const name of [
+        "RESEND_API_KEY",
+        "RESEND_BASE_URL",
+        "PUBLIC_EMAIL_FROM",
+        "MERCADOPAGO_ACCESS_TOKEN",
+        "MERCADOPAGO_WEBHOOK_SECRET",
+        "MERCADOPAGO_API_BASE",
+      ]) {
+        expect(env[name], name).toBe("");
+      }
+    }
+  });
+
+  test("the main server charges and sends email only through the fake server on 3111", async () => {
+    const env = await adminServerEnv();
+
+    expect(env.MERCADOPAGO_API_BASE).toBe("http://localhost:3111");
+    expect(env.RESEND_BASE_URL).toBe("http://localhost:3111");
+    expect(env.MERCADOPAGO_ACCESS_TOKEN.trim().length).toBeGreaterThan(0);
+    expect(env.MERCADOPAGO_WEBHOOK_SECRET.trim().length).toBeGreaterThan(0);
+    expect(env.RESEND_API_KEY).toBe("re_test");
+    expect(env.PUBLIC_EMAIL_FROM).toContain("@");
   });
 
   test.each(CONFIGS)("the %s Playwright config starts its server with DATABASE_URL blank", async (_name, config) => {
@@ -145,7 +169,6 @@ describe("environment of the e2e servers", () => {
     const servers = await serversOf("../../playwright.config");
     const oauth = servers.filter((server) => server.command?.includes("mock-oauth-server"));
 
-    expect(servers).toHaveLength(2);
     expect(oauth).toHaveLength(1);
     expect(oauth[0].command).toBe("node tests/helpers/mock-oauth-server.mjs");
     expect(oauth[0].url).toBe("http://localhost:3110/health");
@@ -154,6 +177,19 @@ describe("environment of the e2e servers", () => {
     for (const config of ["../../playwright.demo.config", "../../playwright.security.config"]) {
       expect(await serversOf(config)).toHaveLength(1);
     }
+  });
+
+  test("the main config also starts the fake Mercado Pago on 3111, which signs its notices with the secret the site verifies", async () => {
+    const servers = await serversOf("../../playwright.config");
+    const mercadopago = servers.filter((server) => server.command?.includes("mock-mercadopago-server"));
+
+    expect(servers).toHaveLength(3);
+    expect(mercadopago).toHaveLength(1);
+    expect(mercadopago[0].command).toBe("node tests/helpers/mock-mercadopago-server.mjs");
+    expect(mercadopago[0].url).toBe("http://localhost:3111/health");
+    expect(mercadopago[0].env?.MOCK_MERCADOPAGO_PORT).toBe("3111");
+    expect(mercadopago[0].env?.APP_BASE).toBe("http://localhost:3100");
+    expect(mercadopago[0].env?.MERCADOPAGO_WEBHOOK_SECRET).toBe((await adminServerEnv()).MERCADOPAGO_WEBHOOK_SECRET);
   });
 
   test("the main server enables the test provider against that fake server, with its own portal secret", async () => {
@@ -169,9 +205,9 @@ describe("environment of the e2e servers", () => {
     expect((await serverEnvOf("../../playwright.config")).PORTAL_OAUTH_TEST_ISSUER).toBe("http://localhost:3110");
   });
 
-  test("the fake OAuth server is never part of the app: nothing under src imports it", () => {
+  test("the fake servers are never part of the app: nothing under src imports them", () => {
     // Un `import … from "…mock-oauth-server…"` o un `import("…mock-oauth-server…")`; nombrarlo en un comentario no cuenta.
-    const importsMock = /(?:\bfrom\s*|\bimport\s*\(?\s*)["'][^"']*mock-oauth-server/;
+    const importsMock = /(?:\bfrom\s*|\bimport\s*\(?\s*)["'][^"']*mock-(?:oauth|mercadopago)-server/;
     const offenders = listSourceFiles(path.join(process.cwd(), "src")).filter((file) =>
       importsMock.test(readFileSync(file, "utf8")),
     );

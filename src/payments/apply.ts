@@ -69,7 +69,8 @@ const TOOK_MONEY: Record<PaymentStatus, boolean> = {
   cancelled: false,
 };
 
-function isSettled(order: Order): boolean {
+/** ¿La aprobación de este pedido ya se procesó? Tiene venta: otra consulta no le puede agregar nada. */
+export function isSettled(order: Pick<Order, "status">): boolean {
   return SETTLED_STATUSES.includes(order.status);
 }
 

@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
+import { CHECKOUT_SLUGS } from "./src/content/services";
 import { routing } from "./src/i18n/routing";
 
 /**
@@ -28,13 +29,35 @@ const SECURITY_HEADERS = [
  */
 const PORTAL_PAGE_SOURCE = `/:locale(${routing.locales.join("|")})/portal`;
 
+/**
+ * La pantalla de compra, por lo mismo: el link de pago de Temporada Pro lleva su token en la dirección,
+ * y desde acá se sale a Mercado Pago. El ingreso que empieza acá también necesita el `Referer` propio.
+ */
+const CHECKOUT_PAGE_SOURCE = `/:locale(${routing.locales.join("|")})/comprar/:path*`;
+
+/**
+ * Lo que está bajo `/comprar` y no es una pantalla de compra. Con Cache Components, un `notFound()` en
+ * la página llega con la respuesta ya empezada y el estado queda en 200 (documentación de `not-found`):
+ * para que sea un 404 de verdad tiene que resolverse antes. Corre después del `proxy`, así que el 404
+ * sale en el idioma de la dirección (`src/app/global-not-found.tsx`).
+ */
+const UNKNOWN_CHECKOUT_SOURCE = `/:locale(${routing.locales.join("|")})/comprar/:service((?!(?:${CHECKOUT_SLUGS.join("|")})$)[^/]+)`;
+
 const nextConfig: NextConfig = {
+  async rewrites() {
+    return {
+      beforeFiles: [{ source: UNKNOWN_CHECKOUT_SOURCE, destination: "/:locale/no-existe" }],
+      afterFiles: [],
+      fallback: [],
+    };
+  },
   async headers() {
     return [
       { source: "/:path*", headers: SECURITY_HEADERS },
-      // Va después de la regla de todas las rutas: cuando dos reglas ponen el mismo encabezado,
+      // Van después de la regla de todas las rutas: cuando dos reglas ponen el mismo encabezado,
       // gana la última, y acá la política es más estricta que la base: nada sale hacia otros sitios.
       { source: PORTAL_PAGE_SOURCE, headers: [{ key: "Referrer-Policy", value: "same-origin" }] },
+      { source: CHECKOUT_PAGE_SOURCE, headers: [{ key: "Referrer-Policy", value: "same-origin" }] },
     ];
   },
   cacheComponents: true,

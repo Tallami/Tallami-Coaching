@@ -234,6 +234,81 @@ describe("the invite of the address counts only when the sign-in starts on the p
   });
 });
 
+describe("a sign-in that starts on a purchase screen", () => {
+  const LINK = "l".repeat(43);
+
+  async function checkoutOf(query: string, headers: Record<string, string> = FROM_PORTAL) {
+    const { cookie } = await begin(`?locale=es&${query}`, undefined, headers);
+    return readFlowCookie(cookie, "test")?.checkout;
+  }
+
+  test("keeps a known screen in the flow", async () => {
+    expect(await checkoutOf("comprar=vod-en-vivo")).toEqual({ slug: "vod-en-vivo", linkToken: null });
+  });
+
+  test("a screen coming from another site is harmless and stays: it is one of the fixed addresses", async () => {
+    expect(await checkoutOf("comprar=vod-en-vivo", { "sec-fetch-site": "cross-site" })).toEqual({
+      slug: "vod-en-vivo",
+      linkToken: null,
+    });
+  });
+
+  test("drops anything that is not a known screen, and the sign-in goes on", async () => {
+    for (const value of ["https://mal.example", encodeURIComponent("https://mal.example"), "//mal.example", "no-existe", ""]) {
+      expect(await checkoutOf(`comprar=${value}`), value).toBeNull();
+    }
+  });
+
+  test("the link travels when the sign-in starts on the site", async () => {
+    expect(await checkoutOf(`comprar=temporada-pro&link=${LINK}`)).toEqual({ slug: "temporada-pro", linkToken: LINK });
+    expect(await checkoutOf(`comprar=temporada-pro&link=${LINK}`, { referer: `${ORIGIN}/es/comprar/temporada-pro` })).toEqual({
+      slug: "temporada-pro",
+      linkToken: LINK,
+    });
+  });
+
+  test.each(["cross-site", "same-site", "none"])("Sec-Fetch-Site: %s drops the link and keeps the screen", async (site) => {
+    expect(await checkoutOf(`comprar=temporada-pro&link=${LINK}`, { "sec-fetch-site": site })).toEqual({
+      slug: "temporada-pro",
+      linkToken: null,
+    });
+  });
+
+  test("a link with another shape is dropped", async () => {
+    expect(await checkoutOf("comprar=temporada-pro&link=corto")).toEqual({ slug: "temporada-pro", linkToken: null });
+  });
+
+  async function comeBack(query: string) {
+    const { cookie, state } = await begin(query, undefined, FROM_PORTAL);
+    return handleCallback(callbackRequest({ code: "codigo", state }, cookie), "test", deps());
+  }
+
+  test("the return goes with a 303 to that same screen, in the language of the sign-in, with the session open", async () => {
+    const response = await comeBack("?locale=pt&comprar=plan-de-juego");
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("/pt/comprar/plan-de-juego");
+    expect(await readPortalSession(db, response.cookies.get(PORTAL_COOKIE)?.value)).not.toBeNull();
+    expectFlowCookieCleared(response);
+  });
+
+  test("the return carries the link", async () => {
+    const response = await comeBack(`?locale=es&comprar=temporada-pro&link=${LINK}`);
+
+    expect(response.headers.get("location")).toBe(`/es/comprar/temporada-pro?link=${LINK}`);
+  });
+
+  test("a sign-in that fails goes to the portal with the notice, like any other", async () => {
+    const { cookie } = await begin("?locale=es&comprar=plan-de-juego", undefined, FROM_PORTAL);
+
+    await expectFailure(await handleCallback(callbackRequest({ code: "codigo", state: "x".repeat(43) }, cookie), "test", deps()));
+  });
+
+  test("without a screen in the flow it goes to the portal, as always", async () => {
+    expect((await comeBack("?locale=es")).headers.get("location")).toBe("/es/portal");
+  });
+});
+
 describe("Discord and Google start only on the public address of the site", () => {
   beforeEach(() => {
     vi.stubEnv("DISCORD_CLIENT_ID", "id-de-discord");

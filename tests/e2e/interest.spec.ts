@@ -7,7 +7,7 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 import { expect, test } from "../helpers/admin";
 import { whenInteractive } from "../helpers/admin-ui";
-import { INTEREST_PATH as ENDPOINT, watchBeacons } from "../helpers/beacons";
+import { INTEREST_PATH as ENDPOINT, clickAndWaitForBeacon, watchBeacons } from "../helpers/beacons";
 
 const BROWSER_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
@@ -15,6 +15,13 @@ const BROWSER_USER_AGENT =
 /** Los botones del menú, en el orden de la pizarra. Temporada Pro lo prueba `admin-services.spec.ts`. */
 const MENU_ITEMS = ["vodRecorded", "tournamentReview", "vodLive", "gamePlan"] as const;
 const LOCALES = ["es", "pt", "en"] as const;
+/** La pantalla de confirmación de cada botón: son direcciones fijas, las mismas en los tres idiomas. */
+const SLUGS = {
+  vodRecorded: "vod-3-partidas",
+  tournamentReview: "vod-torneo",
+  vodLive: "vod-en-vivo",
+  gamePlan: "plan-de-juego",
+} as const;
 
 const bodyOf = (item: string, locale: string) => JSON.stringify({ item, locale });
 
@@ -24,7 +31,7 @@ function menuLink(page: Page, index: number) {
 
 test.describe("the service buttons of the public site", () => {
   for (const locale of LOCALES) {
-    test(`clicking Reservar on a service sends one beacon and still goes to #services (${locale})`, async ({
+    test(`clicking Reservar on a service sends one beacon and goes to its purchase screen (${locale})`, async ({
       page,
       context,
     }) => {
@@ -33,27 +40,26 @@ test.describe("the service buttons of the public site", () => {
       await page.waitForLoadState("networkidle");
       // Cargar la página no manda nada.
       expect(watch.requests(), "nothing is sent on load").toEqual([]);
-      const cookiesOnLoad = await context.cookies();
+      const cookiesOnLoad = (await context.cookies()).map(({ name }) => name);
 
       for (const [index, item] of MENU_ITEMS.entries()) {
+        await page.goto(`/${locale}`);
         const link = menuLink(page, index);
         await whenInteractive(link);
-        const answered = page.waitForResponse((response) => new URL(response.url()).pathname === ENDPOINT);
 
-        await link.click();
+        const response = await clickAndWaitForBeacon(page, link);
 
-        const response = await answered;
         expect(response.status(), item).toBe(204);
         expect(response.headers()["set-cookie"], item).toBeUndefined();
-        await expect(page).toHaveURL(new RegExp(`/${locale}#services$`));
+        await expect(page).toHaveURL(new RegExp(`/${locale}/comprar/${SLUGS[item]}$`));
       }
-      // Cinco botones, cinco clics, cinco avisos con su servicio e idioma: ni uno más.
+      // Cuatro botones, cuatro clics, cuatro avisos con su servicio e idioma: ni uno más.
       await expect
         .poll(() => watch.bodies())
         .toEqual(MENU_ITEMS.map((item) => bodyOf(item, locale)));
       expect(watch.requests()).toHaveLength(MENU_ITEMS.length);
       // El aviso no deja cookies (las que ya tenía la página, como la del idioma, quedan igual).
-      expect(await context.cookies()).toEqual(cookiesOnLoad);
+      expect((await context.cookies()).map(({ name }) => name)).toEqual(cookiesOnLoad);
     });
   }
 
@@ -62,9 +68,13 @@ test.describe("the service buttons of the public site", () => {
 
     const links = page.locator("#services li a, #services .stage a");
     await expect(links).toHaveCount(5);
-    for (const href of await links.evaluateAll((nodes) => nodes.map((node) => node.getAttribute("href")))) {
-      expect(href).toBe("#services");
-    }
+    expect(await links.evaluateAll((nodes) => nodes.map((node) => node.getAttribute("href")))).toEqual([
+      "/es/comprar/vod-3-partidas",
+      "/es/comprar/vod-torneo",
+      "/es/comprar/vod-en-vivo",
+      "/es/comprar/plan-de-juego",
+      "/es/temporada-pro",
+    ]);
     // Un enlace común: sin `role=button`, sin `onclick` en el HTML ni `aria-` agregado.
     const extra = await links.evaluateAll((nodes) =>
       nodes.flatMap((node) => node.getAttributeNames().filter((name) => /^(on|role|aria-|target|rel)/.test(name))),
@@ -83,9 +93,9 @@ test.describe("the service buttons of the public site", () => {
 
     const [opened] = await Promise.all([context.waitForEvent("page"), link.click({ modifiers: ["Control"] })]);
 
-    await expect(opened).toHaveURL(/\/es#services$/);
+    await expect(opened).toHaveURL(/\/es\/comprar\/vod-en-vivo$/);
     // La pestaña de origen no se movió.
-    expect(new URL(page.url()).hash).toBe("");
+    expect(new URL(page.url()).pathname).toBe("/es");
     await expect.poll(() => watch.bodies()).toEqual([bodyOf("vodLive", "es")]);
     expect(watch.requests()).toHaveLength(1);
   });
@@ -98,8 +108,8 @@ test.describe("the service buttons of the public site", () => {
 
     const [opened] = await Promise.all([context.waitForEvent("page"), link.click({ button: "middle" })]);
 
-    await expect(opened).toHaveURL(/\/pt#services$/);
-    expect(new URL(page.url()).hash).toBe("");
+    await expect(opened).toHaveURL(/\/pt\/comprar\/plan-de-juego$/);
+    expect(new URL(page.url()).pathname).toBe("/pt");
     await expect.poll(() => watch.bodies()).toEqual([bodyOf("gamePlan", "pt")]);
     expect(watch.requests()).toHaveLength(1);
   });
@@ -113,7 +123,7 @@ test.describe("the service buttons of the public site", () => {
     await link.focus();
     await page.keyboard.press("Enter");
 
-    await expect(page).toHaveURL(/\/en#services$/);
+    await expect(page).toHaveURL(/\/en\/comprar\/vod-torneo$/);
     await expect.poll(() => watch.bodies()).toEqual([bodyOf("tournamentReview", "en")]);
     expect(watch.requests()).toHaveLength(1);
   });
@@ -126,16 +136,15 @@ test.describe("the service buttons of the public site", () => {
     const link = menuLink(page, 1);
     await whenInteractive(link);
     const sent = page.waitForRequest((request) => new URL(request.url()).pathname === ENDPOINT);
-    const answered = page.waitForResponse((response) => new URL(response.url()).pathname === ENDPOINT);
 
-    await link.click();
+    const response = await clickAndWaitForBeacon(page, link);
 
     const request = await sent;
     expect(request.method()).toBe("POST");
     expect(request.headers()["content-type"]).toBe("application/json");
     expect(request.postData()).toBe(bodyOf("tournamentReview", "pt"));
-    expect((await answered).status()).toBe(204);
-    await expect(page).toHaveURL(/\/pt#services$/);
+    expect(response.status()).toBe(204);
+    await expect(page).toHaveURL(/\/pt\/comprar\/vod-torneo$/);
   });
 
   test("a click that cannot reach the server still follows the link", async ({ page }) => {
@@ -146,19 +155,19 @@ test.describe("the service buttons of the public site", () => {
 
     await link.click();
 
-    await expect(page).toHaveURL(/\/es#services$/);
+    await expect(page).toHaveURL(/\/es\/comprar\/vod-3-partidas$/);
   });
 
   test.describe("without JavaScript", () => {
     test.use({ javaScriptEnabled: false });
 
-    test("the link still goes to #services", async ({ page }) => {
+    test("the link still goes to its purchase screen", async ({ page }) => {
       const watch = await watchBeacons(page);
       await page.goto("/es");
 
       await menuLink(page, 1).click();
 
-      await expect(page).toHaveURL(/\/es#services$/);
+      await expect(page).toHaveURL(/\/es\/comprar\/vod-torneo$/);
       expect(watch.requests()).toEqual([]);
     });
   });

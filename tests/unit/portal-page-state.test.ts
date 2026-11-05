@@ -9,7 +9,8 @@ import { NOTICE_KEYS, parsePortalQuery, portalNotice, type PortalQuery, type Por
 // no hace aparecer un "tu cuenta quedó vinculada" que no es cierto).
 
 const TOKEN = "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_AbCdE";
-const NONE: PortalQuery = { inviteToken: null, inviteOutcome: null, signInFailed: false };
+const NONE: PortalQuery = { inviteToken: null, inviteOutcome: null, signInFailed: false, orderId: null, paymentId: null };
+const ORDER_ID = "3f2c1a54-8d7e-4b6a-9c01-2e3f4a5b6c7d";
 
 describe("parsePortalQuery", () => {
   test("an address without parameters says nothing", () => {
@@ -50,9 +51,38 @@ describe("parsePortalQuery", () => {
 
   test("both can come together", () => {
     expect(parsePortalQuery({ ingreso: "fallido", invitacion: TOKEN })).toEqual({
+      ...NONE,
       inviteToken: TOKEN,
       inviteOutcome: null,
       signInFailed: true,
+    });
+  });
+
+  test("`compra` is the order of the return from the payment, only if it is a UUID", () => {
+    expect(parsePortalQuery({ compra: ORDER_ID }).orderId).toBe(ORDER_ID);
+    for (const value of ["", "123", "no-es-un-id", `${ORDER_ID}x`, "' or 1=1 --", "<script>", "../../admin"]) {
+      expect(parsePortalQuery({ compra: value }).orderId, value).toBeNull();
+    }
+  });
+
+  test("`payment_id` only says what to look up, and only if it is digits", () => {
+    expect(parsePortalQuery({ payment_id: "123456789" }).paymentId).toBe("123456789");
+    for (const value of ["", "abc", "12a", "-1", "1.5", "1 2", "null", "<script>", "../1"]) {
+      expect(parsePortalQuery({ payment_id: value }).paymentId, value).toBeNull();
+    }
+  });
+
+  test("a repeated order or payment counts by its first value", () => {
+    expect(parsePortalQuery({ compra: [ORDER_ID, "otro"], payment_id: ["1", "2"] })).toMatchObject({
+      orderId: ORDER_ID,
+      paymentId: "1",
+    });
+  });
+
+  test("the status that Mercado Pago adds to the address is not read at all", () => {
+    expect(parsePortalQuery({ compra: ORDER_ID, status: "approved", collection_status: "approved" })).toEqual({
+      ...NONE,
+      orderId: ORDER_ID,
     });
   });
 });
@@ -126,7 +156,47 @@ describe("portalNotice", () => {
     expect(notice({ inviteOutcome: "ocupada" }, "signedOut")).toBeNull();
   });
 
+  describe("the return from a payment", () => {
+    const WITH_ORDER = { ...NONE, orderId: ORDER_ID };
+
+    test.each([
+      ["approved", { key: "paymentApproved", tone: "success" }],
+      ["pending", { key: "paymentPending", tone: "info" }],
+      ["created", { key: "paymentPending", tone: "info" }],
+      ["rejected", { key: "paymentFailed", tone: "error" }],
+      ["cancelled", { key: "paymentFailed", tone: "error" }],
+    ] as const)("an order of this account that is %s", (status, expected) => {
+      expect(portalNotice(WITH_ORDER, "linked", status)).toEqual(expected);
+      expect(portalNotice(WITH_ORDER, "unlinked", status)).toEqual(expected);
+    });
+
+    test("an order that was already refunded or charged back says nothing: an old address does not announce a payment", () => {
+      expect(portalNotice(WITH_ORDER, "linked", "refunded")).toBeNull();
+      expect(portalNotice(WITH_ORDER, "linked", "charged_back")).toBeNull();
+    });
+
+    test("an order of another account, or one that does not exist, reaches here with no status: no notice", () => {
+      expect(portalNotice(WITH_ORDER, "linked", null)).toBeNull();
+      expect(portalNotice(WITH_ORDER, "unlinked", null)).toBeNull();
+      expect(portalNotice(WITH_ORDER, "linked")).toBeNull();
+    });
+
+    test("a status with no order in the address says nothing", () => {
+      expect(portalNotice(NONE, "linked", "approved")).toBeNull();
+    });
+
+    test("without a session it says nothing, whatever the address says", () => {
+      expect(portalNotice(WITH_ORDER, "signedOut", null)).toBeNull();
+      expect(portalNotice(WITH_ORDER, "signedOut", "approved")).toBeNull();
+    });
+
+    test("a failed sign-in still comes first", () => {
+      expect(portalNotice({ ...WITH_ORDER, signInFailed: true }, "linked", "approved")?.key).toBe("signInFailed");
+    });
+  });
+
   test("every notice the page can show has a key in the catalog list", () => {
+    const withOrder: PortalQuery = { ...NONE, orderId: ORDER_ID };
     const keys = [
       notice({ signInFailed: true }, "signedOut"),
       notice({ inviteToken: TOKEN }, "signedOut"),
@@ -135,6 +205,9 @@ describe("portalNotice", () => {
       notice({ inviteOutcome: "invalida" }, "linked"),
       notice({ inviteOutcome: "invalida" }, "unlinked"),
       notice({ inviteOutcome: "ocupada" }, "unlinked"),
+      portalNotice(withOrder, "linked", "approved"),
+      portalNotice(withOrder, "linked", "pending"),
+      portalNotice(withOrder, "linked", "rejected"),
     ].map((found) => found?.key);
 
     for (const key of keys) expect(NOTICE_KEYS).toContain(key);

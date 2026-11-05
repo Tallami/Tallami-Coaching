@@ -106,6 +106,32 @@ describe("SettingsView", () => {
     expect(markup).toContain("llaves de acceso");
   });
 
+  test("says what is missing to take payments, by name and never with a value", () => {
+    const markup = render({ paymentAvailability: { canPay: false, rate: null, missing: ["credentials", "rate", "sender"] } });
+
+    expect(markup).toContain("Pagos en la web: apagados.");
+    expect(markup).toContain("las credenciales de Mercado Pago");
+    expect(markup).toContain("los pesos por dólar");
+    expect(markup).toContain("el remitente de los emails");
+  });
+
+  test("names only what is missing", () => {
+    const markup = render({ paymentAvailability: { canPay: false, rate: "1500.0000", missing: ["sender"] } });
+
+    expect(markup).toContain("el remitente de los emails");
+    expect(markup).not.toContain("las credenciales de Mercado Pago");
+    expect(markup).not.toContain("los pesos por dólar");
+    expect(markup).not.toContain("1500");
+  });
+
+  test("says when payments are on, without showing the rate", () => {
+    const markup = render({ paymentAvailability: { canPay: true, rate: "1500.0000", missing: [] } });
+
+    expect(markup).toContain("Pagos en la web: listos.");
+    expect(markup).not.toContain("1500");
+    expect(markup).not.toContain("Falta");
+  });
+
   test("the saved notice points to the meter in Facturación", () => {
     const markup = render({ justSaved: true });
 

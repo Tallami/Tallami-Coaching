@@ -1,6 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 import {
   E2E_PORTS,
+  MERCADOPAGO_TEST_WEBHOOK_SECRET,
+  MOCK_MERCADOPAGO_SERVER_COMMAND,
   MOCK_OAUTH_SERVER_COMMAND,
   SEED_E2E_PASSKEYS_COMMAND,
   adminServerEnv,
@@ -62,6 +64,19 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       timeout: 30_000,
       env: { MOCK_OAUTH_PORT: String(E2E_PORTS.oauth) },
+    },
+    {
+      // Mercado Pago y Resend de mentira: la pantalla de pago, los avisos firmados y los
+      // emails (`tests/helpers/mock-mercadopago-server.mjs`). Ningún e2e cobra de verdad.
+      command: MOCK_MERCADOPAGO_SERVER_COMMAND,
+      url: `${e2eBaseUrl(E2E_PORTS.mercadopago)}/health`,
+      reuseExistingServer: !process.env.CI,
+      timeout: 30_000,
+      env: {
+        MOCK_MERCADOPAGO_PORT: String(E2E_PORTS.mercadopago),
+        APP_BASE: BASE_URL,
+        MERCADOPAGO_WEBHOOK_SECRET: MERCADOPAGO_TEST_WEBHOOK_SECRET,
+      },
     },
   ],
 });

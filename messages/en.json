@@ -152,12 +152,19 @@
       "alreadyLinked": "Your account is already linked.",
       "inviteInvalid": "That invitation doesn't work: it expired or was already used. Ask Tallami for a new one.",
       "inviteTaken": "We couldn't use that invitation: that student already has another account, or yours is already linked to another student. Message Tallami.",
-      "inviteOtherAccount": "Your account is already linked. If this invitation is for another account, sign out and sign in with that one."
+      "inviteOtherAccount": "Your account is already linked. If this invitation is for another account, sign out and sign in with that one.",
+      "paymentApproved": "Done, your payment is confirmed. Your purchase is here now.",
+      "paymentPending": "We're waiting for Mercado Pago to confirm your payment. Your purchase shows up here as soon as it does.",
+      "paymentFailed": "The payment couldn't be completed."
     },
+    "retryPayment": "Try again",
     "unlinked": {
       "title": "One step left",
       "body": "Your account isn't linked yet. Ask Tallami for your invitation.",
-      "withInvite": "Your account isn't linked yet. Sign in again to use the invitation Tallami sent you."
+      "withInvite": "Your account isn't linked yet. Sign in again to use the invitation Tallami sent you.",
+      "orderTitle": "Your purchase isn't confirmed yet",
+      "orderBody": "It shows up here as soon as the payment is confirmed.",
+      "services": "See the services"
     },
     "account": {
       "greeting": "Hi, {name}",
@@ -197,6 +204,45 @@
       "openLink": "Open",
       "opensInNewTab": "(opens in a new tab)",
       "kinds": { "youtube": "Video", "pdf": "PDF", "link": "Link" }
+    }
+  },
+  "Checkout": {
+    "metaTitle": "Confirm your purchase · Tallami Coaching",
+    "metaDescription": "Check the service and the price before paying with Mercado Pago.",
+    "eyebrow": "Confirm your purchase",
+    "loading": "Loading the price…",
+    "noScript": "You need JavaScript to see the price and pay. Turn it on in your browser and reload the page.",
+    "summaryLabel": "Purchase summary",
+    "total": "Total",
+    "paymentNote": "You pay in pesos with Mercado Pago, in a single installment. Only Mercado Pago sees your card details, and your purchase shows up in your portal once the payment is confirmed.",
+    "signIn": {
+      "title": "Sign in to pay",
+      "body": "With your Discord or Google account, no password. Then you come back to this same screen."
+    },
+    "form": {
+      "buyingAs": "You're buying as {name}.",
+      "adult": "I'm an adult, or I'm the responsible adult making this payment.",
+      "pay": "Pay with Mercado Pago",
+      "paying": "Going to Mercado Pago…"
+    },
+    "unavailable": {
+      "title": "You can't pay on the site yet",
+      "body": "Write to me and we'll sort it out there.",
+      "contact": "Write to me"
+    },
+    "errors": {
+      "adult": "To continue, tick the box: the payment is made by an adult.",
+      "price-changed": "The dollar rate changed while this screen was open. You weren't charged: this is the current price.",
+      "unavailable": "You can't pay on the site right now. You weren't charged: try again in a while or write to me.",
+      "link-invalid": "That payment link doesn't work: it expired or was already used. Ask Tallami for a new one.",
+      "provider": "Mercado Pago didn't respond and you weren't charged. Try again in a few minutes."
+    },
+    "legal": {
+      "label": "Before you pay",
+      "terms": "Terms",
+      "refunds": "Refunds",
+      "privacy": "Privacy",
+      "outsideArgentina": "Not in Argentina? Write to me"
     }
   },
   "Emails": {

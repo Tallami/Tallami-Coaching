@@ -14,7 +14,7 @@ import { formatPercent } from "../../src/admin/overview/labels";
 import { PERIOD_SLUGS } from "../../src/admin/overview/period-param";
 import { expect, loginAsAdmin, test } from "../helpers/admin";
 import { PHONE, createSale, uniqueName, whenInteractive } from "../helpers/admin-ui";
-import { watchBeacons } from "../helpers/beacons";
+import { clickAndWaitForBeacon, watchBeacons } from "../helpers/beacons";
 
 const SERVICES_PATH = "/admin/servicios";
 const BROWSER_USER_AGENT =
@@ -84,9 +84,7 @@ test.describe("services", () => {
     await page.goto("/pt");
     const apply = page.locator("#services .stage").getByRole("link");
     await whenInteractive(apply);
-    const answered = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/interest");
-    await apply.click();
-    expect((await answered).status()).toBe(204);
+    expect((await clickAndWaitForBeacon(page, apply)).status()).toBe(204);
     await expect.poll(() => watch.bodies()).toEqual([JSON.stringify({ item: "proSeason", locale: "pt" })]);
 
     // 2) Dos clics directos que valen, uno de un bot y uno inválido, que no valen.

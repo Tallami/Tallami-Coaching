@@ -152,12 +152,19 @@
       "alreadyLinked": "Tu cuenta ya está vinculada.",
       "inviteInvalid": "Esa invitación no sirve: venció o ya se usó. Pedile otra a Tallami.",
       "inviteTaken": "No pudimos usar esa invitación: ese alumno ya tiene otra cuenta, o la tuya ya está vinculada a otro alumno. Escribile a Tallami.",
-      "inviteOtherAccount": "Tu cuenta ya está vinculada. Si esta invitación es para otra cuenta, salí y entrá con esa."
+      "inviteOtherAccount": "Tu cuenta ya está vinculada. Si esta invitación es para otra cuenta, salí y entrá con esa.",
+      "paymentApproved": "Listo, tu pago se confirmó. Tu compra ya está acá.",
+      "paymentPending": "Estamos esperando que Mercado Pago confirme tu pago. Tu compra aparece acá apenas lo haga.",
+      "paymentFailed": "El pago no se pudo completar."
     },
+    "retryPayment": "Intentar de nuevo",
     "unlinked": {
       "title": "Falta un paso",
       "body": "Tu cuenta todavía no está vinculada. Pedile a Tallami tu invitación.",
-      "withInvite": "Tu cuenta todavía no está vinculada. Entrá de nuevo para usar la invitación que te mandó Tallami."
+      "withInvite": "Tu cuenta todavía no está vinculada. Entrá de nuevo para usar la invitación que te mandó Tallami.",
+      "orderTitle": "Tu compra todavía no está confirmada",
+      "orderBody": "Aparece acá apenas se confirme el pago.",
+      "services": "Ver los servicios"
     },
     "account": {
       "greeting": "Hola, {name}",
@@ -197,6 +204,45 @@
       "openLink": "Abrir",
       "opensInNewTab": "(se abre en una pestaña nueva)",
       "kinds": { "youtube": "Video", "pdf": "PDF", "link": "Link" }
+    }
+  },
+  "Checkout": {
+    "metaTitle": "Confirmá tu compra · Tallami Coaching",
+    "metaDescription": "Revisá el servicio y el precio antes de pagar con Mercado Pago.",
+    "eyebrow": "Confirmá tu compra",
+    "loading": "Cargando el precio…",
+    "noScript": "Para ver el precio y pagar hace falta JavaScript. Activalo en tu navegador y volvé a cargar la página.",
+    "summaryLabel": "Resumen de la compra",
+    "total": "Total",
+    "paymentNote": "Pagás en pesos con Mercado Pago, en una cuota. Los datos de tu tarjeta los ve solo Mercado Pago, y tu compra aparece en tu portal cuando se confirma el pago.",
+    "signIn": {
+      "title": "Entrá para pagar",
+      "body": "Con tu cuenta de Discord o de Google, sin contraseña. Después volvés a esta misma pantalla."
+    },
+    "form": {
+      "buyingAs": "Comprás como {name}.",
+      "adult": "Soy mayor de edad, o soy el adulto responsable que hace este pago.",
+      "pay": "Pagar con Mercado Pago",
+      "paying": "Yendo a Mercado Pago…"
+    },
+    "unavailable": {
+      "title": "Todavía no se puede pagar desde la web",
+      "body": "Escribime y lo coordinamos por ahí.",
+      "contact": "Escribirme"
+    },
+    "errors": {
+      "adult": "Para seguir, marcá la casilla: el pago lo hace una persona mayor de edad.",
+      "price-changed": "El valor del dólar cambió mientras tenías esta pantalla abierta. No se te cobró nada: este es el precio de ahora.",
+      "unavailable": "Ahora no se puede pagar desde la web. No se te cobró nada: probá de nuevo en un rato o escribime.",
+      "link-invalid": "Ese link de pago no sirve: venció o ya se usó. Pedile otro a Tallami.",
+      "provider": "Mercado Pago no respondió y no se te cobró nada. Probá de nuevo en unos minutos."
+    },
+    "legal": {
+      "label": "Antes de pagar",
+      "terms": "Términos",
+      "refunds": "Reembolsos",
+      "privacy": "Privacidad",
+      "outsideArgentina": "¿No estás en Argentina? Escribime"
     }
   },
   "Emails": {

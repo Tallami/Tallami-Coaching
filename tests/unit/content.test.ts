@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 import { PLAYERS, playerByHandle } from "@/content/players";
 import { FNCS_TITLES, LAN_RESULTS, WINS } from "@/content/results";
-import { PRO_SEASON, SERVICES, bookingHref } from "@/content/services";
+import { PRO_SEASON, SERVICES, bookingHref, serviceFromSlug } from "@/content/services";
 import { SOCIAL_LINKS } from "@/content/social";
 import { readPlayerEntries } from "../helpers/players-source";
 
@@ -65,9 +65,25 @@ describe("services", () => {
     expect(PRO_SEASON).toEqual({ priceUsd: 2500 });
   });
 
-  test("bookingHref points every service and the pro season to #services", () => {
-    const ids = [...SERVICES.map((service) => service.id), "proSeason" as const];
-    expect(ids.map((id) => bookingHref(id))).toEqual(ids.map(() => "#services"));
+  test("bookingHref points every service to its purchase screen in the language of the page, and the pro season to its application", () => {
+    expect(bookingHref("vodRecorded", "es")).toBe("/es/comprar/vod-3-partidas");
+    expect(bookingHref("tournamentReview", "pt")).toBe("/pt/comprar/vod-torneo");
+    expect(bookingHref("vodLive", "en")).toBe("/en/comprar/vod-en-vivo");
+    expect(bookingHref("gamePlan", "es")).toBe("/es/comprar/plan-de-juego");
+    expect(bookingHref("proSeason", "pt")).toBe("/pt/temporada-pro");
+  });
+
+  test("serviceFromSlug reads back each address of the list", () => {
+    expect(serviceFromSlug("vod-3-partidas")).toBe("vodRecorded");
+    expect(serviceFromSlug("vod-torneo")).toBe("tournamentReview");
+    expect(serviceFromSlug("vod-en-vivo")).toBe("vodLive");
+    expect(serviceFromSlug("plan-de-juego")).toBe("gamePlan");
+  });
+
+  test("serviceFromSlug knows nothing else, not even names that live in every object", () => {
+    for (const slug of ["temporada-pro", "no-existe", "", "VOD-3-PARTIDAS", "vodRecorded", "__proto__", "constructor", "toString"]) {
+      expect(serviceFromSlug(slug), slug).toBeNull();
+    }
   });
 });
 

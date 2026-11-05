@@ -2,6 +2,7 @@ import { getTranslations } from "next-intl/server";
 import { Button } from "@/components/ui/button";
 import type { PortalProvider } from "@/portal/config";
 import type { Locale } from "@/i18n/routing";
+import type { FlowCheckout } from "@/portal/oauth/flow";
 
 interface SignInButtonsProps {
   /** Los proveedores habilitados (`enabledProviders()`), en el orden en que se muestran. */
@@ -9,21 +10,30 @@ interface SignInButtonsProps {
   locale: Locale;
   /** La invitación del link, si la dirección trajo una: viaja solo en el link de cada botón. */
   inviteToken: string | null;
+  /** La pantalla de compra a la que volver después de entrar, si se entra desde una. */
+  checkout?: FlowCheckout | null;
 }
 
 /**
  * La dirección que empieza el ingreso con `provider`. Son links comunes dentro del sitio (no un
- * formulario ni un botón de JavaScript): la ruta solo canjea la invitación si el pedido sale de
- * esta página (`Sec-Fetch-Site: same-origin`), así un link de otro sitio no puede usarla.
+ * formulario ni un botón de JavaScript): la ruta solo usa la invitación o el link de pago si el pedido
+ * sale de esta página (`Sec-Fetch-Site: same-origin`), así un link de otro sitio no puede usarlos.
  */
-function signInHref(provider: PortalProvider, locale: Locale, inviteToken: string | null): string {
+function signInHref(
+  provider: PortalProvider,
+  locale: Locale,
+  inviteToken: string | null,
+  checkout: FlowCheckout | null,
+): string {
   const query = new URLSearchParams({ locale });
   if (inviteToken) query.set("invitacion", inviteToken);
+  if (checkout) query.set("comprar", checkout.slug);
+  if (checkout?.linkToken) query.set("link", checkout.linkToken);
   return `/api/portal/auth/${provider}?${query}`;
 }
 
 /** Un botón por cada forma de entrar que está habilitada. El de prueba dice, en su texto, que lo es. */
-export async function SignInButtons({ providers, locale, inviteToken }: SignInButtonsProps) {
+export async function SignInButtons({ providers, locale, inviteToken, checkout = null }: SignInButtonsProps) {
   const t = await getTranslations("Portal");
 
   return (
@@ -31,7 +41,7 @@ export async function SignInButtons({ providers, locale, inviteToken }: SignInBu
       {providers.map((provider) => (
         <li key={provider}>
           <Button asChild variant={provider === "test" ? "stage-outline" : "gold"} className="w-full sm:w-auto">
-            <a href={signInHref(provider, locale, inviteToken)}>{t(`providers.${provider}.button`)}</a>
+            <a href={signInHref(provider, locale, inviteToken, checkout)}>{t(`providers.${provider}.button`)}</a>
           </Button>
         </li>
       ))}
