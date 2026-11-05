@@ -70,7 +70,7 @@ function failure(status: number, code: string, extra: Record<string, string> = {
  * supera, ya sea porque lo declara `content-length` o porque llega más de lo
  * que dijo (cuerpo en partes): en ese caso corta la lectura.
  */
-async function readLimitedText(request: Request, maxBytes: number): Promise<string | null> {
+export async function readLimitedText(request: Request, maxBytes: number): Promise<string | null> {
   const declared = Number(request.headers.get("content-length"));
   if (Number.isFinite(declared) && declared > maxBytes) return null;
 

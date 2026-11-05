@@ -199,6 +199,17 @@
       "kinds": { "youtube": "Video", "pdf": "PDF", "link": "Link" }
     }
   },
+  "Emails": {
+    "purchase": {
+      "subject": "Tu pago de {service} está confirmado",
+      "greeting": "Hola, {name}:",
+      "confirmed": "Tu pago de {amount} por {service} está confirmado.",
+      "statement": "Si pagaste con tarjeta, en el resumen aparece como {descriptor}.",
+      "portal": "Lo que compraste y lo que te entregue queda en tu portal: {url}",
+      "refund": "Tenés 10 días desde la compra para pedir el reembolso completo, salvo que el servicio ya esté entregado.",
+      "signature": "Tomás Allami (Tallami)"
+    }
+  },
   "NotFound": {
     "title": "No encontramos esta página",
     "body": "Puede que el link esté mal o que la página ya no exista.",

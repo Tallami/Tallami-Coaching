@@ -199,6 +199,17 @@
       "kinds": { "youtube": "Video", "pdf": "PDF", "link": "Link" }
     }
   },
+  "Emails": {
+    "purchase": {
+      "subject": "Your payment for {service} is confirmed",
+      "greeting": "Hi {name},",
+      "confirmed": "Your payment of {amount} for {service} is confirmed.",
+      "statement": "If you paid by card, your statement shows it as {descriptor}.",
+      "portal": "What you bought and what I deliver stays in your portal: {url}",
+      "refund": "You have 10 days from the purchase to ask for a full refund, unless the service has already been delivered.",
+      "signature": "Tomás Allami (Tallami)"
+    }
+  },
   "NotFound": {
     "title": "We couldn't find this page",
     "body": "The link may be wrong, or the page may no longer exist.",

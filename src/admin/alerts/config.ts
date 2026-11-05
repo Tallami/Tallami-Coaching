@@ -14,7 +14,7 @@
 export const DEFAULT_ALERT_FROM = "Panel de Tallami <onboarding@resend.dev>";
 
 /** El dominio de la dirección de prueba de Resend: solo entrega al email de la cuenta. */
-const RESEND_TEST_DOMAIN = "@resend.dev";
+export const RESEND_TEST_DOMAIN = "@resend.dev";
 
 /** Una dirección sola (sin nombre ni espacios): lo justo para no mandar basura a Resend. */
 const EMAIL_PATTERN = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
