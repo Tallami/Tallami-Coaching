@@ -164,6 +164,8 @@
       "withInvite": "Your account isn't linked yet. Sign in again to use the invitation Tallami sent you.",
       "orderTitle": "Your purchase isn't confirmed yet",
       "orderBody": "It shows up here as soon as the payment is confirmed.",
+      "failedTitle": "You don't have any purchases yet",
+      "failedBody": "Your last payment attempt didn't go through. Pick a service to try again.",
       "services": "See the services"
     },
     "account": {

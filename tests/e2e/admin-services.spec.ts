@@ -67,11 +67,20 @@ test.describe("without a session", () => {
   });
 });
 
-/** Lo que está a la venta (5), "Otro" y Clase 1 a 1, que ya no se vende pero tiene una venta cargada. */
-const ROWS_WITH_THE_SEEDED_SALES = 7;
+/** Espera la tabla: lo que está a la venta (5) y "Otro". Otros tests pueden sumar filas de servicios que ya no se venden. */
+async function waitForServiceRows(page: Page): Promise<void> {
+  await expect(page.getByTestId("service-row").nth(5)).toBeVisible();
+}
 
 test.describe("services", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, request }) => {
+    // Sin ninguna venta ni clic la página muestra su estado vacío, y este archivo no depende de lo que hayan
+    // cargado otros: un clic en un servicio que el recorrido de abajo no mira alcanza para que haya tabla.
+    const click = await request.post("/api/interest", {
+      headers: { "user-agent": BROWSER_USER_AGENT, "content-type": "application/json" },
+      data: JSON.stringify({ item: "gamePlan", locale: "es" }),
+    });
+    expect(click.status()).toBe(204);
     await loginAsAdmin(page);
   });
 
@@ -152,32 +161,27 @@ test.describe("services", () => {
     );
   });
 
-  test("lists every item on sale with its label, and a retired one only if it has sales", async ({ page }) => {
+  test("lists every item on sale with its label", async ({ page }) => {
     await page.goto(SERVICES_PATH);
 
     await expect(page.getByRole("heading", { name: "Servicios", level: 1 })).toBeVisible();
-    await expect(page.getByTestId("service-row")).toHaveCount(ROWS_WITH_THE_SEEDED_SALES);
+    await waitForServiceRows(page);
     for (const label of [
       "VOD review de 3 partidas",
       "VOD review de torneo completo",
       "VOD review en vivo",
       "Plan de juego personalizado",
       "Temporada Pro",
-      // Ya no se vende, pero tiene una venta cargada.
-      "Clase 1 a 1",
       "Otro",
     ]) {
       await expect(page.getByRole("rowheader", { name: label, exact: true })).toBeVisible();
-    }
-    for (const label of ["Pack de 4 clases", "Coaching de torneo"]) {
-      await expect(page.getByRole("rowheader", { name: label, exact: true })).toHaveCount(0);
     }
     await expect(page.getByRole("link", { name: "Servicios", exact: true })).toHaveAttribute("aria-current", "page");
   });
 
   test("the services page is accessible", async ({ page }) => {
     await page.goto(SERVICES_PATH);
-    await expect(page.getByTestId("service-row")).toHaveCount(ROWS_WITH_THE_SEEDED_SALES);
+    await waitForServiceRows(page);
 
     const results = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
@@ -193,7 +197,7 @@ test.describe("services", () => {
 
     test("the page never scrolls sideways: the table scrolls inside its own box", async ({ page }) => {
       await page.goto(SERVICES_PATH);
-      await expect(page.getByTestId("service-row")).toHaveCount(ROWS_WITH_THE_SEEDED_SALES);
+      await waitForServiceRows(page);
 
       const sideways = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,

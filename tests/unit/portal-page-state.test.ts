@@ -160,38 +160,35 @@ describe("portalNotice", () => {
     const WITH_ORDER = { ...NONE, orderId: ORDER_ID };
 
     test.each([
-      ["approved", { key: "paymentApproved", tone: "success" }],
-      ["pending", { key: "paymentPending", tone: "info" }],
-      ["created", { key: "paymentPending", tone: "info" }],
-      ["rejected", { key: "paymentFailed", tone: "error" }],
-      ["cancelled", { key: "paymentFailed", tone: "error" }],
-    ] as const)("an order of this account that is %s", (status, expected) => {
-      expect(portalNotice(WITH_ORDER, "linked", status)).toEqual(expected);
-      expect(portalNotice(WITH_ORDER, "unlinked", status)).toEqual(expected);
+      ["confirmed", { key: "paymentApproved", tone: "success" }],
+      ["unconfirmed", { key: "paymentPending", tone: "info" }],
+      ["failed", { key: "paymentFailed", tone: "error" }],
+    ] as const)("an order of this account that is %s", (progress, expected) => {
+      expect(portalNotice(WITH_ORDER, "linked", progress)).toEqual(expected);
+      expect(portalNotice(WITH_ORDER, "unlinked", progress)).toEqual(expected);
     });
 
     test("an order that was already refunded or charged back says nothing: an old address does not announce a payment", () => {
-      expect(portalNotice(WITH_ORDER, "linked", "refunded")).toBeNull();
-      expect(portalNotice(WITH_ORDER, "linked", "charged_back")).toBeNull();
+      expect(portalNotice(WITH_ORDER, "linked", "closed")).toBeNull();
     });
 
-    test("an order of another account, or one that does not exist, reaches here with no status: no notice", () => {
+    test("an order of another account, or one that does not exist, reaches here with no progress: no notice", () => {
       expect(portalNotice(WITH_ORDER, "linked", null)).toBeNull();
       expect(portalNotice(WITH_ORDER, "unlinked", null)).toBeNull();
       expect(portalNotice(WITH_ORDER, "linked")).toBeNull();
     });
 
-    test("a status with no order in the address says nothing", () => {
-      expect(portalNotice(NONE, "linked", "approved")).toBeNull();
+    test("a progress with no order in the address says nothing", () => {
+      expect(portalNotice(NONE, "linked", "confirmed")).toBeNull();
     });
 
     test("without a session it says nothing, whatever the address says", () => {
       expect(portalNotice(WITH_ORDER, "signedOut", null)).toBeNull();
-      expect(portalNotice(WITH_ORDER, "signedOut", "approved")).toBeNull();
+      expect(portalNotice(WITH_ORDER, "signedOut", "confirmed")).toBeNull();
     });
 
     test("a failed sign-in still comes first", () => {
-      expect(portalNotice({ ...WITH_ORDER, signInFailed: true }, "linked", "approved")?.key).toBe("signInFailed");
+      expect(portalNotice({ ...WITH_ORDER, signInFailed: true }, "linked", "confirmed")?.key).toBe("signInFailed");
     });
   });
 
@@ -205,9 +202,9 @@ describe("portalNotice", () => {
       notice({ inviteOutcome: "invalida" }, "linked"),
       notice({ inviteOutcome: "invalida" }, "unlinked"),
       notice({ inviteOutcome: "ocupada" }, "unlinked"),
-      portalNotice(withOrder, "linked", "approved"),
-      portalNotice(withOrder, "linked", "pending"),
-      portalNotice(withOrder, "linked", "rejected"),
+      portalNotice(withOrder, "linked", "confirmed"),
+      portalNotice(withOrder, "linked", "unconfirmed"),
+      portalNotice(withOrder, "linked", "failed"),
     ].map((found) => found?.key);
 
     for (const key of keys) expect(NOTICE_KEYS).toContain(key);

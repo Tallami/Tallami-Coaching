@@ -6,8 +6,7 @@ import type { Locale } from "@/i18n/routing";
 import { isSettled } from "@/payments/apply";
 import { reconcileOrder } from "@/payments/checkout";
 import { getMercadoPagoClient } from "@/payments/mercadopago";
-import { hasUnconfirmedOrder, orderForAccount, type Order } from "@/payments/orders";
-import type { OrderStatus } from "@/payments/policy";
+import { accountOrderState, orderForAccount, orderProgress, type AccountOrderState, type Order } from "@/payments/orders";
 import { getAccount, type PortalAccount } from "@/portal/accounts";
 import { enabledProviders, isPortalConfigured } from "@/portal/config";
 import { getCurrentStudent } from "@/portal/current";
@@ -30,7 +29,7 @@ interface PortalContentProps {
 /** Lo que se sabe de quien mira la página: sin sesión, cuenta sin vincular o alumno con sus compras. */
 type Visitor =
   | { view: "signedOut"; order: null }
-  | { view: "unlinked"; account: PortalAccount; order: Order | null; hasOrder: boolean }
+  | { view: "unlinked"; account: PortalAccount; order: Order | null; orderState: AccountOrderState }
   | { view: "linked"; account: PortalAccount; order: Order | null; purchases: StudentPurchase[] };
 
 /**
@@ -38,14 +37,23 @@ type Visitor =
  * el pago una vez, por si el aviso de Mercado Pago no llegó, y se devuelve cómo quedó. Los emails de esa
  * consulta salen después de responder.
  */
-async function returningOrder(db: Db, account: PortalAccount, query: PortalQuery): Promise<Order | null> {
+async function returningOrder(db: Db, account: PortalAccount, query: PortalQuery, now: Date): Promise<Order | null> {
   if (!query.orderId) return null;
   const order = await orderForAccount(db, query.orderId, account.id);
   if (!order || isSettled(order)) return order;
   const client = getMercadoPagoClient();
   if (!client) return order;
-  await reconcileOrder(db, client, order, query.paymentId, new Date(), (task) => after(task));
+  await reconcileOrder(db, client, order, query.paymentId, now, (task) => after(task));
   return orderForAccount(db, order.id, account.id);
+}
+
+/**
+ * Lo que le dice la vista a una cuenta sin vincular. Manda el pedido con el que volvió, que es del que
+ * habla el aviso de arriba: los dos textos no pueden decir cosas distintas. Sin él, los pedidos de la cuenta.
+ */
+async function unlinkedOrderState(db: Db, accountId: string, order: Order | null, now: Date): Promise<AccountOrderState> {
+  const progress = order ? orderProgress(order, now) : null;
+  return progress === "unconfirmed" || progress === "failed" ? progress : accountOrderState(db, accountId, now);
 }
 
 /**
@@ -56,15 +64,14 @@ async function returningOrder(db: Db, account: PortalAccount, query: PortalQuery
  * El pago que se confirma al volver puede crear el alumno y vincular la cuenta: por eso, si hubo un
  * pedido, la cuenta se lee de nuevo.
  */
-async function loadVisitor(query: PortalQuery): Promise<Visitor> {
+async function loadVisitor(query: PortalQuery, now: Date): Promise<Visitor> {
   const signedIn = await getCurrentStudent();
   if (!signedIn) return { view: "signedOut", order: null };
   const db = await getDb();
-  const order = await returningOrder(db, signedIn, query);
+  const order = await returningOrder(db, signedIn, query, now);
   const account = order ? ((await getAccount(db, signedIn.id)) ?? signedIn) : signedIn;
   if (!account.customerId) {
-    const hasOrder = (order !== null && !isSettled(order)) || (await hasUnconfirmedOrder(db, account.id));
-    return { view: "unlinked", account, order, hasOrder };
+    return { view: "unlinked", account, order, orderState: await unlinkedOrderState(db, account.id, order, now) };
   }
   const purchases = await listStudentPurchases(db, account.customerId);
   return { view: "linked", account, order, purchases };
@@ -95,9 +102,10 @@ export async function PortalContent({ locale, searchParams }: PortalContentProps
   await connection();
   if (!isPortalConfigured()) return <MessageView messageKey="unavailable" />;
 
+  const now = new Date();
   let visitor: Visitor;
   try {
-    visitor = await loadVisitor(query);
+    visitor = await loadVisitor(query, now);
   } catch (error) {
     // Las señales internas de Next (por ejemplo, esperar a que haya un pedido) no son fallas.
     unstable_rethrow(error);
@@ -106,7 +114,7 @@ export async function PortalContent({ locale, searchParams }: PortalContentProps
   }
 
   const view: PortalView = visitor.view;
-  const notice = portalNotice(query, view, (visitor.order?.status as OrderStatus | undefined) ?? null);
+  const notice = portalNotice(query, view, visitor.order ? orderProgress(visitor.order, now) : null);
 
   return (
     <>
@@ -128,7 +136,7 @@ export async function PortalContent({ locale, searchParams }: PortalContentProps
               providers={enabledProviders()}
               locale={locale}
               inviteToken={query.inviteToken}
-              hasOrder={visitor.hasOrder}
+              orderState={visitor.orderState}
             />
           ) : (
             <PurchaseList purchases={visitor.purchases} />

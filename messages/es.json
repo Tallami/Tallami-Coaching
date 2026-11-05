@@ -164,6 +164,8 @@
       "withInvite": "Tu cuenta todavía no está vinculada. Entrá de nuevo para usar la invitación que te mandó Tallami.",
       "orderTitle": "Tu compra todavía no está confirmada",
       "orderBody": "Aparece acá apenas se confirme el pago.",
+      "failedTitle": "Todavía no tenés compras",
+      "failedBody": "Tu último intento de pago no se completó. Elegí un servicio para probar de nuevo.",
       "services": "Ver los servicios"
     },
     "account": {

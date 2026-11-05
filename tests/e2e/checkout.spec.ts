@@ -243,10 +243,17 @@ test.describe("what comes back from Mercado Pago", () => {
     await expect(page).toHaveURL(/\/es\/portal\?compra=/);
     await expect(alerts(page).filter({ hasText: es.Portal.notices.paymentFailed })).toBeVisible();
     await expect(page.getByRole("article")).toHaveCount(0);
-    // Quien vino a comprar no necesita una invitación de Tallami.
-    await expect(page.getByText(es.Portal.unlinked.orderBody)).toBeVisible();
+    // Le dice una sola cosa: ni que espere la confirmación, ni que pida una invitación.
+    await expect(page.getByText(es.Portal.unlinked.failedBody)).toBeVisible();
+    await expect(page.getByText(es.Portal.unlinked.orderBody)).toHaveCount(0);
     await expect(page.getByText(es.Portal.unlinked.body)).toHaveCount(0);
     expect(await salesInPanel(browser, student)).toEqual([]);
+
+    // Lo mismo si abre el portal sin la dirección de la vuelta.
+    await page.goto("/es/portal");
+    await expect(page.getByText(es.Portal.unlinked.failedBody)).toBeVisible();
+    await expect(page.getByText(es.Portal.unlinked.body)).toHaveCount(0);
+    await page.goBack();
 
     await page.getByRole("link", { name: es.Portal.retryPayment }).click();
     await expect(page).toHaveURL(new RegExp(`${screenPath(VOD.slug)}$`));

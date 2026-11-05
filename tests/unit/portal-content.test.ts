@@ -14,7 +14,7 @@ import { UnlinkedView } from "@/components/portal/unlinked-view";
 import { after } from "next/server";
 import { reconcileOrder } from "@/payments/checkout";
 import { getMercadoPagoClient } from "@/payments/mercadopago";
-import { hasUnconfirmedOrder, orderForAccount, type Order } from "@/payments/orders";
+import { accountOrderState, orderForAccount, type Order } from "@/payments/orders";
 import { getAccount, type PortalAccount } from "@/portal/accounts";
 import { getCurrentStudent } from "@/portal/current";
 import { listStudentPurchases } from "@/portal/purchases";
@@ -39,7 +39,7 @@ vi.mock("@/portal/accounts", async (importOriginal) => ({
 vi.mock("@/payments/orders", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/payments/orders")>()),
   orderForAccount: vi.fn(),
-  hasUnconfirmedOrder: vi.fn(),
+  accountOrderState: vi.fn(),
 }));
 vi.mock("@/payments/checkout", () => ({ reconcileOrder: vi.fn(async () => undefined) }));
 vi.mock("@/payments/mercadopago", () => ({ getMercadoPagoClient: vi.fn() }));
@@ -74,16 +74,19 @@ const UNLINKED: PortalAccount = { ...ACCOUNT, customerId: null };
 const currentStudent = vi.mocked(getCurrentStudent);
 const purchasesOf = vi.mocked(listStudentPurchases);
 const orderOf = vi.mocked(orderForAccount);
-const unconfirmedOrder = vi.mocked(hasUnconfirmedOrder);
+const stateOfAccount = vi.mocked(accountOrderState);
 const reconcile = vi.mocked(reconcileOrder);
 const accountNow = vi.mocked(getAccount);
 const providerClient = vi.mocked(getMercadoPagoClient);
 
 const ORDER_ID = "33333333-0000-4000-8000-000000000001";
 const PROVIDER = { id: "mercadopago" } as NonNullable<ReturnType<typeof getMercadoPagoClient>>;
+/** Los pedidos de estos tests vencen dentro de una hora, salvo el que prueba lo contrario. */
+const WITHIN_THE_HOUR = new Date(Date.now() + 60 * 60 * 1000);
+const PAST_THE_HOUR = new Date(Date.now() - 60 * 1000);
 
-function orderWith(status: Order["status"], item = "vodRecorded"): Order {
-  return { id: ORDER_ID, status, item } as Order;
+function orderWith(status: Order["status"], item = "vodRecorded", expiresAt = WITHIN_THE_HOUR): Order {
+  return { id: ORDER_ID, status, item, expiresAt } as Order;
 }
 
 /** Todos los elementos de un árbol de React, incluidos los de adentro de los fragmentos. */
@@ -133,8 +136,8 @@ beforeEach(() => {
   purchasesOf.mockReset();
   orderOf.mockReset();
   orderOf.mockResolvedValue(null);
-  unconfirmedOrder.mockReset();
-  unconfirmedOrder.mockResolvedValue(false);
+  stateOfAccount.mockReset();
+  stateOfAccount.mockResolvedValue(null);
   reconcile.mockClear();
   accountNow.mockReset();
   providerClient.mockReset();
@@ -469,6 +472,39 @@ describe("PortalContent when the buyer comes back from paying", () => {
     expect(html).toContain(es.Portal.retryPayment);
   });
 
+  test("an order that reached its hour with no payment says it failed and offers the retry, after asking Mercado Pago", async () => {
+    currentStudent.mockResolvedValue(ACCOUNT);
+    accountNow.mockResolvedValue(ACCOUNT);
+    orderOf.mockResolvedValue(orderWith("created", "vodLive", PAST_THE_HOUR));
+
+    const tree = await page({ compra: ORDER_ID });
+
+    expect(reconcile).toHaveBeenCalledTimes(1);
+    expect(propsOf(tree, PortalNotice)).toEqual({
+      notice: { key: "paymentFailed", tone: "error" },
+      retryHref: "/es/comprar/vod-en-vivo",
+    });
+  });
+
+  test("an order past its hour that Mercado Pago says was paid is a confirmed purchase", async () => {
+    currentStudent.mockResolvedValue(ACCOUNT);
+    accountNow.mockResolvedValue(ACCOUNT);
+    orderOf.mockResolvedValueOnce(orderWith("created", "vodLive", PAST_THE_HOUR)).mockResolvedValueOnce(orderWith("approved"));
+
+    expect(propsOf(await page({ compra: ORDER_ID }), PortalNotice)).toMatchObject({ notice: { key: "paymentApproved" } });
+  });
+
+  test("an order within its hour keeps saying it is waiting, with no retry", async () => {
+    currentStudent.mockResolvedValue(ACCOUNT);
+    accountNow.mockResolvedValue(ACCOUNT);
+    orderOf.mockResolvedValue(orderWith("created"));
+
+    const notice = propsOf(await page({ compra: ORDER_ID }), PortalNotice);
+
+    expect(notice).toMatchObject({ notice: { key: "paymentPending" } });
+    expect(notice?.retryHref).toBeUndefined();
+  });
+
   test("an approved or pending payment offers no retry", async () => {
     currentStudent.mockResolvedValue(ACCOUNT);
     accountNow.mockResolvedValue(ACCOUNT);
@@ -490,48 +526,82 @@ describe("PortalContent when the buyer comes back from paying", () => {
 });
 
 describe("the unlinked view of someone who is buying", () => {
-  test("an account with an order without confirming is told that, and the page knows from the database, not from the address", async () => {
-    currentStudent.mockResolvedValue(UNLINKED);
-    unconfirmedOrder.mockResolvedValue(true);
+  test.each(["unconfirmed", "failed"] as const)(
+    "without an order in the address, an account whose orders are %s gets that view: the page knows from the database",
+    async (state) => {
+      currentStudent.mockResolvedValue(UNLINKED);
+      stateOfAccount.mockResolvedValue(state);
 
-    const tree = await page();
+      const tree = await page();
 
-    expect(propsOf(tree, UnlinkedView)).toMatchObject({ hasOrder: true });
-    expect(unconfirmedOrder.mock.calls[0][1]).toBe(UNLINKED.id);
-    expect(purchasesOf).not.toHaveBeenCalled();
-  });
+      expect(propsOf(tree, UnlinkedView)).toMatchObject({ orderState: state });
+      expect(stateOfAccount.mock.calls[0][1]).toBe(UNLINKED.id);
+      expect(purchasesOf).not.toHaveBeenCalled();
+    },
+  );
 
-  test("an account that came back from a rejected payment does not need an invitation either", async () => {
-    currentStudent.mockResolvedValue(UNLINKED);
-    accountNow.mockResolvedValue(UNLINKED);
-    orderOf.mockResolvedValue(orderWith("rejected"));
+  test.each([
+    ["rejected", "rejected", WITHIN_THE_HOUR, "failed"],
+    ["cancelled", "cancelled", WITHIN_THE_HOUR, "failed"],
+    ["armed and past its hour", "created", PAST_THE_HOUR, "failed"],
+    ["armed within its hour", "created", WITHIN_THE_HOUR, "unconfirmed"],
+    ["pending and past its hour", "pending", PAST_THE_HOUR, "unconfirmed"],
+  ] as const)(
+    "coming back with an order that is %s gets the view that matches the notice above it, whatever the other orders say",
+    async (_label, status, expiresAt, state) => {
+      currentStudent.mockResolvedValue(UNLINKED);
+      accountNow.mockResolvedValue(UNLINKED);
+      orderOf.mockResolvedValue(orderWith(status, "vodRecorded", expiresAt));
+      stateOfAccount.mockResolvedValue(state === "failed" ? "unconfirmed" : "failed");
 
-    expect(propsOf(await page({ compra: ORDER_ID }), UnlinkedView)).toMatchObject({ hasOrder: true });
-  });
+      expect(propsOf(await page({ compra: ORDER_ID }), UnlinkedView)).toMatchObject({ orderState: state });
+    },
+  );
 
   test("an account with no orders stays as it was", async () => {
     currentStudent.mockResolvedValue(UNLINKED);
 
-    expect(propsOf(await page(), UnlinkedView)).toMatchObject({ hasOrder: false });
+    expect(propsOf(await page(), UnlinkedView)).toMatchObject({ orderState: null });
   });
 
-  test("the view with an order never asks for the invitation; both offer the services", async () => {
+  describe("what each view says", () => {
     const base = { providers: [], locale: "es", inviteToken: null } as const;
 
-    const withOrder = renderToStaticMarkup(await UnlinkedView({ ...base, hasOrder: true }));
-    const withoutOrder = renderToStaticMarkup(await UnlinkedView({ ...base, hasOrder: false }));
+    test("waiting for a payment: it appears here when confirmed, with no invitation", async () => {
+      const html = renderToStaticMarkup(await UnlinkedView({ ...base, orderState: "unconfirmed" }));
 
-    expect(withOrder).not.toMatch(/invitación/i);
-    expect(withOrder).toContain(es.Portal.unlinked.orderBody);
-    expect(withoutOrder).toContain(es.Portal.unlinked.body);
-    for (const html of [withOrder, withoutOrder]) {
+      expect(html).toContain(es.Portal.unlinked.orderTitle);
+      expect(html).toContain(es.Portal.unlinked.orderBody);
+      expect(html).not.toMatch(/invitación/i);
+    });
+
+    test("a failed payment: it does not invite to wait or ask for an invitation", async () => {
+      const html = renderToStaticMarkup(await UnlinkedView({ ...base, orderState: "failed" }));
+
+      expect(html).toContain(es.Portal.unlinked.failedTitle);
+      expect(html).toContain(es.Portal.unlinked.failedBody);
+      expect(html).not.toMatch(/invitación/i);
+      expect(html).not.toContain(es.Portal.unlinked.orderTitle);
+      expect(html).not.toContain(es.Portal.unlinked.orderBody);
+    });
+
+    test("no orders: it asks for the invitation", async () => {
+      const html = renderToStaticMarkup(await UnlinkedView({ ...base, orderState: null }));
+
+      expect(html).toContain(es.Portal.unlinked.title);
+      expect(html).toContain(es.Portal.unlinked.body);
+    });
+
+    test.each(["unconfirmed", "failed", null] as const)("with %s, it offers the services", async (orderState) => {
+      const html = renderToStaticMarkup(await UnlinkedView({ ...base, orderState }));
+
       expect(html).toContain('href="/es#services"');
       expect(html).toContain(es.Portal.unlinked.services);
-    }
+    });
   });
 
   test("an invitation in the address still comes first", async () => {
-    const view = await UnlinkedView({ providers: ["discord"], locale: "es", inviteToken: TOKEN, hasOrder: true });
+    const view = await UnlinkedView({ providers: ["discord"], locale: "es", inviteToken: TOKEN, orderState: "failed" });
 
     expect(propsOf(view, SignInButtons)).toMatchObject({ inviteToken: TOKEN });
     const texts = elementsOf(view).flatMap((element) => (element.type === "p" ? [element.props.children] : []));

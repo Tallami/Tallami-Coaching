@@ -12,7 +12,7 @@
 //                                             se lee: lo que se muestra sale del pedido en la base
 
 import { isUuid } from "@/db/uuid";
-import type { OrderStatus } from "@/payments/policy";
+import type { OrderProgress } from "@/payments/orders";
 import { INVITE_OUTCOMES, type InviteOutcome } from "./invites";
 import { inviteTokenFrom } from "./oauth/flow";
 
@@ -103,17 +103,13 @@ const NOTICES = {
 
 /**
  * Lo que se le dice a quien volvió de pagar, según cómo quedó el pedido. Reembolsado o en contracargo
- * no dice nada: es una dirección vieja, no la vuelta de un pago. Un `Record` para que un estado nuevo
- * obligue a decidirlo.
+ * no dice nada: es una dirección vieja, no la vuelta de un pago.
  */
-const ORDER_NOTICES: Record<OrderStatus, PortalNotice | null> = {
-  approved: NOTICES.paymentApproved,
-  created: NOTICES.paymentPending,
-  pending: NOTICES.paymentPending,
-  rejected: NOTICES.paymentFailed,
-  cancelled: NOTICES.paymentFailed,
-  refunded: null,
-  charged_back: null,
+const ORDER_NOTICES: Record<OrderProgress, PortalNotice | null> = {
+  confirmed: NOTICES.paymentApproved,
+  unconfirmed: NOTICES.paymentPending,
+  failed: NOTICES.paymentFailed,
+  closed: null,
 };
 
 /**
@@ -122,13 +118,13 @@ const ORDER_NOTICES: Record<OrderStatus, PortalNotice | null> = {
  * vista misma le dice que entre de nuevo para usarla. Una cuenta ya vinculada que la abre sí: se le
  * dice que su cuenta ya está vinculada y que, si la invitación es para otra cuenta, salga y entre con esa.
  *
- * `orderStatus` es el estado del pedido de `query.orderId`, solo si es de la cuenta en sesión: quien
- * llama lo lee con `orderForAccount`, y el pedido de otro llega como `null`.
+ * `progress` es cómo va el pedido de `query.orderId` (`orderProgress`), solo si es de la cuenta en sesión:
+ * quien llama lo lee con `orderForAccount`, y el pedido de otro llega como `null`.
  */
-export function portalNotice(query: PortalQuery, view: PortalView, orderStatus: OrderStatus | null = null): PortalNotice | null {
+export function portalNotice(query: PortalQuery, view: PortalView, progress: OrderProgress | null = null): PortalNotice | null {
   if (query.signInFailed) return NOTICES.signInFailed;
   if (view === "signedOut") return query.inviteToken ? NOTICES.inviteToSignIn : null;
-  if (query.orderId && orderStatus) return ORDER_NOTICES[orderStatus];
+  if (query.orderId && progress) return ORDER_NOTICES[progress];
   if (query.inviteOutcome === "ocupada") return NOTICES.inviteTaken;
   if (view === "linked") {
     if (query.inviteOutcome === "vinculada") return NOTICES.linked;

@@ -6,7 +6,7 @@ import { SITE_URL } from "@/lib/site-url";
 import { getPaymentAvailability } from "@/payments/availability";
 import { reconcileOrder, startCheckout } from "@/payments/checkout";
 import { notifyPaymentOutcome } from "@/payments/emails";
-import { cancelOrder, createOrder, hasUnconfirmedOrder, orderForAccount } from "@/payments/orders";
+import { accountOrderState, cancelOrder, createOrder, orderForAccount, orderProgress } from "@/payments/orders";
 import { savePesosPerDollar } from "@/payments/pricing";
 import type { PaymentProviderClient, ProviderPayment } from "@/payments/provider";
 import { getAccount, type PortalAccount } from "@/portal/accounts";
@@ -420,37 +420,103 @@ describe("orders", () => {
     expect((await allOrders())[0].status).toBe(status);
   });
 
-  describe("hasUnconfirmedOrder", () => {
-    const unconfirmed = () => hasUnconfirmedOrder(db, account.id, NOW);
+  describe("orderProgress", () => {
+    const WITHIN_THE_HOUR = ONE_HOUR_LATER;
+    const PAST_THE_HOUR = new Date(NOW.getTime() - 1000);
 
-    test("an account with no orders has none", async () => {
-      expect(await unconfirmed()).toBe(false);
+    test.each([
+      ["approved", "confirmed"],
+      ["pending", "unconfirmed"],
+      ["rejected", "failed"],
+      ["cancelled", "failed"],
+      ["refunded", "closed"],
+      ["charged_back", "closed"],
+    ])("an order that is %s is %s, whatever the hour", (status, progress) => {
+      expect(orderProgress({ status, expiresAt: WITHIN_THE_HOUR }, NOW)).toBe(progress);
+      expect(orderProgress({ status, expiresAt: PAST_THE_HOUR }, NOW)).toBe(progress);
     });
 
-    test("a payment in course counts, even after the hour of the order", async () => {
-      await insertTestOrder(db, { accountId: account.id, status: "pending", expiresAt: new Date(NOW.getTime() - 1000) });
-
-      expect(await unconfirmed()).toBe(true);
+    test("an order armed within its hour can still be paid", () => {
+      expect(orderProgress({ status: "created", expiresAt: WITHIN_THE_HOUR }, NOW)).toBe("unconfirmed");
     });
 
-    test("an order armed within the hour counts; one that expired does not", async () => {
-      await insertTestOrder(db, { accountId: account.id, status: "created", expiresAt: new Date(NOW.getTime() - 1000) });
-      expect(await unconfirmed()).toBe(false);
+    test("an order armed that reached its hour without a payment failed: Mercado Pago no longer takes it", () => {
+      expect(orderProgress({ status: "created", expiresAt: PAST_THE_HOUR }, NOW)).toBe("failed");
+      expect(orderProgress({ status: "created", expiresAt: NOW }, NOW)).toBe("failed");
+    });
+  });
 
-      await insertTestOrder(db, { accountId: account.id, status: "created", expiresAt: ONE_HOUR_LATER });
-      expect(await unconfirmed()).toBe(true);
+  describe("accountOrderState", () => {
+    const PAST_THE_HOUR = new Date(NOW.getTime() - 1000);
+    const state = () => accountOrderState(db, account.id, NOW);
+
+    /** Un pedido de esta cuenta, armado hace `minutes` minutos. */
+    function orderAged(minutes: number, overrides: Parameters<typeof insertTestOrder>[1]) {
+      return insertTestOrder(db, {
+        accountId: account.id,
+        createdAt: new Date(NOW.getTime() - minutes * 60_000),
+        expiresAt: ONE_HOUR_LATER,
+        ...overrides,
+      });
+    }
+
+    test("an account with no orders has nothing to say", async () => {
+      expect(await state()).toBeNull();
     });
 
-    test.each(["approved", "rejected", "cancelled", "refunded", "charged_back"] as const)("an order that is %s does not", async (status) => {
-      await insertTestOrder(db, { accountId: account.id, status, expiresAt: ONE_HOUR_LATER });
+    test("a payment in course is waiting, even after the hour of the order", async () => {
+      await orderAged(120, { status: "pending", expiresAt: PAST_THE_HOUR });
 
-      expect(await unconfirmed()).toBe(false);
+      expect(await state()).toBe("unconfirmed");
     });
 
-    test("the order of another account does not", async () => {
+    test("an order armed within the hour is waiting", async () => {
+      await orderAged(5, { status: "created" });
+
+      expect(await state()).toBe("unconfirmed");
+    });
+
+    test.each([
+      ["rejected", ONE_HOUR_LATER],
+      ["cancelled", ONE_HOUR_LATER],
+      ["created", PAST_THE_HOUR],
+    ] as const)("a last attempt that is %s failed", async (status, expiresAt) => {
+      await orderAged(5, { status, expiresAt });
+
+      expect(await state()).toBe("failed");
+    });
+
+    test.each(["approved", "refunded", "charged_back"] as const)("a last order that is %s has nothing to say", async (status) => {
+      await orderAged(5, { status });
+
+      expect(await state()).toBeNull();
+    });
+
+    test("an order that can still go through counts over a newer attempt that failed", async () => {
+      await orderAged(20, { status: "pending" });
+      await orderAged(5, { status: "rejected" });
+
+      expect(await state()).toBe("unconfirmed");
+    });
+
+    test("only the last attempt says whether it failed: an old rejection does not count after a sale", async () => {
+      await orderAged(20, { status: "rejected" });
+      await orderAged(5, { status: "approved" });
+
+      expect(await state()).toBeNull();
+    });
+
+    test("a rejection after an older sale does count", async () => {
+      await orderAged(20, { status: "approved" });
+      await orderAged(5, { status: "rejected" });
+
+      expect(await state()).toBe("failed");
+    });
+
+    test("the orders of another account do not count", async () => {
       await insertTestOrder(db, { accountId: await insertTestAccount(db), status: "pending" });
 
-      expect(await unconfirmed()).toBe(false);
+      expect(await state()).toBeNull();
     });
   });
 });
@@ -547,6 +613,14 @@ describe("reconcileOrder", () => {
     await reconcileOrder(db, client, order, "222", NOW);
 
     expect(await orderRow(order.id)).toMatchObject({ status: "approved", providerPaymentId: "222" });
+  });
+
+  test("an order past its hour still looks: it may have been paid just in time", async () => {
+    const order = await insertTestOrder(db, { accountId: account.id, expiresAt: new Date(NOW.getTime() - 1000) });
+
+    await reconcileOrder(db, paying(testPayment(order.id)), order, null, NOW);
+
+    expect((await orderRow(order.id)).status).toBe("approved");
   });
 
   test("an order that already went through is not looked up again, so a repeated return makes a single sale", async () => {
