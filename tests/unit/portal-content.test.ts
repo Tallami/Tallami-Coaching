@@ -494,18 +494,26 @@ describe("PortalContent when the buyer comes back from paying", () => {
     expect(propsOf(await page({ compra: ORDER_ID }), PortalNotice)).toMatchObject({ notice: { key: "paymentApproved" } });
   });
 
-  test.each([
-    ["armed within its hour", "created"],
-    ["with a payment in course", "pending"],
-  ] as const)("an order %s keeps saying it is waiting, and offers a way back to whoever did not get to pay", async (_label, status) => {
+  test("an order with no payment seen keeps saying it is waiting, and offers a way back to whoever did not get to pay", async () => {
     currentStudent.mockResolvedValue(ACCOUNT);
     accountNow.mockResolvedValue(ACCOUNT);
-    orderOf.mockResolvedValue(orderWith(status, "gamePlan"));
+    orderOf.mockResolvedValue(orderWith("created", "gamePlan"));
 
     expect(propsOf(await page({ compra: ORDER_ID }, "pt"), PortalNotice)).toEqual({
       notice: { key: "paymentPending", tone: "info" },
       retryHref: "/pt/comprar/plan-de-juego",
     });
+  });
+
+  test("an order with a payment in course says it is waiting and offers no way back: paying again could charge twice", async () => {
+    currentStudent.mockResolvedValue(ACCOUNT);
+    accountNow.mockResolvedValue(ACCOUNT);
+    orderOf.mockResolvedValue(orderWith("pending", "gamePlan"));
+
+    const notice = propsOf(await page({ compra: ORDER_ID }), PortalNotice);
+
+    expect(notice).toMatchObject({ notice: { key: "paymentPending", tone: "info" } });
+    expect(notice?.retryHref).toBeUndefined();
   });
 
   test("the waiting notice words the link for someone who may just not have paid, and keeps its text", async () => {
@@ -538,7 +546,7 @@ describe("PortalContent when the buyer comes back from paying", () => {
 
   test.each([
     ["failed", "rejected", "paymentFailed"],
-    ["waiting", "pending", "paymentPending"],
+    ["waiting", "created", "paymentPending"],
   ] as const)("a %s Temporada Pro payment has no public screen to go back to: no retry link", async (_label, status, key) => {
     currentStudent.mockResolvedValue(ACCOUNT);
     accountNow.mockResolvedValue(ACCOUNT);

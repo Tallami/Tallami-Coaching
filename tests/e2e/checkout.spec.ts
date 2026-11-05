@@ -295,6 +295,19 @@ test.describe("what comes back from Mercado Pago", () => {
     await expect(page).toHaveURL(new RegExp(`${screenPath(PLAN.slug)}$`));
   });
 
+  test("coming back with a payment in course: it says it is waiting and offers no retry, so nobody pays twice", async ({ page, browser }) => {
+    const student = await openScreenSignedIn(page, VOD.slug);
+    await tickAndPay(page);
+    const paymentId = await approveAndNeverComeBack(page);
+    expect(await changePayment(page.request, paymentId, "in_process")).toBe(200);
+
+    await page.goto(await returnWithoutPaying(page.request, student));
+
+    await expect(statuses(page).filter({ hasText: es.Portal.notices.paymentPending })).toBeVisible();
+    await expect(page.getByRole("link", { name: es.Portal.retryUnpaid })).toHaveCount(0);
+    expect(await salesInPanel(browser, student)).toEqual([]);
+  });
+
   test("approved without a notice: the portal asks Mercado Pago and the sale appears anyway, only one, even when the notice arrives later", async ({ page, browser }) => {
     const student = await openScreenSignedIn(page, TOURNAMENT.slug);
 

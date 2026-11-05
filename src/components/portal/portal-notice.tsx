@@ -9,7 +9,7 @@ const TONE_CLASSES: Record<Notice["tone"], string> = {
 
 interface PortalNoticeProps {
   notice: Notice;
-  /** Si el pago falló o sigue sin confirmarse: la pantalla para intentarlo de nuevo. */
+  /** Si el pago falló, o se está esperando y no se vio ningún pago: la pantalla para intentarlo de nuevo. */
   retryHref?: string;
 }
 

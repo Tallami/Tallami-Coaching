@@ -77,8 +77,14 @@ async function loadVisitor(query: PortalQuery, now: Date): Promise<Visitor> {
   return { view: "linked", account, order, purchases };
 }
 
-/** Los avisos que ofrecen volver a la pantalla de compra: el pago falló, o se está esperando y quizás no se hizo. */
-const RETRY_NOTICES: ReadonlySet<NoticeKey> = new Set(["paymentFailed", "paymentPending"]);
+/**
+ * ¿Este aviso ofrece volver a la pantalla de compra? Si el pago falló, sí. Si se está esperando, solo mientras
+ * no se vio ningún pago: quizás no llegó a pagar. Con un pago en curso (`pending`, también el `in_process` de
+ * Mercado Pago) no: pagar de nuevo sería otro pedido, y si se aprueban los dos serían dos cobros.
+ */
+function offersRetry(key: NoticeKey, order: Order | null): boolean {
+  return key === "paymentFailed" || (key === "paymentPending" && order?.status === "created");
+}
 
 /** La pantalla para intentar de nuevo, si es un servicio que se compra solo: Temporada Pro va con su propio link. */
 function retryHrefFor(order: Order | null, locale: Locale): string | undefined {
@@ -126,7 +132,7 @@ export async function PortalContent({ locale, searchParams }: PortalContentProps
       {notice ? (
         <PortalNotice
           notice={notice}
-          retryHref={RETRY_NOTICES.has(notice.key) ? retryHrefFor(visitor.order, locale) : undefined}
+          retryHref={offersRetry(notice.key, visitor.order) ? retryHrefFor(visitor.order, locale) : undefined}
         />
       ) : null}
       {visitor.view === "signedOut" ? (
