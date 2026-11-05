@@ -158,6 +158,7 @@
       "paymentFailed": "El pago no se pudo completar."
     },
     "retryPayment": "Intentar de nuevo",
+    "retryUnpaid": "¿No llegaste a pagar? Volver a intentar",
     "unlinked": {
       "title": "Falta un paso",
       "body": "Tu cuenta todavía no está vinculada. Pedile a Tallami tu invitación.",

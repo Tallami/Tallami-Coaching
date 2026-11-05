@@ -11,6 +11,7 @@ import {
   ensureSharedRate,
   payButton,
   preferencesOf,
+  returnWithoutPaying,
   returnedOrder,
   salesInPanel,
   studentName,
@@ -264,6 +265,34 @@ test.describe("what comes back from Mercado Pago", () => {
     await expect(statuses(page).filter({ hasText: es.Portal.notices.paymentApproved })).toBeVisible();
     await expect(page.getByRole("article")).toHaveCount(1);
     expect(await salesInPanel(browser, student)).toHaveLength(1);
+  });
+
+  test("coming back without paying: it keeps saying it is waiting and offers a way back, to a new buyer and to one with purchases", async ({ page, browser }) => {
+    const student = await openScreenSignedIn(page, VOD.slug);
+    await tickAndPay(page);
+
+    // La primera compra: la cuenta todavía no está vinculada.
+    await page.goto(await returnWithoutPaying(page.request, student));
+    await expect(statuses(page).filter({ hasText: es.Portal.notices.paymentPending })).toBeVisible();
+    await expectNoSevereViolations(page, "portal, pago sin confirmar");
+    await page.getByRole("link", { name: es.Portal.retryUnpaid }).click();
+    await expect(page).toHaveURL(new RegExp(`${screenPath(VOD.slug)}$`));
+
+    // Intentar de nuevo es un pedido nuevo, y el que quedó sin pagar no molesta.
+    await tickAndPay(page);
+    await choosePayment(page, "Aprobar");
+    await expect(statuses(page).filter({ hasText: es.Portal.notices.paymentApproved })).toBeVisible();
+    await expect(page.getByRole("link", { name: es.Portal.retryUnpaid })).toHaveCount(0);
+    expect(await salesInPanel(browser, student)).toHaveLength(1);
+
+    // Ya con una compra: la cuenta está vinculada y esta página no tiene otro camino a los servicios.
+    await page.goto(screenPath(PLAN.slug));
+    await tickAndPay(page);
+    await page.goto(await returnWithoutPaying(page.request, student));
+    await expect(statuses(page).filter({ hasText: es.Portal.notices.paymentPending })).toBeVisible();
+    await expect(page.getByRole("article")).toHaveCount(1);
+    await page.getByRole("link", { name: es.Portal.retryUnpaid }).click();
+    await expect(page).toHaveURL(new RegExp(`${screenPath(PLAN.slug)}$`));
   });
 
   test("approved without a notice: the portal asks Mercado Pago and the sale appears anyway, only one, even when the notice arrives later", async ({ page, browser }) => {

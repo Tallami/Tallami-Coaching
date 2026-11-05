@@ -10,7 +10,7 @@ import { accountOrderState, orderForAccount, orderProgress, type AccountOrderSta
 import { getAccount, type PortalAccount } from "@/portal/accounts";
 import { enabledProviders, isPortalConfigured } from "@/portal/config";
 import { getCurrentStudent } from "@/portal/current";
-import { parsePortalQuery, portalNotice, type PortalQuery, type PortalView } from "@/portal/page-state";
+import { parsePortalQuery, portalNotice, type NoticeKey, type PortalQuery, type PortalView } from "@/portal/page-state";
 import { listStudentPurchases, type StudentPurchase } from "@/portal/purchases";
 import { AccountBar } from "./account-bar";
 import { MessageView } from "./message-view";
@@ -77,6 +77,9 @@ async function loadVisitor(query: PortalQuery, now: Date): Promise<Visitor> {
   return { view: "linked", account, order, purchases };
 }
 
+/** Los avisos que ofrecen volver a la pantalla de compra: el pago falló, o se está esperando y quizás no se hizo. */
+const RETRY_NOTICES: ReadonlySet<NoticeKey> = new Set(["paymentFailed", "paymentPending"]);
+
 /** La pantalla para intentar de nuevo, si es un servicio que se compra solo: Temporada Pro va con su propio link. */
 function retryHrefFor(order: Order | null, locale: Locale): string | undefined {
   const service = SERVICES.find(({ id }) => id === order?.item);
@@ -123,7 +126,7 @@ export async function PortalContent({ locale, searchParams }: PortalContentProps
       {notice ? (
         <PortalNotice
           notice={notice}
-          retryHref={notice.key === "paymentFailed" ? retryHrefFor(visitor.order, locale) : undefined}
+          retryHref={RETRY_NOTICES.has(notice.key) ? retryHrefFor(visitor.order, locale) : undefined}
         />
       ) : null}
       {visitor.view === "signedOut" ? (

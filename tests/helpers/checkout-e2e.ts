@@ -111,6 +111,19 @@ export async function approveAndNeverComeBack(page: Page): Promise<string> {
   return new URL(response.headers().location).searchParams.get("payment_id") ?? "";
 }
 
+/**
+ * La dirección a la que vuelve el comprador desde Mercado Pago si se va sin pagar, según su preferencia más
+ * nueva: sin `payment_id` ni `status`, como el botón "volver al sitio".
+ */
+export async function returnWithoutPaying(request: APIRequestContext, student: string): Promise<string> {
+  const response = await request.get(`${MOCK_MERCADOPAGO_URL}/test/preferences`);
+  const preferences = (await response.json()) as { payer?: { email?: string }; back_urls: { failure: string } }[];
+  const own = preferences.filter(({ payer }) => payer?.email === studentEmail(student));
+  const url = own.at(-1)?.back_urls.failure;
+  if (!url) throw new Error("Este alumno todavía no salió a pagar.");
+  return url;
+}
+
 /** De la dirección de vuelta, el pedido y el pago que dijo Mercado Pago. */
 export function returnedOrder(page: Page): { orderId: string; paymentId: string } {
   const { searchParams } = new URL(page.url());

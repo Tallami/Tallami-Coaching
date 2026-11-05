@@ -9,7 +9,7 @@ const TONE_CLASSES: Record<Notice["tone"], string> = {
 
 interface PortalNoticeProps {
   notice: Notice;
-  /** Si el pago no se pudo hacer: la pantalla para intentarlo de nuevo. */
+  /** Si el pago falló o sigue sin confirmarse: la pantalla para intentarlo de nuevo. */
   retryHref?: string;
 }
 
@@ -30,7 +30,8 @@ export async function PortalNotice({ notice, retryHref }: PortalNoticeProps) {
         <>
           {" "}
           <a href={retryHref} className="underline underline-offset-4">
-            {t("retryPayment")}
+            {/* Quien lee que se está esperando el pago puede ser alguien que se fue sin pagar. */}
+            {notice.key === "paymentPending" ? t("retryUnpaid") : t("retryPayment")}
           </a>
         </>
       ) : null}

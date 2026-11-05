@@ -494,33 +494,59 @@ describe("PortalContent when the buyer comes back from paying", () => {
     expect(propsOf(await page({ compra: ORDER_ID }), PortalNotice)).toMatchObject({ notice: { key: "paymentApproved" } });
   });
 
-  test("an order within its hour keeps saying it is waiting, with no retry", async () => {
+  test.each([
+    ["armed within its hour", "created"],
+    ["with a payment in course", "pending"],
+  ] as const)("an order %s keeps saying it is waiting, and offers a way back to whoever did not get to pay", async (_label, status) => {
     currentStudent.mockResolvedValue(ACCOUNT);
     accountNow.mockResolvedValue(ACCOUNT);
-    orderOf.mockResolvedValue(orderWith("created"));
+    orderOf.mockResolvedValue(orderWith(status, "gamePlan"));
 
-    const notice = propsOf(await page({ compra: ORDER_ID }), PortalNotice);
-
-    expect(notice).toMatchObject({ notice: { key: "paymentPending" } });
-    expect(notice?.retryHref).toBeUndefined();
+    expect(propsOf(await page({ compra: ORDER_ID }, "pt"), PortalNotice)).toEqual({
+      notice: { key: "paymentPending", tone: "info" },
+      retryHref: "/pt/comprar/plan-de-juego",
+    });
   });
 
-  test("an approved or pending payment offers no retry", async () => {
+  test("the waiting notice words the link for someone who may just not have paid, and keeps its text", async () => {
+    const html = renderToStaticMarkup(
+      await PortalNotice({ notice: { key: "paymentPending", tone: "info" }, retryHref: "/es/comprar/vod-torneo" }),
+    );
+
+    expect(html).toContain(es.Portal.notices.paymentPending);
+    expect(html).toContain('href="/es/comprar/vod-torneo"');
+    expect(html).toContain(es.Portal.retryUnpaid);
+    expect(html).not.toContain(es.Portal.retryPayment);
+  });
+
+  test("the failed notice keeps its own wording for the link", async () => {
+    const html = renderToStaticMarkup(
+      await PortalNotice({ notice: { key: "paymentFailed", tone: "error" }, retryHref: "/es/comprar/vod-torneo" }),
+    );
+
+    expect(html).toContain(es.Portal.retryPayment);
+    expect(html).not.toContain(es.Portal.retryUnpaid);
+  });
+
+  test("an approved payment offers no retry", async () => {
     currentStudent.mockResolvedValue(ACCOUNT);
     accountNow.mockResolvedValue(ACCOUNT);
-    orderOf.mockResolvedValue(orderWith("pending"));
+    orderOf.mockResolvedValue(orderWith("approved"));
 
     expect(propsOf(await page({ compra: ORDER_ID }), PortalNotice)?.retryHref).toBeUndefined();
   });
 
-  test("a failed Temporada Pro payment has no public screen to go back to: no retry link", async () => {
+  test.each([
+    ["failed", "rejected", "paymentFailed"],
+    ["waiting", "pending", "paymentPending"],
+  ] as const)("a %s Temporada Pro payment has no public screen to go back to: no retry link", async (_label, status, key) => {
     currentStudent.mockResolvedValue(ACCOUNT);
     accountNow.mockResolvedValue(ACCOUNT);
-    orderOf.mockResolvedValue(orderWith("rejected", "proSeason"));
+    orderOf.mockResolvedValue(orderWith(status, "proSeason"));
 
     const tree = await page({ compra: ORDER_ID });
 
-    expect(propsOf(tree, PortalNotice)).toMatchObject({ notice: { key: "paymentFailed" } });
+    expect(propsOf(tree, PortalNotice)).toMatchObject({ notice: { key } });
     expect(propsOf(tree, PortalNotice)?.retryHref).toBeUndefined();
   });
 });

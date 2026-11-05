@@ -158,6 +158,7 @@
       "paymentFailed": "The payment couldn't be completed."
     },
     "retryPayment": "Try again",
+    "retryUnpaid": "Didn't get to pay? Try again",
     "unlinked": {
       "title": "One step left",
       "body": "Your account isn't linked yet. Ask Tallami for your invitation.",
