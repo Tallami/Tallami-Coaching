@@ -43,7 +43,7 @@
   },
   "Services": {
     "title": "Servicios y precios",
-    "payments": "Precios en dólares. Pagás con Mercado Pago, Pix, PayPal o cripto, según tu país.",
+    "payments": "Precios en dólares y en pesos. Por ahora se paga con Mercado Pago, desde Argentina. ¿Estás en otro país? Escribime.",
     "minors": "¿Tenés menos de 18 años? Podés entrenar igual: el pago lo hace un adulto responsable.",
     "tip": "¿Primera vez? Empezá con un VOD review de 3 partidas.",
     "items": {
@@ -84,11 +84,11 @@
       },
       "pay": {
         "title": "Pagás",
-        "body": "Con el medio de pago de tu país. Te llega la confirmación por email."
+        "body": "Con Mercado Pago, en pesos. Te llega la confirmación por email."
       },
       "schedule": {
-        "title": "Agendás",
-        "body": "Elegís día y hora con el link que te llega, y recibís tu rol en Discord."
+        "title": "Coordinamos",
+        "body": "Si es un VOD offline, pegás tus códigos de replay en el portal. Si es en vivo, arreglamos día y hora."
       },
       "train": {
         "title": "Entrenás",
@@ -99,21 +99,57 @@
   "Faq": {
     "title": "Preguntas frecuentes",
     "items": {
-      "minors": {
-        "question": "¿Puedo entrenar si tengo menos de 18 años?",
-        "answer": "Sí. El pago lo hace un adulto responsable, y la sesión es con vos."
+      "howToBuy": {
+        "question": "¿Cómo compro?",
+        "answer": "Elegís el servicio y entrás con Discord o Google. Confirmás el precio y pagás en Mercado Pago. Tu compra aparece en el Portal de alumnos cuando se confirma el pago."
+      },
+      "afterPayment": {
+        "question": "¿Qué pasa después de pagar?",
+        "answer": "Te escribo para coordinar. Todo lo que te entrego queda guardado en tu portal."
       },
       "payment": {
         "question": "¿Cómo pago desde mi país?",
-        "answer": "Los precios están en dólares. En Argentina pagás con Mercado Pago, en Brasil con Pix y en el resto de Latinoamérica con medios de pago locales. Desde otros países, con PayPal. También podés pagar con cripto."
+        "answer": "Por ahora se paga con Mercado Pago, desde Argentina. Si estás en otro país, escribime y vemos cómo hacerlo."
+      },
+      "currencies": {
+        "question": "¿Por qué veo dólares y pesos?",
+        "answer": "El precio se fija en dólares. En Argentina pagás en pesos y ves el monto exacto antes de confirmar."
+      },
+      "minors": {
+        "question": "¿Puedo entrenar si tengo menos de 18 años?",
+        "answer": "Sí, desde los 13. El pago lo hace un adulto responsable, y la sesión es con vos."
       },
       "schedule": {
         "question": "¿Cómo agendo la sesión?",
-        "answer": "Después del pago te llega un email con el link para elegir día y hora. También recibís tu rol en Discord."
+        "answer": "Coordinamos día y hora por mensaje. Para hablar en vivo te paso mi Discord."
+      },
+      "vodInput": {
+        "question": "¿Qué te mando para un VOD review?",
+        "answer": "Si es offline, pegás los códigos de replay en tu compra, en el portal, y veo las partidas en el juego. Si es en vivo, las vemos juntos en la sesión."
+      },
+      "vodDelivery": {
+        "question": "¿Cuándo recibo mi VOD review?",
+        "answer": "El de 3 partidas, en 72 horas desde que me pasás los códigos. El de torneo completo, en 96 horas. El video queda en tu portal."
+      },
+      "missedSession": {
+        "question": "¿Y si no puedo ir a la sesión?",
+        "answer": "Avisame con 24 horas y la cambiamos sin costo. Si no avisás y pasan 15 minutos del inicio, la sesión cuenta como usada. Si el que falta soy yo, elegís otra fecha o te devuelvo todo."
+      },
+      "withdrawal": {
+        "question": "¿Me puedo arrepentir de la compra?",
+        "answer": "Sí. Tenés 10 días desde la compra para pedir el reembolso, salvo que ya te haya entregado el servicio. Usá el Botón de arrepentimiento, al pie de la página. Te devuelvo por Mercado Pago lo que pagaste en pesos."
+      },
+      "results": {
+        "question": "¿Me garantizás resultados?",
+        "answer": "No. Te doy análisis y un plan de trabajo, pero el resultado depende de tu juego y de cada torneo. Los resultados de esta web son de jugadores con los que trabajé."
       },
       "pro": {
         "question": "¿Cómo entro a la Temporada Pro?",
-        "answer": "Mandás una aplicación. Si quedás, son {price} por equipo por toda la temporada."
+        "answer": "Mandás una aplicación corta y hablamos. Si encajamos, te paso un link de pago."
+      },
+      "contact": {
+        "question": "¿Cómo te contacto?",
+        "answer": "Desde el formulario de contacto, de lunes a viernes de 10 a 18, hora de Argentina."
       }
     }
   },
@@ -121,10 +157,18 @@
     "socialLabel": "Redes",
     "portal": "Portal de alumnos",
     "legal": "© {year} Tallami Coaching. No afiliado ni respaldado por Epic Games.",
-    "legalLinks": "Trámites y contacto",
+    "legalLinks": "Trámites, contacto y legales",
     "withdrawal": "BOTÓN DE ARREPENTIMIENTO",
     "cancellation": "BOTÓN DE BAJA DE SERVICIO",
-    "contact": "Contacto"
+    "contact": "Contacto",
+    "terms": "Términos",
+    "refunds": "Reembolsos",
+    "privacy": "Privacidad"
+  },
+  "Legal": {
+    "eyebrow": "Legales",
+    "updated": "Última actualización: <time>{date}</time>",
+    "contents": "En esta página"
   },
   "Portal": {
     "metaTitle": "Portal de alumnos · Tallami Coaching",
@@ -308,6 +352,7 @@
       "optional": "(opcional)",
       "messageHint": "Lo que quieras contarme del equipo o de lo que buscan.",
       "privacy": "Acepto que Tallami use estos datos para contestarme a esta aplicación.",
+      "privacyLink": "Leé la política de privacidad",
       "submit": "Enviar aplicación",
       "submitting": "Enviando…",
       "trap": "Dejá este campo vacío",

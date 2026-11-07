@@ -23,6 +23,7 @@ export interface ApplicationFormLabels {
   optional: string;
   messageHint: string;
   privacy: string;
+  privacyLink: string;
   submit: string;
   submitting: string;
   trap: string;
@@ -83,11 +84,19 @@ function Field({ id, label, hint, error, children }: FieldProps) {
   );
 }
 
+interface ApplicationFormProps {
+  locale: string;
+  labels: ApplicationFormLabels;
+  homeHref: string;
+  /** La política de privacidad en el idioma de la página: la casilla dice que se acepta. */
+  privacyHref: string;
+}
+
 /**
  * La aplicación a la Temporada Pro. Funciona sin JavaScript: es un formulario con una acción del
  * servidor, y el estado vuelve en la misma página. El campo `website` es la trampa para bots.
  */
-export function ApplicationForm({ locale, labels, homeHref }: { locale: string; labels: ApplicationFormLabels; homeHref: string }) {
+export function ApplicationForm({ locale, labels, homeHref, privacyHref }: ApplicationFormProps) {
   const [state, formAction] = useActionState(applyToProAction, INITIAL);
 
   if (state.status === "sent") {
@@ -164,6 +173,10 @@ export function ApplicationForm({ locale, labels, homeHref }: { locale: string; 
           />
           <span>{labels.privacy}</span>
         </label>
+        {/* Fuera de la etiqueta: tocar el link no marca la casilla. */}
+        <a href={privacyHref} className="ml-9 self-start py-1 text-[.95rem] font-medium underline underline-offset-4 hover:text-zone">
+          {labels.privacyLink}
+        </a>
         {privacyError ? (
           <p id="pro-privacy-error" className="font-bold text-danger-ink">
             {privacyError}

@@ -48,6 +48,7 @@ export default async function ProSeasonPage(props: PageProps<"/[locale]/temporad
     optional: t("form.optional"),
     messageHint: t("form.messageHint"),
     privacy: t("form.privacy"),
+    privacyLink: t("form.privacyLink"),
     submit: t("form.submit"),
     submitting: t("form.submitting"),
     trap: t("form.trap"),
@@ -77,7 +78,7 @@ export default async function ProSeasonPage(props: PageProps<"/[locale]/temporad
         <div className="paper">
           <div className="mx-auto max-w-wrap px-gutter py-[clamp(32px,5vw,56px)]">
             <div className="max-w-[40rem]">
-              <ApplicationForm locale={locale} labels={labels} homeHref={`/${locale}`} />
+              <ApplicationForm locale={locale} labels={labels} homeHref={`/${locale}`} privacyHref={`/${locale}/privacidad`} />
             </div>
           </div>
         </div>

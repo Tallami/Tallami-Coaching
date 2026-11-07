@@ -1,16 +1,26 @@
-import { getLocale, getTranslations } from "next-intl/server";
-import { PRO_SEASON } from "@/content/services";
-import { formatUsd } from "@/lib/format";
+import { getTranslations } from "next-intl/server";
 import styles from "./faq.module.css";
 
-const FAQ_ITEMS = ["minors", "payment", "schedule", "pro"] as const;
+/** Las preguntas, en el orden del diseño de pagos: comprar, pagar, edad, sesiones, VOD, arrepentimiento, Pro y contacto. */
+const FAQ_ITEMS = [
+  "howToBuy",
+  "afterPayment",
+  "payment",
+  "currencies",
+  "minors",
+  "schedule",
+  "vodInput",
+  "vodDelivery",
+  "missedSession",
+  "withdrawal",
+  "results",
+  "pro",
+  "contact",
+] as const;
 
 /** Preguntas frecuentes. Son <details> nativos: abren con Enter o Espacio y sin JS. */
 export async function Faq() {
   const t = await getTranslations("Faq");
-  const locale = await getLocale();
-
-  const answerArguments = { price: formatUsd(PRO_SEASON.priceUsd, locale) };
 
   return (
     <section id="faq" className="paper" aria-labelledby="faq-title">
@@ -20,11 +30,7 @@ export async function Faq() {
           {FAQ_ITEMS.map((item) => (
             <details key={item}>
               <summary>{t(`items.${item}.question`)}</summary>
-              <p>
-                {item === "pro"
-                  ? t("items.pro.answer", answerArguments)
-                  : t(`items.${item}.answer`)}
-              </p>
+              <p>{t(`items.${item}.answer`)}</p>
             </details>
           ))}
         </div>

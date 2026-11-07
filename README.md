@@ -364,7 +364,7 @@ Los tests unitarios (`npm run test`) crean cada base de prueba clonando una base
 
 ## Portal del alumno
 
-El portal es la página donde cada alumno ve lo que compró y todo lo que Tallami le entregó, guardado para siempre: `/es/portal`, `/pt/portal` y `/en/portal` (hay un enlace «Portal de alumnos» en el pie del sitio). El alumno entra con su cuenta de **Discord o Google**, sin contraseña. Vos lo manejás desde el panel: invitás al alumno desde su ficha y cargás las entregas desde la ficha de cada venta. El portal nunca muestra notas, facturas, pesos, cotizaciones ni nada de otros alumnos. Por ahora es solo para ver: pagar y escribirte desde la web vienen después.
+El portal es la página donde cada alumno ve lo que compró y todo lo que Tallami le entregó, guardado para siempre: `/es/portal`, `/pt/portal` y `/en/portal` (hay un enlace «Portal de alumnos» en el pie del sitio). El alumno entra con su cuenta de **Discord o Google**, sin contraseña. Vos lo manejás desde el panel: invitás al alumno desde su ficha y cargás las entregas desde la ficha de cada venta. El portal nunca muestra notas, facturas, pesos, cotizaciones ni nada de otros alumnos. Desde la web también se compra (ver "Pagos"): quien paga con una cuenta que todavía no está vinculada a ningún alumno queda vinculado solo, y su compra aparece en el portal. Escribirte desde la web viene después.
 
 Esta guía sigue a "Ponerlo en línea": da por hecho que ya tenés Supabase y Vercel andando y el panel en línea.
 
@@ -416,7 +416,9 @@ Una sola vez. Cada paso dice dónde hacerlo; los nombres de los menús de Discor
 
 **Que lo abra en el navegador del celular, no dentro de otra app.** Si le mandás el link por Instagram, TikTok o Discord, al tocarlo esas apps lo abren en un navegador propio, embebido en la app. Google no permite iniciar sesión desde ahí y puede bloquear el ingreso (el error se llama `disallowed_useragent`), así que el botón «Entrar con Google» falla. Pedile que lo abra en Chrome o Safari, el navegador de verdad del celular: en el menú de la app suele haber una opción para abrir el link en el navegador, o que lo copie y lo pegue en Chrome o Safari. Lo dicen las guías de Google: [Sign in with a supported browser](https://support.google.com/accounts/answer/7675428) (qué navegadores acepta) y la sección «Use secure browsers» de las [OAuth 2.0 Policies](https://developers.google.com/identity/protocols/oauth2/policies).
 
-**Qué ve el alumno.** Cada compra con el nombre del servicio, la fecha de cobro (o «Pendiente de pago»), el estado, lo que pagó en la moneda de la venta y sus entregas, y un botón «Salir». Si todavía no tiene compras, lo dice; si entra con una cuenta que no está vinculada, ve «Falta un paso» y que te pida su invitación. Nunca ve notas, facturas, pesos, cotizaciones ni el medio de pago, ni nada de otros alumnos.
+**Qué ve el alumno.** Cada compra con el nombre del servicio, la fecha de cobro (o «Pendiente de pago»), el estado, lo que pagó en la moneda de la venta y sus entregas, y un botón «Salir». En un VOD review de 3 partidas o de torneo completo, la compra muestra además el campo «Códigos de replay»: el alumno pega ahí sus códigos de replay, te llega un email, y desde ese momento corren las 72 o 96 horas de la entrega (el portal le dice hasta cuándo). Los puede corregir hasta que subas la entrega; corregirlos no mueve el plazo. A los 150 días del cobro sin códigos ni entrega, el campo se cierra y le dice que te escriba. Si todavía no tiene compras, lo dice; si entra con una cuenta que no está vinculada, ve «Falta un paso» y que te pida su invitación. Nunca ve notas, facturas, pesos, cotizaciones ni el medio de pago, ni nada de otros alumnos.
+
+**Lo que se vincula solo.** Si alguien paga en la web con una cuenta del portal que no está vinculada a ningún alumno, al aprobarse el pago el panel crea el alumno (nombre, email, su usuario de Discord si entró con Discord y país AR, que podés corregir) y la cuenta se vincula sola: no hace falta invitarlo. Si la cuenta ya estaba vinculada, la venta va a ese alumno. Para el caso de un alumno que ya tenías cargado y compra con una cuenta nueva, ver "Pagos" → "Si quien compra ya estaba en el panel".
 
 **Desvincular o borrar la cuenta.** Con la cuenta vinculada, la tarjeta muestra «Vinculado» con el proveedor y el nombre. Los dos botones piden confirmar:
 
@@ -445,6 +447,7 @@ Un video no listado lo puede ver cualquiera que reciba el link, tenga o no cuent
 Al entrar con Discord o Google, la base guarda solo esto:
 
 - el proveedor (Discord o Google) y el id del usuario en ese proveedor (un número interno, no su usuario);
+- con Discord, también su usuario de Discord (con el que lo encontrás para escribirle; Google no tiene uno);
 - el nombre para mostrar que tiene en esa cuenta;
 - el email, solo si el proveedor dice que está verificado;
 - cuándo se creó la cuenta, cuándo entró por última vez y a qué alumno del panel está vinculada;
@@ -458,7 +461,7 @@ Cuánto tiempo queda cada cosa. La limpieza corre de pasada, cuando alguien entr
 - Una cuenta sin vincular a ningún alumno (alguien que entró sin invitación, o una cuenta que desvinculaste) se borra sola, con sus sesiones, unos 31 días después de su último ingreso: los 30 de la sesión más larga y el día que se guarda lo que ya no sirve.
 - Una cuenta vinculada se queda hasta que la borres vos: en la ficha del alumno, «Borrar cuenta del portal» borra la cuenta y se va todo lo de arriba.
 
-La política de privacidad del sitio todavía no está escrita: queda para la investigación legal pendiente. Hasta entonces, el portal no guarda nada en la base de datos fuera de esta lista. Eso no incluye al servicio de hosting (Vercel), que lleva por su cuenta sus propios registros de los pedidos que recibe el sitio: no están en la base ni los maneja el código.
+La política de privacidad del sitio (`/es/privacidad`, también en `/pt` y `/en`) dice esto mismo para el público, junto con lo que guardan las compras, los formularios y los clics; su texto está en `src/content/legal/privacy.ts` y es un borrador para el abogado (ver "Pagos" → "Antes de cobrar de verdad"). Si el portal empieza a guardar otra cosa, hay que cambiar esa página. El portal no guarda nada en la base de datos fuera de esta lista. Eso no incluye al servicio de hosting (Vercel), que lleva por su cuenta sus propios registros de los pedidos que recibe el sitio: no están en la base ni los maneja el código.
 
 ### Probarlo en tu compu
 
@@ -488,6 +491,67 @@ Solo para desarrollo: sin Discord ni Google, con un servidor OAuth falso que cor
 
 `npm run test` y `npm run test:e2e` cubren el portal sin salir a internet: el e2e arranca el servidor OAuth falso (puerto 3110) y el proveedor de prueba habla con él, nunca con Discord ni con Google. Los e2e del portal están en `tests/e2e/portal-*.spec.ts` (ingreso, invitaciones, entregas del panel y la página del alumno). `tests/unit/readme-portal-guide.test.ts` mantiene esta guía igual al código: las variables, las direcciones de vuelta, la migración y el comando del secreto.
 
+## Pagos
+
+La web cobra con Mercado Pago (Checkout Pro). El alumno toca un servicio, entra con Discord o Google, ve el precio en dólares y en pesos, marca que paga un adulto y paga en Mercado Pago; la web nunca ve los datos de la tarjeta. Cuando Mercado Pago confirma el pago, la venta aparece sola en Ventas (en pesos y en dólares, medio de pago Mercado Pago, factura pendiente), la compra aparece en el portal del alumno y te llega un email. Temporada Pro no se paga desde los botones: el equipo aplica, la aplicación cae en **Aplicaciones** y, si encajan, desde su ficha tocás «Generar link de pago» (USD 2.500 por defecto, lo podés cambiar; el link sirve una vez y vence a los 14 días). El BOTÓN DE ARREPENTIMIENTO, el de baja y el formulario de contacto caen en **Pedidos del sitio**.
+
+Esta guía sigue a "Portal del alumno": sin el portal andando nadie puede entrar, y sin entrar nadie puede comprar.
+
+### Dejarlo listo
+
+1. **Crear las tablas.** **Antes de desplegar**, corré `npm run db:migrate` como en "Ponerlo en línea", paso 3. La migración `0008_payments_mercadopago` suma los pedidos, las aplicaciones de Temporada Pro y sus links de pago, los pedidos del sitio, los códigos de replay de las ventas y el usuario de Discord de las cuentas del portal. Sin ella fallan la pantalla de compra, los formularios y el portal.
+2. **Crear la aplicación en Mercado Pago.** Entrá a [Tus integraciones](https://www.mercadopago.com.ar/developers/panel/app) con la cuenta de Mercado Pago que va a cobrar y creá una aplicación para pagos online con Checkout Pro. Los nombres de los pasos cambian de vez en cuando: si algo no coincide, mandan las guías oficiales que se linkean acá.
+3. **Las credenciales.** La aplicación tiene dos juegos, y cada uno su *Access Token* ([Credenciales](https://www.mercadopago.com.ar/developers/es/docs/your-integrations/credentials)):
+   - **De prueba:** se crean solas con la aplicación (el token empieza con `APP_USR`). Cobran de mentira y sirven para la prueba de abajo.
+   - **De producción:** cobran de verdad. Para verlas, en Credenciales elegí «Producción» y tocá «Activar ambiente de producción»: Mercado Pago pide el rubro y la web del negocio y que aceptes sus términos.
+
+   El token que uses va en la variable `MERCADOPAGO_ACCESS_TOKEN`.
+4. **Configurar el aviso de pagos.** Mercado Pago le avisa a la web cada vez que un pago cambia (aprobado, reembolsado, contracargo). En la aplicación, en «Webhooks» → «Configurar notificaciones» ([guía oficial](https://www.mercadopago.com.ar/developers/es/docs/your-integrations/notifications/webhooks)):
+   - en «URL modo producción» poné `https://<tu-dominio>/api/payments/mercadopago` (`<tu-dominio>` es `NEXT_PUBLIC_SITE_URL`, como en "Portal del alumno"); si vas a probar con las credenciales de prueba, poné la misma dirección en «URL modo pruebas»;
+   - elegí los eventos «Pagos» y «Contracargos» (en el panel de Brasil, este último se llama «Contestações»);
+   - tocá «Guardar»: Mercado Pago genera una clave secreta. Revelala en esa misma pantalla y cargala en `MERCADOPAGO_WEBHOOK_SECRET`. Con ella la web comprueba que cada aviso viene de Mercado Pago; sin ella rechaza los avisos.
+
+   La web nunca le cree al aviso: con el número de pago que trae, consulta el pago en Mercado Pago y recién ahí crea la venta. Si el aviso se demora, al volver al portal el alumno dispara la misma consulta.
+5. **El remitente de los emails al público.** El comprador recibe la confirmación de su compra, y quien usa el BOTÓN DE ARREPENTIMIENTO o el de baja recibe su código por email. Para eso hace falta un dominio verificado en Resend ([Verified Domains](https://resend.com/docs/dashboard/domains/introduction)): cargá en `PUBLIC_EMAIL_FROM` una dirección de ese dominio, por ejemplo `Tallami <hola@tu-dominio.com>`. No sirve la de prueba de Resend (`@resend.dev`), que solo le entrega al dueño de la cuenta. A esa dirección no hace falta poder contestarle. Los avisos de cada venta te llegan a vos, a `ADMIN_ALERT_EMAIL`, como los del panel (ver "Avisos por email").
+6. **Cargar las variables en Vercel.** `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_SECRET` y `PUBLIC_EMAIL_FROM`, además de `RESEND_API_KEY` y `ADMIN_ALERT_EMAIL` si todavía no estaban. Marcá las dos de Mercado Pago como «Secret» (ver "Seguridad de tus cuentas"). `MERCADOPAGO_API_BASE` es solo para los tests: no la cargues nunca en Vercel. Volvé a desplegar.
+7. **Cargar los pesos por dólar.** En el panel, Configuración, tarjeta «Pesos por dólar»: escribí cuántos pesos cobrás por cada dólar y tocá «Guardar pesos por dólar». La portada pasa a mostrar los dos precios, con el mismo tamaño, y la pantalla de compra cobra con ese valor (dólares × valor, redondeado al peso). Cuando lo cambies, la portada se actualiza sola. Sin valor, la portada muestra solo dólares y no se puede pagar.
+
+En Configuración, la línea de pagos dice «Pagos en la web: listos.» cuando están las credenciales, el valor y el remitente. Si falta algo dice qué (por nombre, nunca el valor) y los botones de la portada llevan a una pantalla que dice que todavía no se puede pagar y ofrece el formulario de contacto.
+
+### Probar con usuarios de prueba
+
+Antes de cobrar de verdad, hacé una compra con las credenciales de prueba:
+
+1. Cargá el *Access Token* de prueba en `MERCADOPAGO_ACCESS_TOKEN` y volvé a desplegar.
+2. En la aplicación de Mercado Pago, en «Cuentas de prueba», creá una cuenta de prueba de comprador de Argentina ([Cuentas de prueba](https://www.mercadopago.com.ar/developers/es/docs/checkout-pro/additional-content/your-integrations/test/accounts)). Mercado Pago muestra su usuario, su contraseña y el código de verificación que pide al entrar.
+3. En una ventana privada, abrí la web, tocá un servicio, entrá con tu Discord o tu Google, marcá la casilla y pagá. En Mercado Pago entrá con la cuenta de prueba del comprador y pagá con una [tarjeta de prueba](https://www.mercadopago.com.ar/developers/es/docs/checkout-pro/additional-content/your-integrations/test/cards): como nombre del titular, `APRO` aprueba el pago y `OTHE` lo rechaza.
+4. Fijate que volvés al portal con el pago confirmado, que la venta aparece en Ventas y que te llegaron los dos emails (el tuyo y el del comprador).
+5. Cuando todo ande, cambiá `MERCADOPAGO_ACCESS_TOKEN` por el de producción y volvé a desplegar. Las ventas de prueba quedaron como cobradas: abrilas y pasalas a «Cancelada» para que no cuenten como ingreso (las ventas no se borran).
+
+**No se puede probar en `localhost`.** Mercado Pago no acepta direcciones `localhost` para volver al sitio después de pagar (`back_urls` con `auto_return`), y el aviso de pagos tampoco llega a tu compu. Probá en la dirección publicada o, si querés probar desde tu compu, con un túnel: un servicio que le da a tu `npm run dev` una dirección pública con `https`. En ese caso la vuelta va a la dirección del túnel, y esa misma dirección (con `/api/payments/mercadopago`) va en «URL modo pruebas».
+
+### Reembolsos y contracargos
+
+Los reembolsos se hacen en Mercado Pago, desde el pago: el panel no devuelve plata. Cuando Mercado Pago lo confirma, el aviso pasa la venta a «Reembolsada» sola (si ya la habías marcado, no cambia nada). Un reembolso parcial deja la venta cobrada, lo anota en sus notas y te avisa por email. Un contracargo o una mediación te llegan por email con el link a la venta; si el banco le da la razón al comprador, la venta pasa a «Reembolsada». Mercado Pago solo permite reembolsar hasta 180 días después del pago: por eso las compras sin usar vencen a los 150.
+
+### Si quien compra ya estaba en el panel
+
+Un alumno que cargaste a mano y compra con una cuenta que nunca vinculaste queda como alumno nuevo: el panel no busca coincidencias por email, para no abrirle el historial de un alumno a quien tenga ese email en otra cuenta. Para dejarlo en su ficha de siempre:
+
+1. Abrí la venta nueva (Ventas) y, en «Alumno», elegí al alumno original. Guardá.
+2. Abrí la ficha del alumno duplicado y, en la tarjeta «Portal del alumno», tocá **Desvincular**.
+3. Abrí la ficha del alumno original, tocá **Invitar al portal** y mandale el link: entra con la misma cuenta y queda vinculado (ver "Invitar a un alumno").
+
+El panel no borra alumnos: el duplicado queda en la lista, sin ventas ni cuenta.
+
+### Antes de cobrar de verdad
+
+Lo que no resuelve el código, del doc de investigación legal ([Tallami: legal terms and FAQ research](https://claude.ai/artifact/76qjGsq1LQj6sJmFQRsYzK)):
+
+- **Abogado.** Los textos de `/es/terminos`, `/es/reembolsos` y `/es/privacidad` (y sus versiones en portugués e inglés) son borradores: están en `src/content/legal/` y los tiene que revisar un abogado. Las preguntas abiertas del doc: qué tiene que decir la web sobre vos (sin CUIT, email ni dirección), cuándo cuenta como usado cada servicio, la regla de los 15 minutos y el vencimiento a los 150 días, si alcanza la casilla de adulto, si los datos guardados en Brasil necesitan algo más, y si las páginas en portugués necesitan algo por la ley de Brasil.
+- **Contador.** Si te corresponde el QR de Data Fiscal de ARCA y la línea «precio sin impuestos nacionales» (todavía no están en la web), que la factura vaya a nombre de quien paga (el adulto, cuando paga por un menor) y cuánto tiempo hay que guardar las ventas.
+- **Cuenta de Mercado Pago.** Que acepte coaching como actividad y si acepta compradores de fuera de Argentina; hasta saberlo, la web solo ofrece pagar desde Argentina y al resto le dice que te escriba.
+
 ## Deploy (Vercel)
 
 La web se despliega en Vercel como un proyecto Next.js, sin configuración especial.
@@ -498,7 +562,7 @@ Variables de entorno (Project Settings → Environment Variables):
 | --- | --- |
 | `NEXT_PUBLIC_SITE_URL` | Origen público del sitio, sin barra final (por ejemplo `https://tallami.com`). Define canonical, hreflang, Open Graph, `sitemap.xml` y `robots.txt`. Se lee en el build: si la cambiás, volvé a desplegar. También es la dirección a la que quedan atadas las llaves de acceso del panel: si cambia, dejan de servir (ver "La dirección de la web"). |
 
-Las variables del portal del alumno (`PORTAL_SESSION_SECRET`, `DISCORD_*` y `GOOGLE_*`) se cargan como dice "Portal del alumno" → "Dejarlo listo". Las direcciones de vuelta de Discord y Google salen de `NEXT_PUBLIC_SITE_URL`.
+Las variables del portal del alumno (`PORTAL_SESSION_SECRET`, `DISCORD_*` y `GOOGLE_*`) se cargan como dice "Portal del alumno" → "Dejarlo listo". Las direcciones de vuelta de Discord y Google salen de `NEXT_PUBLIC_SITE_URL`. Las de pagos (`MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_SECRET` y `PUBLIC_EMAIL_FROM`), como dice "Pagos" → "Dejarlo listo"; la dirección del aviso de Mercado Pago también sale de `NEXT_PUBLIC_SITE_URL`.
 
 Para el panel en producción `NEXT_PUBLIC_SITE_URL` es obligatoria (ver "Ponerlo en línea", paso 5). Si no está definida (o está vacía), el build usa `https://${VERCEL_PROJECT_PRODUCTION_URL}`: el dominio de producción del proyecto (por ejemplo `tallami-coaching.vercel.app`), que Vercel define solo. Así los metadatos nunca apuntan a `localhost` en un deploy. Fuera de Vercel y sin ninguna de las dos, se usa `http://localhost:3000`.
 

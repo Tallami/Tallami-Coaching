@@ -7,16 +7,22 @@ export function getHomePath(locale: Locale): string {
 }
 
 /**
- * Rutas de la home por código hreflang (`es`, `pt-BR`, `en`) más `x-default`,
- * que apunta al idioma por defecto. Metadatos y sitemap usan el mismo mapa.
+ * Rutas de una página en cada idioma, por código hreflang (`es`, `pt-BR`, `en`),
+ * más `x-default`, que apunta al idioma por defecto. Metadatos y sitemap usan el
+ * mismo mapa. `href` es la ruta sin idioma: `/` para la home, `/terminos`…
  */
-export function getHomeLanguageAlternates(): Record<string, string> {
+export function getLanguageAlternates(href: string): Record<string, string> {
   const byLanguage = routing.locales.map(
-    (locale) => [HTML_LANG[locale], getHomePath(locale)] as const,
+    (locale) => [HTML_LANG[locale], getPathname({ locale, href })] as const,
   );
 
   return Object.fromEntries([
     ...byLanguage,
-    ["x-default", getHomePath(routing.defaultLocale)],
+    ["x-default", getPathname({ locale: routing.defaultLocale, href })],
   ]);
+}
+
+/** Las de la home: `/es`, `/pt`, `/en`. */
+export function getHomeLanguageAlternates(): Record<string, string> {
+  return getLanguageAlternates("/");
 }

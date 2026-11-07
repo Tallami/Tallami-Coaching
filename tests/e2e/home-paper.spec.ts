@@ -1,5 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { SOCIAL_LINKS } from "../../src/content/social";
+import en from "../../messages/en.json" with { type: "json" };
+import es from "../../messages/es.json" with { type: "json" };
+import pt from "../../messages/pt.json" with { type: "json" };
 
 const STAGE_BACKGROUND = "rgb(11, 20, 51)";
 const GOLD = "rgb(255, 201, 60)";
@@ -52,14 +55,17 @@ const LOCALIZED_SERVICES = [
 const LOCALE_PATHS = ["/es", "/pt", "/en"] as const;
 
 const EPIC_NOTICES = [
-  ["/es", "No afiliado ni respaldado por Epic Games."],
-  ["/pt", "Não afiliado nem endossado pela Epic Games."],
-  ["/en", "Not affiliated with or endorsed by Epic Games."],
+  ["/es", "No afiliado ni respaldado por Epic Games.", es],
+  ["/pt", "Não afiliado nem endossado pela Epic Games.", pt],
+  ["/en", "Not affiliated with or endorsed by Epic Games.", en],
 ] as const;
+
+/** Los links del pie que no son redes: el portal, los dos botones, contacto y las tres páginas legales. */
+const FOOTER_SITE_LINKS = ["portal", "withdrawal", "cancellation", "contact", "terms", "refunds", "privacy"] as const;
 
 const MINORS_QUESTION = "¿Puedo entrenar si tengo menos de 18 años?";
 const MINORS_ANSWER =
-  "Sí. El pago lo hace un adulto responsable, y la sesión es con vos.";
+  "Sí, desde los 13. El pago lo hace un adulto responsable, y la sesión es con vos.";
 
 function columnCount(gridTemplateColumns: string): number {
   return gridTemplateColumns.split(" ").length;
@@ -137,10 +143,18 @@ test.describe("services menu", () => {
       .click();
     await expect(
       page.getByText(
-        "Mandás una aplicación. Si quedás, son USD 2.500 por equipo por toda la temporada.",
+        "Mandás una aplicación corta y hablamos. Si encajamos, te paso un link de pago.",
         { exact: true },
       ),
     ).toBeVisible();
+  });
+
+  test("the payments line says dollars and pesos, Mercado Pago from Argentina, and to write from other countries", async ({ page }) => {
+    await page.goto("/es");
+
+    await expect(page.locator("#services")).toContainText(
+      "Precios en dólares y en pesos. Por ahora se paga con Mercado Pago, desde Argentina. ¿Estás en otro país? Escribime.",
+    );
   });
 
   test("minors note sits next to prices", async ({ page }) => {
@@ -263,9 +277,13 @@ test.describe("how it works", () => {
     await expect(steps.getByRole("heading", { level: 3 })).toHaveText([
       "Elegís el servicio",
       "Pagás",
-      "Agendás",
+      "Coordinamos",
       "Entrenás",
     ]);
+    await expect(steps.nth(1)).toContainText("Con Mercado Pago, en pesos. Te llega la confirmación por email.");
+    await expect(steps.nth(2)).toContainText(
+      "Si es un VOD offline, pegás tus códigos de replay en el portal. Si es en vivo, arreglamos día y hora.",
+    );
   });
 
   test("steps run in 4 columns, then 2 at 900px, then 1 at 640px", async ({
@@ -307,30 +325,27 @@ test.describe("faq", () => {
     await expect(answer).toBeHidden();
   });
 
-  test("faq lists four native details, closed by default", async ({ page }) => {
+  test("faq lists thirteen native details, closed by default", async ({ page }) => {
     await page.goto("/es");
 
     const items = page.locator("#faq details");
 
-    await expect(items).toHaveCount(4);
+    await expect(items).toHaveCount(13);
     await expect(page.locator("#faq details[open]")).toHaveCount(0);
   });
 
-  test("Temporada Pro answer takes the price from the data", async ({
+  test("the Temporada Pro answer is about the application and the payment link, in English too", async ({
     page,
   }) => {
     await page.goto("/en");
 
     const summary = page.locator("#faq summary", {
-      hasText: "How do I join Temporada Pro?",
+      hasText: en.Faq.items.pro.question,
     });
 
     await summary.click();
-    await expect(
-      page.getByText(
-        "If you're accepted, it's USD 2,500 per team for the whole season.",
-      ),
-    ).toBeVisible();
+    await expect(page.getByText(en.Faq.items.pro.answer, { exact: true })).toBeVisible();
+    await expect(page.locator("#faq")).not.toContainText("USD");
   });
 });
 
@@ -338,12 +353,12 @@ test.describe("footer", () => {
   test("footer shows social links, the link to the student portal and the Epic disclaimer per locale", async ({
     page,
   }) => {
-    for (const [path, notice] of EPIC_NOTICES) {
+    for (const [path, notice, messages] of EPIC_NOTICES) {
       await page.goto(path);
 
       const footer = page.getByRole("contentinfo");
-      // Las redes son la lista del pie; el link al portal va aparte, fuera de ella.
-      const links = footer.getByRole("list").getByRole("link");
+      // Las redes son su propia lista; el portal, los trámites y lo legal van aparte.
+      const links = footer.getByRole("list", { name: messages.Footer.socialLabel }).getByRole("link");
 
       await expect(footer).toContainText(notice);
       await expect(links).toHaveCount(SOCIAL_LINKS.length);
@@ -352,8 +367,11 @@ test.describe("footer", () => {
         anchors.map((anchor) => anchor.getAttribute("href")),
       );
       expect(hrefs, path).toEqual(SOCIAL_LINKS.map(({ href }) => href));
-      await expect(footer.getByRole("link")).toHaveCount(SOCIAL_LINKS.length + 1);
-      await expect(footer.getByRole("link").last()).toHaveAttribute("href", `${path}/portal`);
+      await expect(footer.getByRole("link")).toHaveCount(SOCIAL_LINKS.length + FOOTER_SITE_LINKS.length);
+      for (const key of FOOTER_SITE_LINKS) {
+        await expect(footer.getByRole("link", { name: messages.Footer[key], exact: true }), `${path}: ${key}`).toBeVisible();
+      }
+      await expect(footer.getByRole("link", { name: messages.Footer.portal, exact: true })).toHaveAttribute("href", `${path}/portal`);
     }
   });
 

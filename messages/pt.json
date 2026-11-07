@@ -43,7 +43,7 @@
   },
   "Services": {
     "title": "Serviços e preços",
-    "payments": "Preços em dólares. Você paga com Mercado Pago, Pix, PayPal ou cripto, conforme o seu país.",
+    "payments": "Preços em dólares e em pesos. Por enquanto o pagamento é com Mercado Pago, da Argentina. Está em outro país? Me escreva.",
     "minors": "Tem menos de 18 anos? Você pode treinar do mesmo jeito: o pagamento é feito por um adulto responsável.",
     "tip": "Primeira vez? Comece com um VOD review de 3 partidas.",
     "items": {
@@ -84,11 +84,11 @@
       },
       "pay": {
         "title": "Você paga",
-        "body": "Com o meio de pagamento do seu país. A confirmação chega por e-mail."
+        "body": "Com Mercado Pago, em pesos. A confirmação chega por e-mail."
       },
       "schedule": {
-        "title": "Você agenda",
-        "body": "Você escolhe dia e horário pelo link que chega para você e recebe o seu cargo no Discord."
+        "title": "Combinamos",
+        "body": "Se for um VOD offline, você cola os seus códigos de replay no portal. Se for ao vivo, combinamos dia e horário."
       },
       "train": {
         "title": "Você treina",
@@ -99,21 +99,57 @@
   "Faq": {
     "title": "Perguntas frequentes",
     "items": {
-      "minors": {
-        "question": "Posso treinar se eu tiver menos de 18 anos?",
-        "answer": "Sim. O pagamento é feito por um adulto responsável, e a sessão é com você."
+      "howToBuy": {
+        "question": "Como eu compro?",
+        "answer": "Você escolhe o serviço e entra com Discord ou Google. Confirma o preço e paga no Mercado Pago. A sua compra aparece no Portal do aluno quando o pagamento é confirmado."
+      },
+      "afterPayment": {
+        "question": "O que acontece depois de pagar?",
+        "answer": "Eu escrevo para você para combinarmos. Tudo o que eu entrego fica guardado no seu portal."
       },
       "payment": {
         "question": "Como pago do meu país?",
-        "answer": "Os preços estão em dólares. Na Argentina você paga com Mercado Pago, no Brasil com Pix e no resto da América Latina com meios de pagamento locais. De outros países, com PayPal. Você também pode pagar com cripto."
+        "answer": "Por enquanto o pagamento é com Mercado Pago, da Argentina. Se você está em outro país, me escreva e vemos como fazer."
+      },
+      "currencies": {
+        "question": "Por que vejo dólares e pesos?",
+        "answer": "O preço é definido em dólares. Na Argentina você paga em pesos e vê o valor exato antes de confirmar."
+      },
+      "minors": {
+        "question": "Posso treinar se eu tiver menos de 18 anos?",
+        "answer": "Sim, a partir dos 13. O pagamento é feito por um adulto responsável, e a sessão é com você."
       },
       "schedule": {
         "question": "Como agendo a sessão?",
-        "answer": "Depois do pagamento, você recebe um e-mail com o link para escolher dia e horário. Você também recebe o seu cargo no Discord."
+        "answer": "Combinamos dia e horário por mensagem. Para falar ao vivo, eu passo o meu Discord."
+      },
+      "vodInput": {
+        "question": "O que eu mando para um VOD review?",
+        "answer": "Se for offline, você cola os códigos de replay na sua compra, no portal, e eu vejo as partidas no jogo. Se for ao vivo, assistimos juntos na sessão."
+      },
+      "vodDelivery": {
+        "question": "Quando recebo o meu VOD review?",
+        "answer": "O de 3 partidas, em 72 horas a partir de quando você me passa os códigos. O de torneio completo, em 96 horas. O vídeo fica no seu portal."
+      },
+      "missedSession": {
+        "question": "E se eu não puder ir à sessão?",
+        "answer": "Me avise com 24 horas de antecedência e remarcamos sem custo. Se você não avisar e passarem 15 minutos do início, a sessão conta como usada. Se quem faltar for eu, você escolhe outra data ou eu devolvo tudo."
+      },
+      "withdrawal": {
+        "question": "Posso desistir da compra?",
+        "answer": "Sim. Você tem 10 dias a partir da compra para pedir o reembolso, a menos que eu já tenha entregado o serviço. Use o BOTÓN DE ARREPENTIMIENTO, no rodapé da página. Eu devolvo pelo Mercado Pago o que você pagou em pesos."
+      },
+      "results": {
+        "question": "Você garante resultados?",
+        "answer": "Não. Eu dou análise e um plano de trabalho, mas o resultado depende do seu jogo e de cada torneio. Os resultados deste site são de jogadores com quem trabalhei."
       },
       "pro": {
         "question": "Como entro na Temporada Pro?",
-        "answer": "Você envia uma candidatura. Se ela for aprovada, são {price} por equipe por toda a temporada."
+        "answer": "Você envia uma candidatura curta e conversamos. Se fizer sentido para os dois, eu passo um link de pagamento."
+      },
+      "contact": {
+        "question": "Como falo com você?",
+        "answer": "Pelo formulário de contato, de segunda a sexta, das 10h às 18h, horário da Argentina."
       }
     }
   },
@@ -121,10 +157,18 @@
     "socialLabel": "Redes sociais",
     "portal": "Portal do aluno",
     "legal": "© {year} Tallami Coaching. Não afiliado nem endossado pela Epic Games.",
-    "legalLinks": "Solicitações e contato",
+    "legalLinks": "Solicitações, contato e informações legais",
     "withdrawal": "BOTÓN DE ARREPENTIMIENTO",
     "cancellation": "BOTÓN DE BAJA DE SERVICIO",
-    "contact": "Contato"
+    "contact": "Contato",
+    "terms": "Termos",
+    "refunds": "Reembolsos",
+    "privacy": "Privacidade"
+  },
+  "Legal": {
+    "eyebrow": "Informações legais",
+    "updated": "Última atualização: <time>{date}</time>",
+    "contents": "Nesta página"
   },
   "Portal": {
     "metaTitle": "Portal do aluno · Tallami Coaching",
@@ -308,6 +352,7 @@
       "optional": "(opcional)",
       "messageHint": "O que quiser me contar sobre o time ou o que vocês procuram.",
       "privacy": "Aceito que o Tallami use estes dados para responder a esta aplicação.",
+      "privacyLink": "Leia a política de privacidade",
       "submit": "Enviar aplicação",
       "submitting": "Enviando…",
       "trap": "Deixe este campo vazio",

@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 import es from "../../messages/es.json";
 import { MIN_PORTAL_SECRET_LENGTH } from "@/portal/config";
@@ -150,12 +150,19 @@ describe("the portal guide of the README", () => {
     expect(deliveries).toContain("bodySizeLimit");
   });
 
-  test("lists what is kept about each student, and says the privacy policy is pending", () => {
+  test("lists what is kept about each student, and points to the privacy policy of the site", () => {
     const data = subsectionOf("Qué se guarda de cada alumno");
 
-    for (const item of ["proveedor", "nombre para mostrar", "email", "verificado"]) expect(data, item).toContain(item);
+    for (const item of ["proveedor", "nombre para mostrar", "email", "verificado", "usuario de Discord"]) expect(data, item).toContain(item);
     expect(data).toMatch(/política de privacidad/);
-    expect(data).toMatch(/investigación legal/);
+    expect(data).toContain("/es/privacidad");
+    expect(data).not.toMatch(/todavía no está escrita/);
+  });
+
+  test("says what the student sees of a purchase made on the web: the replay codes and the account that links itself", () => {
+    expect(GUIDE).toMatch(/códigos de replay/);
+    expect(GUIDE).toMatch(/se vincula sol[ao]/);
+    expect(GUIDE).not.toMatch(/Por ahora es solo para ver/);
   });
 
   test("says how long an account that is not linked stays, and what the panel deletes", () => {
@@ -239,6 +246,54 @@ describe("the portal guide of the README", () => {
         "vercel.com",
       ]),
     );
+  });
+});
+
+describe("the payments guide of the README", () => {
+  const PAYMENTS = sectionOf("Pagos");
+
+  test("sits after the portal guide and before the deploy section", () => {
+    expect(README.indexOf("\n## Portal del alumno\n")).toBeLessThan(README.indexOf("\n## Pagos\n"));
+    expect(README.indexOf("\n## Pagos\n")).toBeLessThan(README.indexOf("\n## Deploy (Vercel)\n"));
+  });
+
+  test("names the three variables and the migration to run before deploying", () => {
+    const migration = MIGRATIONS.find((name) => name.startsWith("0008_"));
+
+    expect(migration, "la migración 0008 existe").toBeDefined();
+    for (const name of ["MERCADOPAGO_ACCESS_TOKEN", "MERCADOPAGO_WEBHOOK_SECRET", "PUBLIC_EMAIL_FROM"]) {
+      expect(PAYMENTS, name).toContain(`\`${name}\``);
+      expect(ENV_EXAMPLE, name).toMatch(new RegExp(`^${name}=$`, "m"));
+    }
+    expect(PAYMENTS).toContain("npm run db:migrate");
+    expect(PAYMENTS).toContain("0008");
+  });
+
+  test("gives the real address of the notices, with both events and the secret key", () => {
+    expect(existsSync(new URL("../../src/app/api/payments/mercadopago/route.ts", import.meta.url))).toBe(true);
+    expect(PAYMENTS).toContain("https://<tu-dominio>/api/payments/mercadopago");
+    expect(PAYMENTS).toContain("Tus integraciones");
+    expect(PAYMENTS).toContain("«Pagos»");
+    expect(PAYMENTS).toContain("«Contracargos»");
+    expect(PAYMENTS).toMatch(/clave secreta/);
+  });
+
+  test("covers the rate, the test users, localhost, the duplicate student and what is missing before charging", () => {
+    expect(PAYMENTS).toContain("Pesos por dólar");
+    expect(PAYMENTS).toMatch(/cuentas? de prueba/i);
+    expect(PAYMENTS).toContain("localhost");
+    expect(PAYMENTS).toContain("auto_return");
+    expect(PAYMENTS).toMatch(/túnel/);
+    expect(PAYMENTS).toContain("Desvincular");
+    expect(PAYMENTS).toContain("Invitar al portal");
+    for (const who of ["abogado", "contador", "arca", "precio sin impuestos nacionales"]) expect(PAYMENTS.toLowerCase(), who).toContain(who);
+  });
+
+  test("every link of the guide points to Mercado Pago, Resend or this project's research", () => {
+    const hosts = [...PAYMENTS.matchAll(/\]\((https:\/\/[^)\s]+)\)/g)].map(([, url]) => new URL(url).hostname);
+
+    expect(hosts.length).toBeGreaterThan(0);
+    for (const host of hosts) expect(["www.mercadopago.com.ar", "resend.com", "claude.ai"], host).toContain(host);
   });
 });
 

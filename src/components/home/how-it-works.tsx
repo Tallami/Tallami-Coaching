@@ -4,7 +4,7 @@ import styles from "./how-it-works.module.css";
 /** Los cuatro pasos, en orden; el número lo pone el CSS con un contador. */
 const STEPS = ["choose", "pay", "schedule", "train"] as const;
 
-/** Ruta de cuatro pasos: elegir, pagar, agendar y entrenar. */
+/** Ruta de cuatro pasos: elegir, pagar, coordinar (códigos de replay o día y hora) y entrenar. */
 export async function HowItWorks() {
   const t = await getTranslations("HowItWorks");
 

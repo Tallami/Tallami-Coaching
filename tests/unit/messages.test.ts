@@ -73,7 +73,8 @@ describe("messages", () => {
     expect(spanish.get("Metadata.description")).toEqual(["count"]);
     expect(spanish.get("Hero.title")).toEqual(["count"]);
     expect(spanish.get("Services.pro.unit")).toEqual([]);
-    expect(spanish.get("Faq.items.pro.answer")).toEqual(["price"]);
+    // La respuesta de Temporada Pro ya no lleva el precio: se entra por aplicación y el monto se acuerda.
+    expect(spanish.get("Faq.items.pro.answer")).toEqual([]);
     expect(spanish.get("Footer.legal")).toEqual(["year"]);
     expect(spanish.get("Reviews.cardLabel")).toEqual(["name"]);
   });
@@ -109,6 +110,37 @@ describe("messages", () => {
   test.each(catalogs)("no price is written in %s messages", (_locale, messages) => {
     for (const [path, value] of flattenMessages(messages)) {
       expect(String(value), path).not.toMatch(/USD\s*\d|\$\s*\d/);
+    }
+  });
+
+  /**
+   * Lo que la web prometía antes de cobrar con Mercado Pago y ya no hace: Pix, PayPal y cripto
+   * llegan más adelante, y no hay rol en Discord ni link para agendar (se coordina por mensaje).
+   */
+  const RETIRED_PROMISES = {
+    es: /\bPix\b|PayPal|\bcripto\b|rol en Discord|link que te llega|link para elegir/i,
+    pt: /\bPix\b|PayPal|\bcripto\b|cargo no Discord|link que chega|link para escolher/i,
+    en: /\bPix\b|PayPal|\bcrypto\b|role on Discord|link you receive|link to pick/i,
+  } as const;
+
+  test.each(catalogs)("no message in %s promises Pix, PayPal, crypto, a Discord role or a booking link", (locale, messages) => {
+    for (const [path, value] of flattenMessages(messages)) {
+      expect(String(value), path).not.toMatch(RETIRED_PROMISES[locale as keyof typeof RETIRED_PROMISES]);
+    }
+  });
+
+  test("the FAQ has the thirteen questions of the design, in every language", () => {
+    for (const [locale, messages] of catalogs) {
+      expect(Object.keys((messages.Faq as Messages).items as Messages), locale).toHaveLength(13);
+    }
+  });
+
+  test("the footer names the three legal pages in every language", () => {
+    for (const [locale, messages] of catalogs) {
+      const footer = messages.Footer as Messages;
+      for (const key of ["terms", "refunds", "privacy"]) {
+        expect(typeof footer[key], `${locale}: Footer.${key}`).toBe("string");
+      }
     }
   });
 

@@ -43,7 +43,7 @@
   },
   "Services": {
     "title": "Services and prices",
-    "payments": "Prices in US dollars. You pay with Mercado Pago, Pix, PayPal or crypto, depending on your country.",
+    "payments": "Prices in US dollars and in pesos. For now, payment is through Mercado Pago, from Argentina. In another country? Write to me.",
     "minors": "Under 18? You can still train: a responsible adult makes the payment.",
     "tip": "First time? Start with a 3-game VOD review.",
     "items": {
@@ -84,11 +84,11 @@
       },
       "pay": {
         "title": "You pay",
-        "body": "With the payment method from your country. Your confirmation arrives by email."
+        "body": "With Mercado Pago, in pesos. Your confirmation arrives by email."
       },
       "schedule": {
-        "title": "You schedule",
-        "body": "You pick a day and time with the link you receive, and you get your role on Discord."
+        "title": "We set it up",
+        "body": "For an offline VOD, you paste your replay codes in the portal. For a live one, we agree on a day and time."
       },
       "train": {
         "title": "You train",
@@ -99,21 +99,57 @@
   "Faq": {
     "title": "Frequently asked questions",
     "items": {
-      "minors": {
-        "question": "Can I train if I'm under 18?",
-        "answer": "Yes. A responsible adult makes the payment, and the session is with you."
+      "howToBuy": {
+        "question": "How do I buy?",
+        "answer": "Pick the service and sign in with Discord or Google. Confirm the price and pay with Mercado Pago. Your purchase shows up in the Student portal once the payment is confirmed."
+      },
+      "afterPayment": {
+        "question": "What happens after I pay?",
+        "answer": "I write to you to set things up. Everything I deliver stays saved in your portal."
       },
       "payment": {
         "question": "How do I pay from my country?",
-        "answer": "Prices are in US dollars. In Argentina you pay with Mercado Pago, in Brazil with Pix, and in the rest of Latin America with local payment methods. From other countries, with PayPal. You can also pay with crypto."
+        "answer": "For now, payment is through Mercado Pago, from Argentina. If you're in another country, write to me and we'll work out how."
+      },
+      "currencies": {
+        "question": "Why do I see dollars and pesos?",
+        "answer": "The price is set in US dollars. In Argentina you pay in pesos and see the exact amount before you confirm."
+      },
+      "minors": {
+        "question": "Can I train if I'm under 18?",
+        "answer": "Yes, from age 13. A responsible adult makes the payment, and the session is with you."
       },
       "schedule": {
         "question": "How do I schedule the session?",
-        "answer": "After payment, you get an email with a link to pick a day and time. You also get your role on Discord."
+        "answer": "We set the day and time by message. For the live call, I'll give you my Discord."
+      },
+      "vodInput": {
+        "question": "What do I send you for a VOD review?",
+        "answer": "If it's offline, you paste the replay codes into your purchase, in the portal, and I watch the games in Fortnite. If it's live, we watch them together in the session."
+      },
+      "vodDelivery": {
+        "question": "When do I get my VOD review?",
+        "answer": "The 3-game one, within 72 hours of you sending me the codes. The full tournament one, within 96 hours. The video stays in your portal."
+      },
+      "missedSession": {
+        "question": "What if I can't make the session?",
+        "answer": "Let me know 24 hours ahead and we'll move it at no cost. If you don't, and 15 minutes pass from the start, the session counts as used. If I'm the one who misses it, you pick another date or I refund you in full."
+      },
+      "withdrawal": {
+        "question": "Can I change my mind about a purchase?",
+        "answer": "Yes. You have 10 days from the purchase to ask for a refund, unless I've already delivered the service. Use the BOTÓN DE ARREPENTIMIENTO (withdrawal button) at the bottom of the page. I refund what you paid in pesos through Mercado Pago."
+      },
+      "results": {
+        "question": "Do you guarantee results?",
+        "answer": "No. I give you analysis and a plan to work on, but the result depends on your play and on each tournament. The results on this site belong to players I've worked with."
       },
       "pro": {
         "question": "How do I join Temporada Pro?",
-        "answer": "You send in an application. If you're accepted, it's {price} per team for the whole season."
+        "answer": "Send a short application and we'll talk. If we're a good fit, I'll send you a payment link."
+      },
+      "contact": {
+        "question": "How do I contact you?",
+        "answer": "Through the contact form, Monday to Friday, 10 am to 6 pm, Argentina time."
       }
     }
   },
@@ -121,10 +157,18 @@
     "socialLabel": "Social media",
     "portal": "Student portal",
     "legal": "© {year} Tallami Coaching. Not affiliated with or endorsed by Epic Games.",
-    "legalLinks": "Requests and contact",
+    "legalLinks": "Requests, contact and legal",
     "withdrawal": "BOTÓN DE ARREPENTIMIENTO",
     "cancellation": "BOTÓN DE BAJA DE SERVICIO",
-    "contact": "Contact"
+    "contact": "Contact",
+    "terms": "Terms",
+    "refunds": "Refunds",
+    "privacy": "Privacy"
+  },
+  "Legal": {
+    "eyebrow": "Legal",
+    "updated": "Last updated: <time>{date}</time>",
+    "contents": "On this page"
   },
   "Portal": {
     "metaTitle": "Student portal · Tallami Coaching",
@@ -308,6 +352,7 @@
       "optional": "(optional)",
       "messageHint": "Anything you want to tell me about the team or what you're looking for.",
       "privacy": "I agree that Tallami may use this information to reply to this application.",
+      "privacyLink": "Read the privacy policy",
       "submit": "Send application",
       "submitting": "Sending…",
       "trap": "Leave this field empty",
