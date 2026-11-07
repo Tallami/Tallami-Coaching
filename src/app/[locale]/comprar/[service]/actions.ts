@@ -2,7 +2,7 @@
 
 import { headers } from "next/headers";
 import { redirect, unstable_rethrow } from "next/navigation";
-import { checkoutHref, serviceFromSlug, type ServiceId } from "@/content/services";
+import { PRO_SEASON_SLUG, checkoutHref, serviceFromSlug, type ServiceId } from "@/content/services";
 import { getDb } from "@/db/client";
 import type { Locale } from "@/i18n/routing";
 import { SITE_URL } from "@/lib/site-url";
@@ -24,7 +24,7 @@ interface ScreenRef {
 }
 
 /** A dónde sale el comprador: a Mercado Pago, o de vuelta a la pantalla con lo que pasó. */
-async function destination(formData: FormData, item: ServiceId, screen: ScreenRef): Promise<string> {
+async function destination(formData: FormData, item: ServiceId | "proSeason", screen: ScreenRef): Promise<string> {
   const { slug, locale, link } = screen;
   const account = await getCurrentStudent();
   // La sesión venció con la pantalla abierta: la pantalla vuelve a ofrecer el ingreso.
@@ -55,7 +55,7 @@ async function destination(formData: FormData, item: ServiceId, screen: ScreenRe
 export async function startCheckoutAction(formData: FormData): Promise<void> {
   const locale = portalLocale(textField(formData, "locale"));
   const slug = textField(formData, "service") ?? "";
-  const item = serviceFromSlug(slug);
+  const item = slug === PRO_SEASON_SLUG ? "proSeason" : serviceFromSlug(slug);
   // Un formulario armado a mano con un servicio que no existe no tiene pantalla a la que volver.
   if (!item) redirect(`/${locale}#services`);
 

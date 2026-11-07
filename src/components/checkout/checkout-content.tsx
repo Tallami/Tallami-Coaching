@@ -1,6 +1,6 @@
 import { unstable_rethrow } from "next/navigation";
 import { connection } from "next/server";
-import { SERVICE_SLUGS, priceUsdMinor, type ServiceId } from "@/content/services";
+import { PRO_SEASON_SLUG, SERVICE_SLUGS, priceUsdMinor, type ServiceId } from "@/content/services";
 import { getDb } from "@/db/client";
 import type { Locale } from "@/i18n/routing";
 import { getPaymentAvailability } from "@/payments/availability";
@@ -10,16 +10,18 @@ import type { PortalAccount } from "@/portal/accounts";
 import { enabledProviders, isPortalConfigured } from "@/portal/config";
 import { getCurrentStudent } from "@/portal/current";
 import { inviteTokenFrom } from "@/portal/oauth/flow";
+import { readProPaymentLink } from "@/pro/payment-links";
 import { CheckoutForm } from "./checkout-form";
 import { CheckoutLegal } from "./checkout-legal";
 import { CheckoutNotice } from "./checkout-notice";
+import { CheckoutProInvalid } from "./checkout-pro-invalid";
 import { CheckoutSignIn } from "./checkout-sign-in";
 import { CheckoutSummary } from "./checkout-summary";
 import { CheckoutUnavailable } from "./checkout-unavailable";
 
 interface CheckoutContentProps {
   locale: Locale;
-  item: ServiceId;
+  item: ServiceId | "proSeason";
   /** Los parámetros de la dirección, sin esperar: leerlos vuelve dinámico a todo lo que sigue. */
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
@@ -54,17 +56,36 @@ async function loadScreenSafely(): Promise<Screen> {
   }
 }
 
+const CENTS_PER_DOLLAR = 100;
+
+/** Lo que se compra en esta pantalla: el monto en centavos de dólar y el slug. Temporada Pro sale del link, o de nada. */
+async function loadPurchase(item: ServiceId | "proSeason", linkToken: string | null): Promise<{ slug: string; amountUsdMinor: number } | null> {
+  if (item !== "proSeason") return { slug: SERVICE_SLUGS[item], amountUsdMinor: priceUsdMinor(item) };
+  if (!linkToken) return null;
+  try {
+    const link = await readProPaymentLink(await getDb(), linkToken);
+    return link ? { slug: PRO_SEASON_SLUG, amountUsdMinor: link.amountUsdMinor } : null;
+  } catch (error) {
+    unstable_rethrow(error);
+    console.error("[pagos] no se pudo leer el link de pago:", error instanceof Error ? error.name : typeof error);
+    return null;
+  }
+}
+
 /**
  * Lo que cambia en cada pedido de la pantalla de confirmación: el precio, quién mira y lo que dice la
  * dirección. Va dentro de un `Suspense`, y `connection()` corta la precarga, como en `PortalContent`.
- * El monto del campo oculto lo calcula el servidor con el valor de ahora, directo de la base.
+ * El monto del campo oculto lo calcula el servidor con el valor de ahora, directo de la base. En Temporada
+ * Pro el monto es el del link; sin un link que sirva no se muestra nada de ninguna venta.
  */
 export async function CheckoutContent({ locale, item, searchParams }: CheckoutContentProps) {
   const params = await searchParams;
   await connection();
   const reason = checkoutErrorFrom(first(params.error));
   const linkToken = inviteTokenFrom(first(params.link));
-  const slug = SERVICE_SLUGS[item];
+  const purchase = await loadPurchase(item, linkToken);
+  if (purchase === null) return <CheckoutProInvalid locale={locale} />;
+  const { slug, amountUsdMinor } = purchase;
   const screen = await loadScreenSafely();
 
   return (
@@ -72,7 +93,7 @@ export async function CheckoutContent({ locale, item, searchParams }: CheckoutCo
       {reason ? <CheckoutNotice reason={reason} /> : null}
       <div className="grid items-start gap-x-[clamp(32px,6vw,80px)] gap-y-10 md:grid-cols-[minmax(0,1fr)_minmax(0,27rem)]">
         <div className="min-w-0">
-          <CheckoutSummary item={item} rate={screen.rate} locale={locale} />
+          <CheckoutSummary priceUsd={amountUsdMinor / CENTS_PER_DOLLAR} rate={screen.rate} locale={locale} />
           <CheckoutLegal locale={locale} />
         </div>
         {!screen.canPay ? (
@@ -82,7 +103,7 @@ export async function CheckoutContent({ locale, item, searchParams }: CheckoutCo
             account={screen.account}
             slug={slug}
             locale={locale}
-            shownArsMinor={pesosForUsd(priceUsdMinor(item), screen.rate)}
+            shownArsMinor={pesosForUsd(amountUsdMinor, screen.rate)}
             linkToken={linkToken}
           />
         ) : (

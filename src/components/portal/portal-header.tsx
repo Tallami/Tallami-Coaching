@@ -4,9 +4,9 @@ import { Link } from "@/i18n/navigation";
 
 /**
  * Encabezado del portal: la marca, que vuelve a la portada, y el cambio de idioma. Sin la
- * navegación de la portada (sus links son anclas de esa página) y sin el botón de reservar.
+ * navegación de la portada (sus links son anclas de esa página) y sin el botón de reservar. `keepParams`: los parámetros de la dirección que sobreviven al cambio de idioma.
  */
-export async function PortalHeader() {
+export async function PortalHeader({ keepParams }: { keepParams?: readonly string[] } = {}) {
   const t = await getTranslations("Header");
 
   return (
@@ -14,7 +14,7 @@ export async function PortalHeader() {
       <Link href="/" translate="no" className="mr-auto text-[1.5rem] font-extrabold font-stretch-75% no-underline">
         Tallami<span className="text-gold">.</span>
       </Link>
-      <LocaleSwitcher label={t("languageLabel")} />
+      <LocaleSwitcher label={t("languageLabel")} keepParams={keepParams} />
     </header>
   );
 }

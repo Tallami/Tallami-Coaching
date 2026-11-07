@@ -8,9 +8,9 @@
 import { eq } from "drizzle-orm";
 import { createTranslator } from "next-intl";
 import { ITEM_LABELS, type SaleItem } from "@/admin/catalog";
-import { saleHref } from "@/admin/routes";
+import { applicationHref, saleHref } from "@/admin/routes";
 import type { Db } from "@/db/client";
-import { customers, orders, sales } from "@/db/schema";
+import { customers, orders, proApplications, sales } from "@/db/schema";
 import { isUuid } from "@/db/uuid";
 import { sendPublicEmail, sendTallamiEmail, type EmailDeps, type EmailMessage } from "@/email/send";
 import type { Locale } from "@/i18n/routing";
@@ -215,5 +215,33 @@ export async function notifyReplayCodesSent(db: Db, saleId: string, deps: EmailD
     );
   } catch (error) {
     console.error("[pagos] no se pudo avisar de los códigos:", error instanceof Error ? error.name : typeof error);
+  }
+}
+
+/** Avisa a Tallami de una aplicación nueva a la Temporada Pro. Nunca tira. */
+export async function notifyProApplication(
+  application: typeof proApplications.$inferSelect,
+  deps: EmailDeps = {},
+): Promise<void> {
+  try {
+    await sendTallamiEmail(
+      {
+        subject: `Aplicación a Temporada Pro: ${application.name}`,
+        text: [
+          "Llegó una aplicación nueva a la Temporada Pro.",
+          "",
+          `Nombre: ${application.name}`,
+          `Discord: ${application.discord}`,
+          `Integrantes: ${application.teamMembers}`,
+          `Resultados: ${application.results}`,
+          ...(application.message ? [`Mensaje: ${application.message}`] : []),
+          "",
+          `Aplicación: ${SITE_URL}${applicationHref(application.id)}`,
+        ].join("\n"),
+      },
+      deps,
+    );
+  } catch (error) {
+    console.error("[pro] no se pudo avisar de la aplicación:", error instanceof Error ? error.name : typeof error);
   }
 }

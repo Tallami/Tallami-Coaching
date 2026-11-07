@@ -17,6 +17,7 @@ import type { Db } from "@/db/client";
 import { customers, orders, portalAccounts, sales } from "@/db/schema";
 import { isUuid } from "@/db/uuid";
 import { linkAccountToCustomer } from "@/portal/accounts";
+import { markProPaymentLinkPaid } from "@/pro/payment-links";
 import type { OrderStatus } from "./policy";
 import type { PaymentStatus, ProviderPayment } from "./provider";
 
@@ -83,10 +84,14 @@ function noChange(order: Order): ApplyOutcome {
 }
 
 async function saveOrder(
-  { tx, order, payment }: Application,
+  { tx, order, payment, now }: Application,
   status: OrderStatus,
   saleId: string | null = order.saleId,
 ): Promise<void> {
+  // Un pedido aprobado gasta el link de Temporada Pro con el que se armó: solo ese.
+  if (status === "approved" && order.proPaymentLinkId !== null) {
+    await markProPaymentLinkPaid(tx, order.proPaymentLinkId, now);
+  }
   await tx
     .update(orders)
     .set({ status, saleId, providerPaymentId: payment.providerPaymentId })

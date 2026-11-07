@@ -259,12 +259,54 @@
       "link-invalid": "Ese link de pago no sirve: venció o ya se usó. Pedile otro a Tallami.",
       "provider": "Mercado Pago no respondió y no se te cobró nada. Probá de nuevo en unos minutos."
     },
+    "pro": {
+      "invalidTitle": "Este link de pago no sirve",
+      "invalidBody": "Venció, ya se usó o no existe. Si ya hablaste con Tallami, pedile otro. Si todavía no, aplicá a la Temporada Pro.",
+      "apply": "Ir a la aplicación"
+    },
     "legal": {
       "label": "Antes de pagar",
       "terms": "Términos",
       "refunds": "Reembolsos",
       "privacy": "Privacidad",
       "outsideArgentina": "¿No estás en Argentina? Escribime"
+    }
+  },
+  "Pro": {
+    "metaTitle": "Aplicar a Temporada Pro · Tallami Coaching",
+    "metaDescription": "Contame quiénes son y cómo vienen jugando. Te escribo por Discord para ver si encajamos.",
+    "eyebrow": "Temporada Pro",
+    "title": "Aplicá con tu equipo",
+    "intro": "La Temporada Pro es coaching para tu dúo o trío durante toda la temporada, y se entra por aplicación. Contame quiénes son y cómo vienen jugando: te escribo por Discord y, si encajamos, te mando un link de pago.",
+    "form": {
+      "label": "Aplicación a Temporada Pro",
+      "name": "Tu nombre",
+      "discord": "Tu usuario de Discord",
+      "discordHint": "Para que pueda escribirte.",
+      "teamMembers": "Integrantes del equipo",
+      "teamMembersHint": "Los nombres en el juego, uno por línea.",
+      "results": "Mejores resultados",
+      "resultsHint": "Torneos y puestos de las últimas temporadas.",
+      "message": "Mensaje",
+      "optional": "(opcional)",
+      "messageHint": "Lo que quieras contarme del equipo o de lo que buscan.",
+      "privacy": "Acepto que Tallami use estos datos para contestarme a esta aplicación.",
+      "submit": "Enviar aplicación",
+      "submitting": "Enviando…",
+      "trap": "Dejá este campo vacío",
+      "summary": "Revisá los campos marcados."
+    },
+    "errors": {
+      "required": "Completá este campo.",
+      "tooLong": "Es demasiado largo (máximo {max} caracteres).",
+      "privacy": "Marcá la casilla para poder enviar.",
+      "limited": "Mandaste varias aplicaciones en poco tiempo. Probá de nuevo en una hora.",
+      "failed": "No pudimos guardar tu aplicación. Probá de nuevo en unos minutos."
+    },
+    "sent": {
+      "title": "Recibí tu aplicación",
+      "body": "Gracias. La leo y te escribo por Discord para ver cómo seguimos.",
+      "home": "Volver al inicio"
     }
   },
   "Emails": {

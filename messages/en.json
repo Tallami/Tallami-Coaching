@@ -259,12 +259,54 @@
       "link-invalid": "That payment link doesn't work: it expired or was already used. Ask Tallami for a new one.",
       "provider": "Mercado Pago didn't respond and you weren't charged. Try again in a few minutes."
     },
+    "pro": {
+      "invalidTitle": "This payment link doesn't work",
+      "invalidBody": "It expired, was already used, or doesn't exist. If you already talked to Tallami, ask for a new one. If not, apply to Temporada Pro.",
+      "apply": "Go to the application"
+    },
     "legal": {
       "label": "Before you pay",
       "terms": "Terms",
       "refunds": "Refunds",
       "privacy": "Privacy",
       "outsideArgentina": "Not in Argentina? Write to me"
+    }
+  },
+  "Pro": {
+    "metaTitle": "Apply to Temporada Pro · Tallami Coaching",
+    "metaDescription": "Tell me who you are and how you've been playing. I'll message you on Discord to see if we're a fit.",
+    "eyebrow": "Temporada Pro",
+    "title": "Apply with your team",
+    "intro": "Temporada Pro is coaching for your duo or trio for the whole season, and you join by applying. Tell me who you are and how you've been playing: I'll message you on Discord and, if we're a fit, send you a payment link.",
+    "form": {
+      "label": "Temporada Pro application",
+      "name": "Your name",
+      "discord": "Your Discord username",
+      "discordHint": "So I can message you.",
+      "teamMembers": "Team members",
+      "teamMembersHint": "In-game names, one per line.",
+      "results": "Best results",
+      "resultsHint": "Tournaments and placements from recent seasons.",
+      "message": "Message",
+      "optional": "(optional)",
+      "messageHint": "Anything you want to tell me about the team or what you're looking for.",
+      "privacy": "I agree that Tallami may use this information to reply to this application.",
+      "submit": "Send application",
+      "submitting": "Sending…",
+      "trap": "Leave this field empty",
+      "summary": "Please review the marked fields."
+    },
+    "errors": {
+      "required": "Fill in this field.",
+      "tooLong": "That's too long (maximum {max} characters).",
+      "privacy": "Tick the box to send.",
+      "limited": "You sent several applications in a short time. Try again in an hour.",
+      "failed": "We couldn't save your application. Try again in a few minutes."
+    },
+    "sent": {
+      "title": "I got your application",
+      "body": "Thanks. I'll read it and message you on Discord to talk about next steps.",
+      "home": "Back to home"
     }
   },
   "Emails": {

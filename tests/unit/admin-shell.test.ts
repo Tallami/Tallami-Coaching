@@ -27,6 +27,7 @@ describe("AdminShell", () => {
       "Ventas",
       "Servicios",
       "Alumnos",
+      "Aplicaciones",
       "Facturación",
       "Configuración",
     ]);

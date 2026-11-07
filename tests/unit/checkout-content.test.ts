@@ -91,7 +91,7 @@ describe("the purchase screen", () => {
   test("without a session it shows the price in both currencies and the ways to sign in, coming back to this same screen, and no form", async () => {
     const tree = await screen();
 
-    expect(propsOf(tree, CheckoutSummary)).toEqual({ item: "vodRecorded", rate: "1500.0000", locale: "es" });
+    expect(propsOf(tree, CheckoutSummary)).toEqual({ priceUsd: 30, rate: "1500.0000", locale: "es" });
     expect(propsOf(tree, CheckoutSignIn)).toEqual({
       providers: ["test"],
       locale: "es",

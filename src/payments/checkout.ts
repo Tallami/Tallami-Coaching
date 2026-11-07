@@ -10,6 +10,7 @@ import type { Db } from "@/db/client";
 import type { Locale } from "@/i18n/routing";
 import { SITE_URL } from "@/lib/site-url";
 import type { PortalAccount } from "@/portal/accounts";
+import { readProPaymentLink } from "@/pro/payment-links";
 import en from "../../messages/en.json";
 import es from "../../messages/es.json";
 import pt from "../../messages/pt.json";
@@ -49,6 +50,16 @@ function errorName(error: unknown): string {
   return error instanceof Error ? error.name : typeof error;
 }
 
+function serviceName(locale: Locale, item: ServiceId | "proSeason"): string {
+  const { Services } = CATALOGS[locale];
+  return item === "proSeason" ? Services.pro.name : Services.items[item].name;
+}
+
+/** El link de la dirección si sirve; un token que no es texto o que no existe es `null`. */
+function readProLink(db: Db, token: string | null, now: Date) {
+  return token ? readProPaymentLink(db, token, now) : Promise.resolve(null);
+}
+
 function failed(reason: CheckoutErrorReason): CheckoutResult {
   return { kind: "error", reason };
 }
@@ -77,15 +88,16 @@ export async function startCheckout(
   input: CheckoutInput,
   now: Date = new Date(),
 ): Promise<CheckoutResult> {
-  const { account, item, adultConfirmed, shownArsMinor, locale } = input;
-  // Temporada Pro se paga solo con su link, que llega con la página de aplicaciones.
-  if (item === "proSeason") return failed("link-invalid");
+  const { account, item, adultConfirmed, shownArsMinor, locale, linkToken } = input;
+  // Temporada Pro se paga solo con su link: de él salen el monto y a qué link se ata el pedido.
+  const link = item === "proSeason" ? await readProLink(db, linkToken, now) : null;
+  if (item === "proSeason" && link === null) return failed("link-invalid");
 
   const { canPay, rate } = await getPaymentAvailability(db);
   if (!canPay || rate === null) return failed("unavailable");
   if (!adultConfirmed) return failed("adult");
 
-  const amountUsdMinor = priceUsdMinor(item);
+  const amountUsdMinor = link ? link.amountUsdMinor : priceUsdMinor(item as ServiceId);
   const amountArsMinor = pesosForUsd(amountUsdMinor, rate);
   if (shownArsMinor !== amountArsMinor) return failed("price-changed");
 
@@ -102,6 +114,7 @@ export async function startCheckout(
     amountArsMinor,
     adultConfirmedAt: now,
     locale,
+    proPaymentLinkId: link?.id ?? null,
     createdAt: now,
     expiresAt,
   });
@@ -109,7 +122,7 @@ export async function startCheckout(
   try {
     const { redirectUrl } = await client.createCheckout({
       orderId: order.id,
-      title: `Tallami Coaching: ${CATALOGS[locale].Services.items[item].name}`,
+      title: `Tallami Coaching: ${serviceName(locale, item)}`,
       amountArsMinor,
       payerEmail: account.email,
       expiresAt,
