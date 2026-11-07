@@ -120,7 +120,11 @@
   "Footer": {
     "socialLabel": "Redes sociais",
     "portal": "Portal do aluno",
-    "legal": "© {year} Tallami Coaching. Não afiliado nem endossado pela Epic Games."
+    "legal": "© {year} Tallami Coaching. Não afiliado nem endossado pela Epic Games.",
+    "legalLinks": "Solicitações e contato",
+    "withdrawal": "BOTÓN DE ARREPENTIMIENTO",
+    "cancellation": "BOTÓN DE BAJA DE SERVICIO",
+    "contact": "Contato"
   },
   "Portal": {
     "metaTitle": "Portal do aluno · Tallami Coaching",
@@ -141,9 +145,18 @@
       "providersLabel": "Formas de entrar"
     },
     "providers": {
-      "discord": { "name": "Discord", "button": "Entrar com o Discord" },
-      "google": { "name": "Google", "button": "Entrar com o Google" },
-      "test": { "name": "Conta de teste", "button": "Entrar com a conta de teste" }
+      "discord": {
+        "name": "Discord",
+        "button": "Entrar com o Discord"
+      },
+      "google": {
+        "name": "Google",
+        "button": "Entrar com o Google"
+      },
+      "test": {
+        "name": "Conta de teste",
+        "button": "Entrar com a conta de teste"
+      }
     },
     "notices": {
       "signInFailed": "Não conseguimos concluir o login. Tente de novo.",
@@ -206,7 +219,11 @@
       "viewPdf": "Ver PDF",
       "openLink": "Abrir",
       "opensInNewTab": "(abre em uma nova aba)",
-      "kinds": { "youtube": "Vídeo", "pdf": "PDF", "link": "Link" }
+      "kinds": {
+        "youtube": "Vídeo",
+        "pdf": "PDF",
+        "link": "Link"
+      }
     },
     "replay": {
       "title": "Códigos de replay",
@@ -319,11 +336,72 @@
       "refund": "Você tem 10 dias a partir da compra para pedir o reembolso completo, exceto se o serviço já tiver sido entregue.",
       "signature": "Tomás Allami (Tallami)",
       "replay": "Para começar, cole os códigos de replay das suas partidas no seu portal. O review chega {hours} horas depois de recebermos os códigos."
+    },
+    "request": {
+      "greeting": "Olá, {name}:",
+      "signature": "Tomás Allami (Tallami)",
+      "withdrawal": {
+        "subject": "Recebemos o seu pedido de arrependimento ({code})",
+        "body": "Recebi o seu pedido de arrependimento. Seu código de acompanhamento é {code}. Respondo por aqui no horário de atendimento: segunda a sexta, das 10h às 18h, horário da Argentina."
+      },
+      "cancellation": {
+        "subject": "Recebemos o seu pedido de cancelamento de serviço ({code})",
+        "body": "Recebi o seu pedido de cancelamento de serviço. Seu código de acompanhamento é {code}. Respondo por aqui no horário de atendimento: segunda a sexta, das 10h às 18h, horário da Argentina."
+      }
     }
   },
   "NotFound": {
     "title": "Não encontramos esta página",
     "body": "Talvez o link esteja errado ou a página não exista mais.",
     "back": "Voltar ao início"
+  },
+  "SiteRequests": {
+    "withdrawal": {
+      "metaTitle": "Botão de arrependimento · Tallami Coaching",
+      "title": "Botão de arrependimento",
+      "intro": "Se você comprou um serviço e se arrependeu, preencha estes dados. Você tem 10 dias a partir da compra. Te envio um email com um código de acompanhamento e respondo no horário de atendimento.",
+      "submit": "Pedir o arrependimento"
+    },
+    "cancellation": {
+      "metaTitle": "Botão de cancelamento de serviço · Tallami Coaching",
+      "title": "Botão de cancelamento de serviço",
+      "intro": "Se quer cancelar um serviço que contratou, preencha estes dados. Te envio um email com um código de acompanhamento e respondo no horário de atendimento.",
+      "submit": "Pedir o cancelamento"
+    },
+    "contact": {
+      "metaTitle": "Contato · Tallami Coaching",
+      "title": "Contato",
+      "intro": "Escreva a sua dúvida e eu respondo por email.",
+      "hoursLabel": "Horário de atendimento",
+      "submit": "Enviar mensagem"
+    },
+    "hours": "segunda a sexta, das 10h às 18h, horário da Argentina",
+    "form": {
+      "label": "Formulário",
+      "name": "Seu nome",
+      "email": "Seu email",
+      "emailHint": "Neste email chegam o comprovante e a resposta.",
+      "orderReference": "Compra",
+      "orderReferenceHint": "O que você comprou e quando, ou o número do pedido, se tiver.",
+      "message": "Mensagem",
+      "optional": "(opcional)",
+      "trap": "Deixe este campo vazio",
+      "summary": "Revise os campos marcados.",
+      "submitting": "Enviando…"
+    },
+    "errors": {
+      "required": "Preencha este campo.",
+      "invalid": "Escreva um email válido.",
+      "tooLong": "Está longo demais (máximo de {max} caracteres).",
+      "limited": "Você enviou vários pedidos em pouco tempo. Tente de novo em uma hora.",
+      "failed": "Não conseguimos salvar o seu pedido. Tente de novo em alguns minutos."
+    },
+    "sent": {
+      "title": "Recebi o seu pedido",
+      "codeLabel": "Seu código de acompanhamento",
+      "contactBody": "Obrigado por escrever. Respondo por email no horário de atendimento.",
+      "home": "Voltar ao início",
+      "saveCode": "Guarde este código. Se em alguns minutos o email de comprovante não chegar, olhe o spam."
+    }
   }
 }

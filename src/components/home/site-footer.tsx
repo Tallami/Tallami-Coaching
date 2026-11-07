@@ -48,6 +48,38 @@ export async function SiteFooter() {
             {t("portal")}
           </Link>
         </div>
+        {/* Los dos botones que exige la norma, con el nombre que ella les da, en los tres idiomas. */}
+        <nav aria-label={t("legalLinks")} className="basis-full">
+          <ul className="m-0 flex list-none flex-wrap gap-x-[22px] gap-y-1 p-0">
+            <li>
+              <Link
+                href="/arrepentimiento"
+                prefetch={false}
+                className="inline-block py-2.5 font-medium text-on-stage-2 no-underline hover:text-on-stage"
+              >
+                {t("withdrawal")}
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/baja"
+                prefetch={false}
+                className="inline-block py-2.5 font-medium text-on-stage-2 no-underline hover:text-on-stage"
+              >
+                {t("cancellation")}
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/contacto"
+                prefetch={false}
+                className="inline-block py-2.5 font-medium text-on-stage-2 no-underline hover:text-on-stage"
+              >
+                {t("contact")}
+              </Link>
+            </li>
+          </ul>
+        </nav>
         <small className="text-on-stage-2 [font-size:smaller]">
           {t("legal", { year: COPYRIGHT_YEAR })}
         </small>

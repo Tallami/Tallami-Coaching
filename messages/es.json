@@ -120,7 +120,11 @@
   "Footer": {
     "socialLabel": "Redes",
     "portal": "Portal de alumnos",
-    "legal": "© {year} Tallami Coaching. No afiliado ni respaldado por Epic Games."
+    "legal": "© {year} Tallami Coaching. No afiliado ni respaldado por Epic Games.",
+    "legalLinks": "Trámites y contacto",
+    "withdrawal": "BOTÓN DE ARREPENTIMIENTO",
+    "cancellation": "BOTÓN DE BAJA DE SERVICIO",
+    "contact": "Contacto"
   },
   "Portal": {
     "metaTitle": "Portal de alumnos · Tallami Coaching",
@@ -141,9 +145,18 @@
       "providersLabel": "Formas de entrar"
     },
     "providers": {
-      "discord": { "name": "Discord", "button": "Entrar con Discord" },
-      "google": { "name": "Google", "button": "Entrar con Google" },
-      "test": { "name": "Cuenta de prueba", "button": "Entrar con la cuenta de prueba" }
+      "discord": {
+        "name": "Discord",
+        "button": "Entrar con Discord"
+      },
+      "google": {
+        "name": "Google",
+        "button": "Entrar con Google"
+      },
+      "test": {
+        "name": "Cuenta de prueba",
+        "button": "Entrar con la cuenta de prueba"
+      }
     },
     "notices": {
       "signInFailed": "No pudimos completar el ingreso. Probá de nuevo.",
@@ -206,7 +219,11 @@
       "viewPdf": "Ver PDF",
       "openLink": "Abrir",
       "opensInNewTab": "(se abre en una pestaña nueva)",
-      "kinds": { "youtube": "Video", "pdf": "PDF", "link": "Link" }
+      "kinds": {
+        "youtube": "Video",
+        "pdf": "PDF",
+        "link": "Link"
+      }
     },
     "replay": {
       "title": "Códigos de replay",
@@ -319,11 +336,72 @@
       "refund": "Tenés 10 días desde la compra para pedir el reembolso completo, salvo que el servicio ya esté entregado.",
       "signature": "Tomás Allami (Tallami)",
       "replay": "Para empezar, pegá los códigos de replay de tus partidas en tu portal. El review llega {hours} horas después de que los recibamos."
+    },
+    "request": {
+      "greeting": "Hola, {name}:",
+      "signature": "Tomás Allami (Tallami)",
+      "withdrawal": {
+        "subject": "Recibimos tu pedido de arrepentimiento ({code})",
+        "body": "Recibí tu pedido de arrepentimiento. Tu código de seguimiento es {code}. Te respondo por este medio en el horario de atención: lunes a viernes, de 10 a 18, hora de Argentina."
+      },
+      "cancellation": {
+        "subject": "Recibimos tu pedido de baja de servicio ({code})",
+        "body": "Recibí tu pedido de baja de servicio. Tu código de seguimiento es {code}. Te respondo por este medio en el horario de atención: lunes a viernes, de 10 a 18, hora de Argentina."
+      }
     }
   },
   "NotFound": {
     "title": "No encontramos esta página",
     "body": "Puede que el link esté mal o que la página ya no exista.",
     "back": "Volver al inicio"
+  },
+  "SiteRequests": {
+    "withdrawal": {
+      "metaTitle": "Botón de arrepentimiento · Tallami Coaching",
+      "title": "Botón de arrepentimiento",
+      "intro": "Si compraste un servicio y te arrepentiste, completá estos datos. Tenés 10 días desde la compra. Te mando un email con un código de seguimiento y te respondo en el horario de atención.",
+      "submit": "Pedir el arrepentimiento"
+    },
+    "cancellation": {
+      "metaTitle": "Botón de baja de servicio · Tallami Coaching",
+      "title": "Botón de baja de servicio",
+      "intro": "Si querés dar de baja un servicio que contrataste, completá estos datos. Te mando un email con un código de seguimiento y te respondo en el horario de atención.",
+      "submit": "Pedir la baja"
+    },
+    "contact": {
+      "metaTitle": "Contacto · Tallami Coaching",
+      "title": "Contacto",
+      "intro": "Escribime tu consulta y te contesto por email.",
+      "hoursLabel": "Horario de atención",
+      "submit": "Enviar mensaje"
+    },
+    "hours": "lunes a viernes, de 10 a 18, hora de Argentina",
+    "form": {
+      "label": "Formulario",
+      "name": "Tu nombre",
+      "email": "Tu email",
+      "emailHint": "A este email te llega la constancia y la respuesta.",
+      "orderReference": "Compra",
+      "orderReferenceHint": "Qué compraste y cuándo, o el número de pedido si lo tenés.",
+      "message": "Mensaje",
+      "optional": "(opcional)",
+      "trap": "Dejá este campo vacío",
+      "summary": "Revisá los campos marcados.",
+      "submitting": "Enviando…"
+    },
+    "errors": {
+      "required": "Completá este campo.",
+      "invalid": "Escribí un email válido.",
+      "tooLong": "Es demasiado largo (máximo {max} caracteres).",
+      "limited": "Mandaste varios pedidos en poco tiempo. Probá de nuevo en una hora.",
+      "failed": "No pudimos guardar tu pedido. Probá de nuevo en unos minutos."
+    },
+    "sent": {
+      "title": "Recibí tu pedido",
+      "codeLabel": "Tu código de seguimiento",
+      "contactBody": "Gracias por escribirme. Te contesto por email en el horario de atención.",
+      "home": "Volver al inicio",
+      "saveCode": "Guardá este código. Si en unos minutos no te llega el email con la constancia, revisá el correo no deseado."
+    }
   }
 }

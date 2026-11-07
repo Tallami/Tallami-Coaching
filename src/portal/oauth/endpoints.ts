@@ -34,6 +34,7 @@ import { shouldUseSecureCookie } from "@/admin/auth/request";
 import { checkoutHref } from "@/content/services";
 import type { Db } from "@/db/client";
 import { routing, type Locale } from "@/i18n/routing";
+import { purgeExpiredRecords } from "@/payments/retention";
 import { upsertAccountFromIdentity } from "../accounts";
 import { isPortalConfigured, type PortalProvider } from "../config";
 import { inviteOutcome, redeemInvite, type InviteOutcome } from "../invites";
@@ -152,7 +153,8 @@ export function handleSignInStart(
 }
 
 /**
- * Borra las sesiones, las invitaciones y las cuentas sin vincular viejas. Es una limpieza
+ * Borra las sesiones, las invitaciones y las cuentas sin vincular viejas, y los pedidos y
+ * registros públicos vencidos (`purgeExpiredRecords`). Es una limpieza
  * de pasada: si falla, el alumno igual entra. Se anota solo el nombre del error (el mensaje
  * podría traer la conexión a la base).
  */
@@ -161,6 +163,11 @@ async function purgeQuietly(db: Db, now: Date): Promise<void> {
     await purgePortalRecords(db, now);
   } catch (error) {
     console.error(`Portal: no se pudieron borrar los registros viejos. ${errorName(error)}`);
+  }
+  try {
+    await purgeExpiredRecords(db, now);
+  } catch (error) {
+    console.error(`Pagos: no se pudieron borrar los registros vencidos. ${errorName(error)}`);
   }
 }
 

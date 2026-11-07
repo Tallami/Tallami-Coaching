@@ -120,7 +120,11 @@
   "Footer": {
     "socialLabel": "Social media",
     "portal": "Student portal",
-    "legal": "© {year} Tallami Coaching. Not affiliated with or endorsed by Epic Games."
+    "legal": "© {year} Tallami Coaching. Not affiliated with or endorsed by Epic Games.",
+    "legalLinks": "Requests and contact",
+    "withdrawal": "BOTÓN DE ARREPENTIMIENTO",
+    "cancellation": "BOTÓN DE BAJA DE SERVICIO",
+    "contact": "Contact"
   },
   "Portal": {
     "metaTitle": "Student portal · Tallami Coaching",
@@ -141,9 +145,18 @@
       "providersLabel": "Ways to sign in"
     },
     "providers": {
-      "discord": { "name": "Discord", "button": "Sign in with Discord" },
-      "google": { "name": "Google", "button": "Sign in with Google" },
-      "test": { "name": "Test account", "button": "Sign in with the test account" }
+      "discord": {
+        "name": "Discord",
+        "button": "Sign in with Discord"
+      },
+      "google": {
+        "name": "Google",
+        "button": "Sign in with Google"
+      },
+      "test": {
+        "name": "Test account",
+        "button": "Sign in with the test account"
+      }
     },
     "notices": {
       "signInFailed": "We couldn't complete the sign-in. Try again.",
@@ -206,7 +219,11 @@
       "viewPdf": "View PDF",
       "openLink": "Open",
       "opensInNewTab": "(opens in a new tab)",
-      "kinds": { "youtube": "Video", "pdf": "PDF", "link": "Link" }
+      "kinds": {
+        "youtube": "Video",
+        "pdf": "PDF",
+        "link": "Link"
+      }
     },
     "replay": {
       "title": "Replay codes",
@@ -319,11 +336,72 @@
       "refund": "You have 10 days from the purchase to ask for a full refund, unless the service has already been delivered.",
       "signature": "Tomás Allami (Tallami)",
       "replay": "To get started, paste the replay codes of your matches in your portal. The review arrives {hours} hours after we receive them."
+    },
+    "request": {
+      "greeting": "Hi, {name}:",
+      "signature": "Tomás Allami (Tallami)",
+      "withdrawal": {
+        "subject": "We received your withdrawal request ({code})",
+        "body": "I received your withdrawal request. Your tracking code is {code}. I'll reply here during business hours: Monday to Friday, 10 am to 6 pm, Argentina time."
+      },
+      "cancellation": {
+        "subject": "We received your service cancellation request ({code})",
+        "body": "I received your service cancellation request. Your tracking code is {code}. I'll reply here during business hours: Monday to Friday, 10 am to 6 pm, Argentina time."
+      }
     }
   },
   "NotFound": {
     "title": "We couldn't find this page",
     "body": "The link may be wrong, or the page may no longer exist.",
     "back": "Back to home"
+  },
+  "SiteRequests": {
+    "withdrawal": {
+      "metaTitle": "Withdrawal button · Tallami Coaching",
+      "title": "Withdrawal button",
+      "intro": "If you bought a service and changed your mind, fill in these details. You have 10 days from the purchase. I'll email you a tracking code and reply during business hours.",
+      "submit": "Request the withdrawal"
+    },
+    "cancellation": {
+      "metaTitle": "Service cancellation button · Tallami Coaching",
+      "title": "Service cancellation button",
+      "intro": "If you want to cancel a service you signed up for, fill in these details. I'll email you a tracking code and reply during business hours.",
+      "submit": "Request the cancellation"
+    },
+    "contact": {
+      "metaTitle": "Contact · Tallami Coaching",
+      "title": "Contact",
+      "intro": "Write your question and I'll answer by email.",
+      "hoursLabel": "Business hours",
+      "submit": "Send message"
+    },
+    "hours": "Monday to Friday, 10 am to 6 pm, Argentina time",
+    "form": {
+      "label": "Form",
+      "name": "Your name",
+      "email": "Your email",
+      "emailHint": "Your receipt and my reply go to this email.",
+      "orderReference": "Purchase",
+      "orderReferenceHint": "What you bought and when, or the order number if you have it.",
+      "message": "Message",
+      "optional": "(optional)",
+      "trap": "Leave this field empty",
+      "summary": "Check the marked fields.",
+      "submitting": "Sending…"
+    },
+    "errors": {
+      "required": "Fill in this field.",
+      "invalid": "Enter a valid email.",
+      "tooLong": "That's too long (maximum {max} characters).",
+      "limited": "You sent several requests in a short time. Try again in an hour.",
+      "failed": "We couldn't save your request. Try again in a few minutes."
+    },
+    "sent": {
+      "title": "I got your request",
+      "codeLabel": "Your tracking code",
+      "contactBody": "Thanks for writing. I'll reply by email during business hours.",
+      "home": "Back to home",
+      "saveCode": "Keep this code. If the confirmation email doesn't arrive in a few minutes, check your spam folder."
+    }
   }
 }

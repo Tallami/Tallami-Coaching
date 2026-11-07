@@ -9,6 +9,7 @@ export const ADMIN_ROUTES = {
   newSale: "/admin/ventas/nueva",
   salesExport: "/admin/ventas/exportar",
   applications: "/admin/aplicaciones",
+  siteRequests: "/admin/pedidos",
   students: "/admin/alumnos",
   newStudent: "/admin/alumnos/nuevo",
   services: "/admin/servicios",

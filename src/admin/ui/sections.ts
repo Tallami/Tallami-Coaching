@@ -4,6 +4,7 @@
 import {
   FileTextIcon,
   InboxIcon,
+  MailQuestionIcon,
   LayoutDashboardIcon,
   LayersIcon,
   ReceiptTextIcon,
@@ -19,6 +20,7 @@ export const ADMIN_SECTIONS = [
   { id: "services", label: "Servicios", href: ADMIN_ROUTES.services, icon: LayersIcon },
   { id: "students", label: "Alumnos", href: ADMIN_ROUTES.students, icon: UsersIcon },
   { id: "applications", label: "Aplicaciones", href: ADMIN_ROUTES.applications, icon: InboxIcon },
+  { id: "siteRequests", label: "Pedidos del sitio", href: ADMIN_ROUTES.siteRequests, icon: MailQuestionIcon },
   { id: "billing", label: "Facturación", href: ADMIN_ROUTES.billing, icon: FileTextIcon },
   { id: "settings", label: "Configuración", href: ADMIN_ROUTES.settings, icon: SettingsIcon },
 ] as const satisfies readonly {
