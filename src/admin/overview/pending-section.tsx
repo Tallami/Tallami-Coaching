@@ -111,6 +111,7 @@ function FoldedRows<T extends { id: string }>({ items, renderRow }: FoldedRowsPr
 }
 
 function deliveryWhen(delivery: PendingDelivery, today: string): string {
+  if (delivery.waitingForCodes) return "faltan los códigos del alumno";
   if (delivery.dueAt === null) return "sin fecha de entrega";
   const day = formatDueDay(delivery.dueAt, today);
   return delivery.overdue ? `venció el ${day}` : `vence el ${day}`;
@@ -164,6 +165,26 @@ function Sessions({ sessions }: { sessions: readonly UpcomingSession[] }) {
             />
           ))}
         </ul>
+      )}
+    </Block>
+  );
+}
+
+function Coordinate({ sales }: { sales: readonly PendingSaleRef[] }) {
+  return (
+    <Block
+      testId="pending-coordinate"
+      title="Por coordinar"
+      count={sales.length}
+      hint="VOD reviews en vivo y Temporadas Pro cobrados que todavía no tienen día: escribile al alumno para acordarlo."
+    >
+      {sales.length === 0 ? (
+        <NothingPending />
+      ) : (
+        <FoldedRows
+          items={sales}
+          renderRow={(sale) => <PendingRow key={sale.id} sale={sale} when="sin día acordado" />}
+        />
       )}
     </Block>
   );
@@ -231,7 +252,7 @@ function Uninvoiced({ uninvoiced }: { uninvoiced: OverviewData["pending"]["uninv
 
 /** Lo que no hay que olvidarse: entregas, sesiones, sesiones sin marcar y ventas sin facturar. No depende del período. */
 export function PendingSection({ data }: { data: OverviewData }) {
-  const { deliveries, sessions, toMark, uninvoiced } = data.pending;
+  const { deliveries, sessions, toMark, toCoordinate, uninvoiced } = data.pending;
   return (
     <SectionCard
       id="pendientes"
@@ -248,6 +269,7 @@ export function PendingSection({ data }: { data: OverviewData }) {
         </div>
         <div className="flex min-w-0 flex-col gap-7">
           <Sessions sessions={sessions} />
+          <Coordinate sales={toCoordinate} />
           <Uninvoiced uninvoiced={uninvoiced} />
         </div>
       </div>

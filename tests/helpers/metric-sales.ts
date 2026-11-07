@@ -39,6 +39,7 @@ export function sale({ dollars = 40, ...overrides }: SaleOverrides = {}): Metric
     paymentMethod: "transfer",
     country: "AR",
     invoiceStatus: "issued",
+    replayCodesSentAt: null,
     ...overrides,
   };
 }

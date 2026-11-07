@@ -41,6 +41,7 @@ const metricColumns = {
   paidOn: sales.paidOn,
   dueAt: sales.dueAt,
   deliveredAt: sales.deliveredAt,
+  replayCodesSentAt: sales.replayCodesSentAt,
   amountArsMinor: sales.amountArsMinor,
   amountUsdMinor: sales.amountUsdMinor,
   paymentMethod: sales.paymentMethod,
@@ -58,6 +59,7 @@ interface RawMetricRow {
   paidOn: string | null;
   dueAt: Date | null;
   deliveredAt: Date | null;
+  replayCodesSentAt: Date | null;
   amountArsMinor: number;
   amountUsdMinor: number;
   paymentMethod: string;
@@ -80,6 +82,7 @@ function toMetricSale(row: RawMetricRow): MetricSale {
     paidOn: row.paidOn,
     dueAt: row.dueAt?.toISOString() ?? null,
     deliveredAt: row.deliveredAt?.toISOString() ?? null,
+    replayCodesSentAt: row.replayCodesSentAt?.toISOString() ?? null,
     amountArsMinor: row.amountArsMinor,
     amountUsdMinor: row.amountUsdMinor,
     paymentMethod: row.paymentMethod as PaymentMethod,

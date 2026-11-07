@@ -3,8 +3,10 @@ import type { Db } from "@/db/client";
 import { getPublicEmailSetup, sendPublicEmail, sendTallamiEmail, type EmailMessage } from "@/email/send";
 import { SITE_URL } from "@/lib/site-url";
 import { applyProviderPayment, type ApplyOutcome } from "@/payments/apply";
-import { notifyPaymentOutcome } from "@/payments/emails";
+import { sales } from "@/db/schema";
+import { notifyPaymentOutcome, notifyReplayCodesSent } from "@/payments/emails";
 import { createTestDb } from "../helpers/db";
+import { insertTestCustomer, insertTestSale } from "../helpers/portal";
 import { insertTestOrder, testPayment, type TestOrder } from "../helpers/orders";
 
 const TALLAMI_EMAIL = "tallami-privado@example.com";
@@ -381,5 +383,57 @@ describe("notifyPaymentOutcome: it never breaks anything", () => {
 
     expect(loggedText().length).toBeGreaterThan(0);
     expect(loggedText()).not.toContain("clave@base");
+  });
+});
+
+describe("notifyReplayCodesSent", () => {
+  async function sentSale(overrides: Partial<typeof sales.$inferInsert> = {}) {
+    const customerId = await insertTestCustomer(db, "Ana");
+    return insertTestSale(db, customerId, {
+      item: "vodRecorded",
+      replayCodes: "CODIGO-SECRETO-123",
+      replayCodesSentAt: new Date("2026-11-05T15:00:00.000Z"),
+      dueAt: new Date("2026-11-08T15:00:00.000Z"),
+      ...overrides,
+    });
+  }
+
+  test("tells Tallami who sent the codes, until when to deliver and where the sale is, without the codes", async () => {
+    const saleId = await sentSale();
+    const { sent, transport } = recorder();
+
+    await notifyReplayCodesSent(db, saleId, { transport });
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0].to).toBe(TALLAMI_EMAIL);
+    expect(sent[0].subject).toContain("VOD review de 3 partidas");
+    expect(sent[0].text).toContain("Ana");
+    expect(sent[0].text).toContain("08/11/2026, 12:00");
+    expect(sent[0].text).toContain(`${SITE_URL}/admin/ventas/${saleId}`);
+    expect(sent[0].text).not.toContain("CODIGO-SECRETO-123");
+  });
+
+  test("sends nothing for a sale without codes or for something that is not an id, and never throws", async () => {
+    const withoutCodes = await sentSale({ replayCodes: null, replayCodesSentAt: null });
+    const { sent, transport } = recorder();
+
+    await notifyReplayCodesSent(db, withoutCodes, { transport });
+    await notifyReplayCodesSent(db, "no-es-un-id", { transport });
+    await notifyReplayCodesSent(db, "00000000-0000-4000-8000-000000000000", { transport });
+
+    expect(sent).toEqual([]);
+  });
+});
+
+describe("the confirmation to the buyer", () => {
+  test("a VOD review says to paste the replay codes in the portal; another service does not", async () => {
+    const vod = await insertTestOrder(db, { item: "vodRecorded", buyerEmail: BUYER_EMAIL });
+    const plan = await insertTestOrder(db, { item: "gamePlan", buyerEmail: BUYER_EMAIL });
+
+    const forVod = await notify(vod, await outcomeOf(vod, {}));
+    const forPlan = await notify(plan, await outcomeOf(plan, { providerPaymentId: "pago-plan" }));
+
+    expect(forVod.toBuyer[0].text).toContain("códigos de replay");
+    expect(forPlan.toBuyer[0].text).not.toContain("códigos de replay");
   });
 });

@@ -11,6 +11,7 @@ import { toDeliveryRows } from "@/admin/sales/delivery-rows";
 import { priceListUsd } from "@/admin/sales/price-list";
 import { getSale } from "@/admin/sales/repository";
 import { SaleForm } from "@/admin/sales/sale-form";
+import { ReplayCodesCard } from "@/admin/sales/replay-codes-card";
 import { SavedValues } from "@/admin/sales/saved-values";
 import { DRAFT_KEYS } from "@/admin/ui/draft-keys";
 import { EmptyState } from "@/admin/ui/empty-state";
@@ -68,6 +69,7 @@ export default async function EditSalePage(props: PageProps<"/admin/ventas/[id]"
         undoAction={markInvoicePendingAction.bind(null, sale.id)}
         today={todayInArgentina()}
       />
+      <ReplayCodesCard sale={sale} />
       <DeliveriesCard saleId={sale.id} deliveries={deliveryRows} />
       <SaleForm
         mode="edit"

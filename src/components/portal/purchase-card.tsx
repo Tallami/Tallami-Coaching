@@ -3,6 +3,7 @@ import type { SaleStatus } from "@/admin/catalog";
 import { formatPortalDay, formatPortalMoney } from "@/portal/format";
 import type { StudentPurchase } from "@/portal/purchases";
 import { DeliveryCard } from "./delivery-card";
+import { ReplayCodesBlock } from "./replay-codes-block";
 
 /** El color de la insignia de cada estado (cada par contrasta 7:1 o más; ver `globals.css`). */
 const STATUS_CLASSES: Record<SaleStatus, string> = {
@@ -55,6 +56,7 @@ export async function PurchaseCard({ purchase }: { purchase: StudentPurchase }) 
         </span>
         {dateText ? <span>{dateText}</span> : null}
       </p>
+      <ReplayCodesBlock purchase={purchase} />
       <h4 className="mt-7 mb-4 text-[.85rem] font-bold uppercase tracking-wide text-ink-2">{t("deliveries.title")}</h4>
       {purchase.deliveries.length === 0 ? (
         <p className="m-0 text-ink-2">{t("deliveries.empty")}</p>

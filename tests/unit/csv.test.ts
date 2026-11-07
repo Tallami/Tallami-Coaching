@@ -36,6 +36,8 @@ const ROW: SaleRow = {
   invoicedOn: null,
   source: "manual",
   notes: "no va al CSV",
+  replayCodes: null,
+  replayCodesSentAt: null,
   createdAt: new Date("2026-10-12T15:00:00Z"),
   updatedAt: new Date("2026-10-12T15:00:00Z"),
 };

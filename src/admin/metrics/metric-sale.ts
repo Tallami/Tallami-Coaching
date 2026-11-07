@@ -23,6 +23,8 @@ export interface MetricSale {
   dueAt: string | null;
   /** Cuándo se entregó, en el mismo formato que `dueAt`. */
   deliveredAt: string | null;
+  /** Cuándo mandó el alumno los códigos de replay (mismo formato), o `null` si todavía no. */
+  replayCodesSentAt: string | null;
   amountArsMinor: number;
   amountUsdMinor: number;
   paymentMethod: PaymentMethod;

@@ -32,6 +32,12 @@ const SESSION_ITEMS: ReadonlySet<SaleItem> = new Set([
 ]);
 
 /** Servicios de varias sesiones: no se marcan como hechos con una sola fecha. */
+/** Servicios que se coordinan por mensaje: cobrados, esperan que Tallami y el alumno acuerden el día. */
+const COORDINATE_ITEMS: ReadonlySet<SaleItem> = new Set(["vodLive", "proSeason"]);
+
+/** VOD reviews que empiezan cuando el alumno manda los códigos de replay. */
+const REPLAY_ITEMS: ReadonlySet<SaleItem> = new Set(["vodRecorded", "tournamentReview"]);
+
 const MULTI_SESSION_ITEMS: ReadonlySet<SaleItem> = new Set(["lessonPack", "proSeason"]);
 
 /** Cuántos días hacia adelante cuentan como "próximos" para las sesiones. */
@@ -51,6 +57,8 @@ export interface PendingDelivery extends PendingSaleRef {
   dueAt: string | null;
   /** La fecha comprometida ya pasó (la que vence ahora mismo todavía no). */
   overdue: boolean;
+  /** VOD review cobrado al que todavía le faltan los códigos de replay del alumno. */
+  waitingForCodes: boolean;
 }
 
 export interface UpcomingSession extends PendingSaleRef {
@@ -87,6 +95,11 @@ export interface PendingWork {
    * vieja primero.
    */
   toMark: SessionToMark[];
+  /**
+   * VOD en vivo y Temporada Pro cobrados, sin entregar y sin fecha: falta coordinar el día con el
+   * alumno. Los más viejos primero.
+   */
+  toCoordinate: PendingSaleRef[];
   /** Ventas de ingreso ya fechadas con la factura pendiente (no cuentan las "no requiere"). */
   uninvoiced: UninvoicedTotals;
 }
@@ -130,6 +143,16 @@ function ref(sale: MetricSale): PendingSaleRef {
   };
 }
 
+/** Por día de cobro, el más viejo primero (sin día, al final) y, a igual día, por id. */
+function byPaidOnThenId(a: MetricSale, b: MetricSale): number {
+  if (a.paidOn !== b.paidOn) {
+    if (a.paidOn === null) return 1;
+    if (b.paidOn === null) return -1;
+    return a.paidOn < b.paidOn ? -1 : 1;
+  }
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
 /** Por fecha (las sin fecha al final) y, a igual fecha, por id. */
 function byDueThenId(a: OpenSale, b: OpenSale): number {
   if (a.dueMs !== b.dueMs) {
@@ -157,7 +180,13 @@ export function pendingWork(sales: readonly MetricSale[], now: Date): PendingWor
       ...ref(sale),
       dueAt: dueMs === null ? null : sale.dueAt,
       overdue: dueMs !== null && dueMs < nowMs,
+      waitingForCodes: REPLAY_ITEMS.has(sale.item) && sale.replayCodesSentAt === null,
     }));
+
+  const toCoordinate = open
+    .filter(({ sale, dueMs }) => sale.status === "paid" && COORDINATE_ITEMS.has(sale.item) && dueMs === null)
+    .sort((a, b) => byPaidOnThenId(a.sale, b.sale))
+    .map(({ sale }) => ref(sale));
 
   const sessions = open
     .filter(
@@ -199,6 +228,7 @@ export function pendingWork(sales: readonly MetricSale[], now: Date): PendingWor
     deliveries,
     sessions,
     toMark,
+    toCoordinate,
     uninvoiced: {
       count: uninvoiced.length,
       arsMinor: sumMinor(uninvoiced.map((sale) => sale.amountArsMinor)),

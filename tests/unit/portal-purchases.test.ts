@@ -25,7 +25,7 @@ const INTERNAL = {
   source: "manual",
 } as const;
 
-const PURCHASE_KEYS = ["amountMinor", "currency", "deliveries", "id", "item", "paidOn", "status"];
+const PURCHASE_KEYS = ["amountMinor", "currency", "deliveries", "id", "item", "paidOn", "replay", "status"];
 const YOUTUBE_KEYS = ["createdAt", "id", "kind", "title", "youtubeVideoId"];
 const PDF_KEYS = ["createdAt", "fileHref", "id", "kind", "title"];
 const LINK_KEYS = ["createdAt", "id", "kind", "title", "url"];
@@ -131,7 +131,47 @@ describe("listStudentPurchases", () => {
       amountMinor: 15_050,
       currency: "BRL",
       deliveries: [],
+      replay: { state: "none" },
     });
+  });
+
+  test("a VOD review shows its own codes and when the delivery is due, and never those of another student", async () => {
+    const ana = await insertTestCustomer(db, "Ana");
+    const beto = await insertTestCustomer(db, "Beto");
+    const sentAt = new Date("2026-10-20T15:00:00.000Z");
+    await insertTestSale(db, ana, {
+      item: "vodRecorded",
+      replayCodes: "CODIGO-DE-ANA",
+      replayCodesSentAt: sentAt,
+      dueAt: new Date("2026-10-23T15:00:00.000Z"),
+    });
+    await insertTestSale(db, beto, { item: "tournamentReview", paidOn: "2026-10-19" });
+
+    const [forAna] = await listStudentPurchases(db, ana, new Date("2026-10-21T00:00:00.000Z"));
+    const [forBeto] = await listStudentPurchases(db, beto, new Date("2026-10-21T00:00:00.000Z"));
+
+    expect(forAna.replay).toEqual({
+      state: "sent",
+      codes: "CODIGO-DE-ANA",
+      dueAt: "2026-10-23T15:00:00.000Z",
+      editable: true,
+    });
+    expect(forBeto.replay).toEqual({ state: "open" });
+    expect(JSON.stringify(forBeto)).not.toContain("CODIGO-DE-ANA");
+  });
+
+  test("once Tallami uploads a delivery the codes can no longer be edited", async () => {
+    const customerId = await insertTestCustomer(db);
+    const saleId = await insertTestSale(db, customerId, {
+      item: "vodRecorded",
+      replayCodes: "ABC",
+      replayCodesSentAt: START,
+    });
+    await addLinkDelivery(db, saleId, "Review", DRIVE, at(1));
+
+    const [purchase] = await listStudentPurchases(db, customerId);
+
+    expect(purchase.replay).toMatchObject({ state: "sent", codes: "ABC", editable: false });
   });
 
   test("a sale that is still pending has no day of payment", async () => {

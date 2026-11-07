@@ -127,6 +127,7 @@ describe("pending work", () => {
         customerName: "Bruno",
         dueAt: "2026-10-12T18:00:00.000Z",
         overdue: true,
+        waitingForCodes: true,
       },
       {
         id: "plan-soon",
@@ -135,6 +136,7 @@ describe("pending work", () => {
         customerName: "Ana",
         dueAt: "2026-10-16T15:00:00.000Z",
         overdue: false,
+        waitingForCodes: false,
       },
       {
         id: "plan-no-date",
@@ -143,6 +145,7 @@ describe("pending work", () => {
         customerName: "Ana",
         dueAt: null,
         overdue: false,
+        waitingForCodes: false,
       },
     ]);
     expect(work.sessions).toEqual([
@@ -418,6 +421,7 @@ describe("pending work", () => {
       deliveries: [],
       sessions: [],
       toMark: [],
+      toCoordinate: [],
       uninvoiced: { count: 0, arsMinor: 0, usdMinor: 0 },
     });
   });
@@ -536,5 +540,55 @@ describe("monotributo", () => {
       sale({ paidOn: "2027-03-01", dollars: 2 }),
     ];
     expect(monotributoStatus(edge, settings, leapDay).last12ArsMinor).toBe(300_000);
+  });
+});
+
+describe("pending work: replay codes and sales to coordinate", () => {
+  test("a paid live VOD or Pro season without a date goes to coordinate, not to sessions; with a date it does not", () => {
+    const sales = [
+      sale({ id: "live-no-date", item: "vodLive", dueAt: null, paidOn: "2026-10-02" }),
+      sale({ id: "pro-no-date", item: "proSeason", dueAt: null, paidOn: "2026-10-01" }),
+      sale({ id: "live-dated", item: "vodLive", dueAt: "2026-10-14T20:00:00.000Z" }),
+      sale({ id: "pro-dated", item: "proSeason", dueAt: "2026-10-14T20:00:00.000Z" }),
+      sale({ id: "live-unpaid", item: "vodLive", status: "pending", paidOn: null, dueAt: null }),
+      sale({ id: "live-done", item: "vodLive", dueAt: null, deliveredAt: "2026-10-10T18:00:00.000Z" }),
+      sale({ id: "live-cancelled", item: "vodLive", status: "cancelled", dueAt: null }),
+      sale({ id: "plan", item: "gamePlan", dueAt: null }),
+    ];
+
+    const { toCoordinate, sessions } = pendingWork(sales, NOW);
+
+    expect(toCoordinate.map((entry) => entry.item)).toEqual(["proSeason", "vodLive"]);
+    expect(ids(toCoordinate)).toEqual([sales[1].id, sales[0].id]);
+    expect(toCoordinate[0]).toEqual({
+      id: sales[1].id,
+      item: "proSeason",
+      customerId: "ana",
+      customerName: "Ana",
+    });
+    expect(ids(sessions)).toEqual([sales[2].id, sales[3].id]);
+  });
+
+  test("a VOD review without codes waits for them; with codes, or a game plan, it does not", () => {
+    const sales = [
+      sale({ id: "a", item: "vodRecorded", dueAt: null }),
+      sale({ id: "b", item: "tournamentReview", dueAt: null }),
+      sale({
+        id: "c",
+        item: "vodRecorded",
+        dueAt: "2026-10-15T18:00:00.000Z",
+        replayCodesSentAt: "2026-10-12T18:00:00.000Z",
+      }),
+      sale({ id: "d", item: "gamePlan", dueAt: null }),
+    ];
+
+    const { deliveries } = pendingWork(sales, NOW);
+
+    const waiting = new Map(deliveries.map((delivery) => [delivery.id, delivery.waitingForCodes]));
+    expect([...waiting.values()].sort()).toEqual([false, false, true, true]);
+    expect(waiting.get(sales[0].id)).toBe(true);
+    expect(waiting.get(sales[1].id)).toBe(true);
+    expect(waiting.get(sales[2].id)).toBe(false);
+    expect(waiting.get(sales[3].id)).toBe(false);
   });
 });

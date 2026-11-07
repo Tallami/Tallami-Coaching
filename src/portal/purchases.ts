@@ -10,7 +10,10 @@ import type { Currency, SaleItem, SaleStatus } from "@/admin/catalog";
 import type { Db } from "../db/client";
 import { deliveries, sales } from "../db/schema";
 import { isUuid } from "../db/uuid";
+import { replayState, type StudentReplayCodes } from "../payments/replay-codes";
 import type { DeliveryKind } from "./deliveries";
+
+export type { StudentReplayCodes };
 
 /** Una entrega tal como la ve el alumno. Cada tipo trae solo el campo que le corresponde. */
 export type StudentDelivery = {
@@ -38,6 +41,8 @@ export type StudentPurchase = {
   amountMinor: number;
   currency: Currency;
   deliveries: StudentDelivery[];
+  /** Los códigos de replay del VOD review: lo que se pide, lo que mandó o que ya no se pueden mandar. */
+  replay: StudentReplayCodes;
 };
 
 /** La dirección donde el alumno dueño abre el PDF de la entrega `deliveryId`. */
@@ -65,6 +70,9 @@ const PURCHASE_COLUMNS = {
   paidOn: sales.paidOn,
   amountMinor: sales.amountMinor,
   currency: sales.currency,
+  dueAt: sales.dueAt,
+  replayCodes: sales.replayCodes,
+  replayCodesSentAt: sales.replayCodesSentAt,
   deliveryId: deliveries.id,
   deliveryKind: deliveries.kind,
   deliveryTitle: deliveries.title,
@@ -81,6 +89,9 @@ type PurchaseRow = {
   paidOn: string | null;
   amountMinor: number;
   currency: string;
+  dueAt: Date | null;
+  replayCodes: string | null;
+  replayCodesSentAt: Date | null;
   deliveryId: string | null;
   deliveryKind: string | null;
   deliveryTitle: string | null;
@@ -116,7 +127,11 @@ function toStudentDelivery(row: PurchaseRow): StudentDelivery | null {
  * de alta; ver `NEWEST_PURCHASES_FIRST`), cada una con sus entregas en el orden en que se cargaron.
  * De otro alumno, de un id que no existe o que no es un id: lista vacía.
  */
-export async function listStudentPurchases(db: Db, customerId: string): Promise<StudentPurchase[]> {
+export async function listStudentPurchases(
+  db: Db,
+  customerId: string,
+  now: Date = new Date(),
+): Promise<StudentPurchase[]> {
   if (!isUuid(customerId)) return [];
   const rows: PurchaseRow[] = await db
     .select(PURCHASE_COLUMNS)
@@ -127,6 +142,7 @@ export async function listStudentPurchases(db: Db, customerId: string): Promise<
 
   // Las filas de una misma venta vienen juntas y en orden; un `Map` conserva el orden de llegada.
   const purchases = new Map<string, StudentPurchase>();
+  const replayRows = new Map<string, PurchaseRow>();
   for (const row of rows) {
     let purchase = purchases.get(row.saleId);
     if (!purchase) {
@@ -138,11 +154,17 @@ export async function listStudentPurchases(db: Db, customerId: string): Promise<
         amountMinor: row.amountMinor,
         currency: row.currency as Currency,
         deliveries: [],
+        replay: { state: "none" },
       };
       purchases.set(row.saleId, purchase);
+      replayRows.set(row.saleId, row);
     }
     const delivery = toStudentDelivery(row);
     if (delivery) purchase.deliveries.push(delivery);
   }
-  return [...purchases.values()];
+  // Los códigos dependen de cuántas entregas tiene la venta: se resuelven con todas ya agrupadas.
+  return [...purchases.values()].map((purchase) => {
+    const row = replayRows.get(purchase.id) as PurchaseRow;
+    return { ...purchase, replay: replayState(row, purchase.deliveries.length, now) };
+  });
 }

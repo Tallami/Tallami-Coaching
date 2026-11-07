@@ -45,6 +45,9 @@ export interface SaleRow {
   invoicedOn: string | null;
   source: string;
   notes: string | null;
+  /** Los códigos de replay que mandó el alumno (texto del alumno: se muestra siempre como texto). */
+  replayCodes: string | null;
+  replayCodesSentAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -77,6 +80,8 @@ export const saleRowColumns = {
   invoicedOn: sales.invoicedOn,
   source: sales.source,
   notes: sales.notes,
+  replayCodes: sales.replayCodes,
+  replayCodesSentAt: sales.replayCodesSentAt,
   createdAt: sales.createdAt,
   updatedAt: sales.updatedAt,
 };

@@ -27,6 +27,7 @@ export function demoMetricSales(data: DemoData): MetricSale[] {
       paymentMethod: sale.paymentMethod as PaymentMethod,
       country: customer.country?.trim() || null,
       invoiceStatus: (sale.invoiceStatus ?? "pending") as InvoiceStatus,
+      replayCodesSentAt: null,
     };
   });
 }

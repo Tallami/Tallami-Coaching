@@ -207,6 +207,25 @@
       "openLink": "Abrir",
       "opensInNewTab": "(se abre en una pestaña nueva)",
       "kinds": { "youtube": "Video", "pdf": "PDF", "link": "Link" }
+    },
+    "replay": {
+      "title": "Códigos de replay",
+      "openHint": "Pegá los códigos de replay de tus partidas, uno por línea. Tallami te entrega el review dentro de las {hours} horas de recibirlos.",
+      "label": "Códigos de replay",
+      "submit": "Enviar códigos",
+      "submitting": "Enviando…",
+      "sentOn": "Recibimos tus códigos. Tu entrega llega hasta el {date} (hora de Argentina).",
+      "correctHint": "¿Te equivocaste? Podés corregirlos hasta que Tallami suba tu entrega.",
+      "correct": "Corregir códigos",
+      "expired": "Esta compra venció sin recibir los códigos de replay. Escribile a Tallami.",
+      "saved": "Listo, recibimos tus códigos.",
+      "corrected": "Listo, actualizamos tus códigos.",
+      "errors": {
+        "invalid": "Pegá al menos un código, de hasta {max} caracteres.",
+        "closed": "Ya no se pueden mandar códigos para esta compra.",
+        "notFound": "No encontramos esa compra.",
+        "failed": "No pudimos guardar los códigos. Probá de nuevo."
+      }
     }
   },
   "Checkout": {
@@ -256,7 +275,8 @@
       "statement": "Si pagaste con tarjeta, en el resumen aparece como {descriptor}.",
       "portal": "Lo que compraste y lo que te entregue queda en tu portal: {url}",
       "refund": "Tenés 10 días desde la compra para pedir el reembolso completo, salvo que el servicio ya esté entregado.",
-      "signature": "Tomás Allami (Tallami)"
+      "signature": "Tomás Allami (Tallami)",
+      "replay": "Para empezar, pegá los códigos de replay de tus partidas en tu portal. El review llega {hours} horas después de que los recibamos."
     }
   },
   "NotFound": {

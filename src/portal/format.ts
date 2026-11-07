@@ -50,6 +50,13 @@ export function formatPortalMoment(iso: string, locale: Locale): string {
   return Number.isNaN(date.getTime()) ? iso : dateFormat(locale, BUSINESS_TIME_ZONE).format(date);
 }
 
+/** Día y hora de un instante en hora de Argentina, en el idioma: "23 oct 2026, 15:00". Lo que no es un instante se devuelve tal cual. */
+export function formatPortalDeadline(iso: string, locale: Locale): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return new Intl.DateTimeFormat(INTL_TAG[locale], { dateStyle: "medium", timeStyle: "short", timeZone: BUSINESS_TIME_ZONE }).format(date);
+}
+
 /**
  * El dominio al que va un link (`drive.google.com`), para mostrarlo junto al botón: sin usuario,
  * puerto, camino ni parámetros. `null` si no es un link.

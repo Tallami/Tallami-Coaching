@@ -207,6 +207,25 @@
       "openLink": "Open",
       "opensInNewTab": "(opens in a new tab)",
       "kinds": { "youtube": "Video", "pdf": "PDF", "link": "Link" }
+    },
+    "replay": {
+      "title": "Replay codes",
+      "openHint": "Paste the replay codes of your matches, one per line. Tallami delivers your review within {hours} hours of receiving them.",
+      "label": "Replay codes",
+      "submit": "Send codes",
+      "submitting": "Sending…",
+      "sentOn": "We got your codes. Your delivery arrives by {date} (Argentina time).",
+      "correctHint": "Made a mistake? You can fix them until Tallami uploads your delivery.",
+      "correct": "Fix codes",
+      "expired": "This purchase expired without receiving the replay codes. Write to Tallami.",
+      "saved": "Done, we got your codes.",
+      "corrected": "Done, we updated your codes.",
+      "errors": {
+        "invalid": "Paste at least one code, up to {max} characters.",
+        "closed": "Codes can no longer be sent for this purchase.",
+        "notFound": "We could not find that purchase.",
+        "failed": "We could not save the codes. Try again."
+      }
     }
   },
   "Checkout": {
@@ -256,7 +275,8 @@
       "statement": "If you paid by card, your statement shows it as {descriptor}.",
       "portal": "What you bought and what I deliver stays in your portal: {url}",
       "refund": "You have 10 days from the purchase to ask for a full refund, unless the service has already been delivered.",
-      "signature": "Tomás Allami (Tallami)"
+      "signature": "Tomás Allami (Tallami)",
+      "replay": "To get started, paste the replay codes of your matches in your portal. The review arrives {hours} hours after we receive them."
     }
   },
   "NotFound": {

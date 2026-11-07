@@ -10,9 +10,11 @@ import { createTranslator } from "next-intl";
 import { ITEM_LABELS, type SaleItem } from "@/admin/catalog";
 import { saleHref } from "@/admin/routes";
 import type { Db } from "@/db/client";
-import { orders } from "@/db/schema";
+import { customers, orders, sales } from "@/db/schema";
+import { isUuid } from "@/db/uuid";
 import { sendPublicEmail, sendTallamiEmail, type EmailDeps, type EmailMessage } from "@/email/send";
 import type { Locale } from "@/i18n/routing";
+import { formatMoment } from "@/admin/dates";
 import { formatMoney } from "@/lib/money";
 import { SITE_URL } from "@/lib/site-url";
 import { formatPortalMoney } from "@/portal/format";
@@ -20,7 +22,7 @@ import en from "../../messages/en.json";
 import es from "../../messages/es.json";
 import pt from "../../messages/pt.json";
 import type { ApplyOutcome } from "./apply";
-import { STATEMENT_DESCRIPTOR } from "./policy";
+import { REPLAY_DELIVERY_HOURS, STATEMENT_DESCRIPTOR } from "./policy";
 
 type Order = typeof orders.$inferSelect;
 type TallamiEmail = Omit<EmailMessage, "to">;
@@ -112,6 +114,14 @@ function emailForTallami(order: Order, outcome: ApplyOutcome): TallamiEmail | nu
   }
 }
 
+type Translator = ReturnType<typeof createTranslator>;
+
+/** Para un VOD review, qué sigue: pegar los códigos en el portal. Otro servicio no suma nada. */
+function replayLines(order: Order, t: Translator): string[] {
+  const hours = REPLAY_DELIVERY_HOURS[order.item as keyof typeof REPLAY_DELIVERY_HOURS];
+  return hours === undefined ? [] : ["", t("Emails.purchase.replay", { hours })];
+}
+
 /** La confirmación a quien compró: Mercado Pago la recomienda para bajar contracargos. */
 function emailForBuyer(order: Order, to: string): EmailMessage {
   const locale = order.locale as Locale;
@@ -128,6 +138,7 @@ function emailForBuyer(order: Order, to: string): EmailMessage {
       t("Emails.purchase.statement", { descriptor: STATEMENT_DESCRIPTOR }),
       "",
       t("Emails.purchase.portal", { url: `${SITE_URL}/${locale}/portal` }),
+      ...replayLines(order, t),
       "",
       t("Emails.purchase.refund"),
       "",
@@ -163,5 +174,46 @@ export async function notifyPaymentOutcome(db: Db, outcome: ApplyOutcome, deps: 
   } catch (error) {
     // Solo el tipo de error: el mensaje puede traer la dirección de la base.
     console.error("[pagos] no se pudieron armar los emails:", error instanceof Error ? error.name : typeof error);
+  }
+}
+
+/**
+ * Avisa a Tallami que un alumno mandó los códigos de replay de su VOD review: desde ahí corre el plazo.
+ * Sale solo con el primer envío. No incluye los códigos (se ven en la venta). Nunca tira.
+ */
+export async function notifyReplayCodesSent(db: Db, saleId: string, deps: EmailDeps = {}): Promise<void> {
+  try {
+    if (!isUuid(saleId)) return;
+    const [row] = await db
+      .select({
+        item: sales.item,
+        dueAt: sales.dueAt,
+        sentAt: sales.replayCodesSentAt,
+        customerName: customers.name,
+        customerDiscord: customers.discord,
+      })
+      .from(sales)
+      .innerJoin(customers, eq(sales.customerId, customers.id))
+      .where(eq(sales.id, saleId));
+    if (!row || !row.sentAt) return;
+    const service = ITEM_LABELS[row.item as SaleItem];
+    await sendTallamiEmail(
+      {
+        subject: `Códigos de replay recibidos: ${service}`,
+        text: [
+          "Un alumno mandó los códigos de replay de su VOD review. Desde ahora corre el plazo de entrega.",
+          "",
+          `Quién: ${row.customerName}${row.customerDiscord ? ` (Discord: ${row.customerDiscord})` : ""}`,
+          `Qué: ${service}`,
+          `Recibidos: ${formatMoment(row.sentAt)} (hora de Argentina)`,
+          ...(row.dueAt ? [`Entrega hasta: ${formatMoment(row.dueAt)}`] : []),
+          "",
+          `Venta: ${saleLink(saleId)}`,
+        ].join("\n"),
+      },
+      deps,
+    );
+  } catch (error) {
+    console.error("[pagos] no se pudo avisar de los códigos:", error instanceof Error ? error.name : typeof error);
   }
 }
