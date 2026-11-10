@@ -5,9 +5,9 @@
 // email que no sale queda en el log. Qué se manda sale del resultado de `applyProviderPayment`,
 // y `no-change` no manda nada: por eso un aviso repetido no repite el email.
 
-import { eq } from "drizzle-orm";
+import { and, asc, eq, isNotNull, ne } from "drizzle-orm";
 import { createTranslator } from "next-intl";
-import { ITEM_LABELS, type SaleItem } from "@/admin/catalog";
+import { CURRENCIES, ITEM_LABELS, type Currency, type SaleItem } from "@/admin/catalog";
 import { applicationHref, saleHref } from "@/admin/routes";
 import type { Db } from "@/db/client";
 import { customers, orders, proApplications, sales } from "@/db/schema";
@@ -53,13 +53,18 @@ function itemLabel(order: Order): string {
   return ITEM_LABELS[order.item as SaleItem];
 }
 
-/** Quién, qué, pesos y dólares. El Discord y el email son lo que Tallami tiene para escribirle. */
-function orderDetails(order: Order): string[] {
+/** Quién compró. El Discord y el email son lo que Tallami tiene para escribirle. */
+function buyerLine(order: Order): string {
   const contact = [order.buyerHandle && `Discord: ${order.buyerHandle}`, order.buyerEmail && `email: ${order.buyerEmail}`]
     .filter(Boolean)
     .join(", ");
+  return `Quién: ${order.buyerName}${contact ? ` (${contact})` : ""}`;
+}
+
+/** Quién, qué, pesos y dólares. */
+function orderDetails(order: Order): string[] {
   return [
-    `Quién: ${order.buyerName}${contact ? ` (${contact})` : ""}`,
+    buyerLine(order),
     `Qué: ${itemLabel(order)}`,
     `Pesos: ${formatMoney(order.amountArsMinor, "ARS")}`,
     `Dólares: ${formatMoney(order.amountUsdMinor, "USD")}`,
@@ -83,15 +88,53 @@ function saleCreatedEmail(order: Order, saleId: string, status: "paid" | "refund
   return tallamiEmail(`Venta nueva: ${itemLabel(order)}`, "Entró un pago por la web.", order, closing);
 }
 
-function mismatchEmail(order: Order): TallamiEmail {
-  return tallamiEmail(
-    `Un pago no coincide con su pedido: ${itemLabel(order)}`,
-    `Llegó un pago de Mercado Pago que no coincide con el pedido ${order.id}: el monto o la moneda son otros, o el pedido ya tenía otro pago. Ese pago no creó ninguna venta.`,
-    order,
-    [
+/** Un monto en la moneda que informó el proveedor: una que el panel no conoce sale con su código. */
+function paymentAmount(amountMinor: number, currency: string): string {
+  if ((CURRENCIES as readonly string[]).includes(currency)) return formatMoney(amountMinor, currency as Currency);
+  return formatMoney(amountMinor, "USD").replace(/^USD/, currency);
+}
+
+/**
+ * El pago que no coincide va con su id y su monto, separados de los del pedido: un cobro doble se
+ * devuelve con el id del pago de más, y la venta del pedido sigue siendo la del otro.
+ */
+function mismatchEmail(order: Order, outcome: Extract<ApplyOutcome, { kind: "mismatch" }>): TallamiEmail {
+  return {
+    subject: `Un pago no coincide con su pedido: ${itemLabel(order)}`,
+    text: [
+      `Llegó un pago de Mercado Pago que no coincide con el pedido ${order.id}: el monto o la moneda son otros, o el pedido ya tenía otro pago. Ese pago no creó ninguna venta.`,
+      "",
+      buyerLine(order),
+      `Qué: ${itemLabel(order)}`,
+      `Monto del pedido: ${formatMoney(order.amountArsMinor, "ARS")} (${formatMoney(order.amountUsdMinor, "USD")})`,
+      "",
+      `Pago que no coincide: ${outcome.providerPaymentId}`,
+      `Monto del pago: ${paymentAmount(outcome.amountMinor, outcome.currency)}`,
+      ...(order.saleId && order.providerPaymentId ? [`Pago de la venta: ${order.providerPaymentId}`] : []),
+      "",
       `Para encontrarlo en Mercado Pago, buscá la referencia ${order.id}.`,
       ...(order.saleId ? [`Venta del pedido: ${saleLink(order.saleId)}`] : []),
-    ],
+    ].join("\n"),
+  };
+}
+
+/**
+ * Un link de Temporada Pro que pagaron dos pedidos: el link no bloquea un segundo pedido, así que se
+ * cobró dos veces. Va con las ventas de los dos, para devolver la que sobre.
+ */
+async function linkPaidTwiceEmail(db: Db, order: Order, saleId: string): Promise<TallamiEmail | null> {
+  if (order.proPaymentLinkId === null) return null;
+  const others = await db
+    .select({ saleId: orders.saleId })
+    .from(orders)
+    .where(and(eq(orders.proPaymentLinkId, order.proPaymentLinkId), ne(orders.id, order.id), isNotNull(orders.saleId)))
+    .orderBy(asc(orders.createdAt), asc(orders.id));
+  const saleIds = [...others.flatMap((other) => (other.saleId ? [other.saleId] : [])), saleId];
+  return tallamiEmail(
+    `Link de Temporada Pro pagado dos veces: ${itemLabel(order)}`,
+    "Un link de pago de la Temporada Pro se pagó más de una vez. Cada pago creó su venta: revisá con el equipo cuál corresponde y devolvé la que sobre en Mercado Pago.",
+    order,
+    saleIds.map((id, index) => `Venta ${index + 1}: ${saleLink(id)}`),
   );
 }
 
@@ -108,7 +151,7 @@ function emailForTallami(order: Order, outcome: ApplyOutcome): TallamiEmail | nu
     case "sale-updated":
       return saleUpdatedEmail(order, outcome.saleId, outcome.change);
     case "mismatch":
-      return mismatchEmail(order);
+      return mismatchEmail(order, outcome);
     default:
       return null;
   }
@@ -166,9 +209,14 @@ export async function notifyPaymentOutcome(db: Db, outcome: ApplyOutcome, deps: 
     if (!order) return;
 
     const forTallami = emailForTallami(order, outcome);
+    const linkTwice =
+      (outcome.kind === "sale-created" || outcome.kind === "sale-updated") && outcome.linkAlreadyPaid
+        ? await linkPaidTwiceEmail(db, order, outcome.saleId)
+        : null;
     const buyer = buyerAddress(order, outcome);
     await Promise.all([
       forTallami ? sendTallamiEmail(forTallami, deps) : false,
+      linkTwice ? sendTallamiEmail(linkTwice, deps) : false,
       buyer ? sendPublicEmail(emailForBuyer(order, buyer), deps) : false,
     ]);
   } catch (error) {

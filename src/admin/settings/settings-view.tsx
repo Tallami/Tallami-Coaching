@@ -33,6 +33,8 @@ const REQUIREMENT_LABELS: Record<PaymentRequirement, string> = {
   credentials: "las credenciales de Mercado Pago",
   rate: "los pesos por dólar",
   sender: "el remitente de los emails",
+  alerts: "la dirección de los avisos (ADMIN_ALERT_EMAIL)",
+  portal: "el portal del alumno",
 };
 
 /** Qué le falta a la web para cobrar: solo nombres, nunca un valor. */

@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { Db } from "@/db/client";
+import { isDbConfigured } from "@/db/config";
 import { orders, portalAccounts, sales } from "@/db/schema";
 import { SITE_URL } from "@/lib/site-url";
 import { getPaymentAvailability } from "@/payments/availability";
@@ -16,6 +17,11 @@ import { insertTestAccount } from "../helpers/portal";
 
 // El envío de verdad se prueba en `payments-emails.test.ts`: acá importa si se manda y cuándo.
 vi.mock("@/payments/emails", () => ({ notifyPaymentOutcome: vi.fn(async () => undefined) }));
+// En Vercel el portal pide una `DATABASE_URL`: estos tests le pasan la base en memoria y nunca la necesitan.
+vi.mock("@/db/config", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/db/config")>();
+  return { ...actual, isDbConfigured: vi.fn(actual.isDbConfigured) };
+});
 
 const NOW = new Date("2026-11-05T12:00:00.000-03:00");
 const ONE_HOUR_LATER = new Date("2026-11-05T13:00:00.000-03:00");
@@ -33,6 +39,14 @@ function stubReadyEnv(): void {
   vi.stubEnv("MERCADOPAGO_WEBHOOK_SECRET", "clave-de-los-avisos");
   vi.stubEnv("RESEND_API_KEY", "re_test");
   vi.stubEnv("PUBLIC_EMAIL_FROM", "Tallami <pagos@tallami.example>");
+  vi.stubEnv("ADMIN_ALERT_EMAIL", "avisos@example.test");
+  vi.stubEnv("PORTAL_SESSION_SECRET", "secreto-del-portal-de-los-tests-0123456789");
+  vi.stubEnv("DISCORD_CLIENT_ID", "id-de-discord");
+  vi.stubEnv("DISCORD_CLIENT_SECRET", "secreto-de-discord");
+  // Discord es el único proveedor del portal en estos tests.
+  vi.stubEnv("GOOGLE_CLIENT_ID", "");
+  vi.stubEnv("GOOGLE_CLIENT_SECRET", "");
+  vi.stubEnv("PORTAL_OAUTH_TEST_ISSUER", "");
   vi.stubEnv("VERCEL", "");
 }
 
@@ -93,6 +107,8 @@ beforeEach(async () => {
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
+  // Vuelve a la función de verdad.
+  vi.mocked(isDbConfigured).mockReset();
 });
 
 describe("startCheckout", () => {
@@ -307,6 +323,7 @@ describe("startCheckout", () => {
 
   test("on Vercel the return address is always the public site, whatever origin the request claims", async () => {
     vi.stubEnv("VERCEL", "1");
+    vi.mocked(isDbConfigured).mockReturnValue(true);
     const client = fakeClient();
 
     await checkout(client, { returnOrigin: "https://evil.example", locale: "en" });
@@ -326,7 +343,7 @@ describe("startCheckout", () => {
 });
 
 describe("getPaymentAvailability", () => {
-  test("with credentials, rate and sender it can pay, and gives the rate", async () => {
+  test("with credentials, rate, sender, alert address and portal it can pay, and gives the rate", async () => {
     expect(await getPaymentAvailability(db)).toEqual({ canPay: true, rate: "1500.0000", missing: [] });
   });
 
@@ -342,9 +359,32 @@ describe("getPaymentAvailability", () => {
     expect(await getPaymentAvailability(db)).toEqual({ canPay: false, rate: "1500.0000", missing: ["credentials"] });
   });
 
+  test("without a Resend key, both the sender and the alerts are missing", async () => {
+    vi.stubEnv("RESEND_API_KEY", "");
+
+    expect(await getPaymentAvailability(db)).toEqual({ canPay: false, rate: "1500.0000", missing: ["sender", "alerts"] });
+  });
+
+  test.each([
+    ["no alert address", { ADMIN_ALERT_EMAIL: "" }],
+    ["an alert address that is not an address", { ADMIN_ALERT_EMAIL: "tallami" }],
+  ])("with %s, the alerts are missing: a double charge would reach nobody", async (_label, env) => {
+    for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value);
+
+    expect(await getPaymentAvailability(db)).toEqual({ canPay: false, rate: "1500.0000", missing: ["alerts"] });
+  });
+
+  test.each([
+    ["no portal secret", { PORTAL_SESSION_SECRET: "" }],
+    ["no way to sign in", { DISCORD_CLIENT_ID: "" }],
+  ])("with %s, the portal is missing: the buyer could not see the purchase", async (_label, env) => {
+    for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value);
+
+    expect(await getPaymentAvailability(db)).toEqual({ canPay: false, rate: "1500.0000", missing: ["portal"] });
+  });
+
   test.each([
     ["no sender", { PUBLIC_EMAIL_FROM: "" }],
-    ["no Resend key", { RESEND_API_KEY: "" }],
     ["the test sender of Resend, which only reaches the owner of the account", { PUBLIC_EMAIL_FROM: "Tallami <onboarding@resend.dev>" }],
   ])("with %s, the sender is missing", async (_label, env) => {
     for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value);
@@ -356,11 +396,13 @@ describe("getPaymentAvailability", () => {
     const empty = await createTestDb();
     vi.stubEnv("MERCADOPAGO_ACCESS_TOKEN", "");
     vi.stubEnv("PUBLIC_EMAIL_FROM", "");
+    vi.stubEnv("ADMIN_ALERT_EMAIL", "");
+    vi.stubEnv("PORTAL_SESSION_SECRET", "");
 
     expect(await getPaymentAvailability(empty)).toEqual({
       canPay: false,
       rate: null,
-      missing: ["credentials", "rate", "sender"],
+      missing: ["credentials", "rate", "sender", "alerts", "portal"],
     });
   });
 });

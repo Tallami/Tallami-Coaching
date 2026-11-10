@@ -115,6 +115,15 @@ describe("SettingsView", () => {
     expect(markup).toContain("el remitente de los emails");
   });
 
+  test("names the alert address and the student portal when they are missing", () => {
+    const markup = render({ paymentAvailability: { canPay: false, rate: "1500.0000", missing: ["alerts", "portal"] } });
+
+    expect(markup).toContain("Pagos en la web: apagados.");
+    expect(markup).toContain("la dirección de los avisos (ADMIN_ALERT_EMAIL)");
+    expect(markup).toContain("el portal del alumno");
+    expect(markup).not.toContain("el remitente de los emails");
+  });
+
   test("names only what is missing", () => {
     const markup = render({ paymentAvailability: { canPay: false, rate: "1500.0000", missing: ["sender"] } });
 

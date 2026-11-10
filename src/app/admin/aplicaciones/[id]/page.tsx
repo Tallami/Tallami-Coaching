@@ -19,7 +19,7 @@ import { getDb } from "@/db/client";
 import { formatMoney } from "@/lib/money";
 import { PRO_APPLICATION_STATUSES } from "@/payments/policy";
 import { getProApplication } from "@/pro/applications";
-import { listProPaymentLinks, type ProPaymentLink } from "@/pro/payment-links";
+import { collectedForApplication, listProPaymentLinks, type ProPaymentLink } from "@/pro/payment-links";
 import { setApplicationStatusAction } from "../actions";
 
 export const metadata: Metadata = { title: "Aplicación" };
@@ -63,8 +63,12 @@ export default async function ApplicationPage(props: PageProps<"/admin/aplicacio
     );
   }
 
-  const links = await listProPaymentLinks(db, application.id);
-  const collected = links.reduce((sum, link) => (link.paidAt ? sum + link.amountUsdMinor : sum), 0);
+  // Lo cobrado sale de las ventas, no de los links: un link pagado dos veces suma los dos pagos, y una
+  // venta reembolsada deja de sumar.
+  const [links, collected] = await Promise.all([
+    listProPaymentLinks(db, application.id),
+    collectedForApplication(db, application.id),
+  ]);
   const saved = firstValue((await props.searchParams).guardado) === "estado";
 
   return (

@@ -1,13 +1,14 @@
 // Los links de pago de la Temporada Pro. Un link lleva un token de 32 bytes al azar
 // (base64url); en la base queda solo su SHA-256, como en las invitaciones del portal
-// (`src/portal/invites.ts`). Es de un solo uso (`paidAt`) y vence a los 14 días. Una
-// aplicación puede tener varios: cada uno es un pago con su monto.
+// (`src/portal/invites.ts`). Es de un solo uso (`paidAt`, lo marca el primer pago que cobra) y vence a
+// los 14 días. Una aplicación puede tener varios: cada uno es un pago con su monto.
 
 import { createHash, randomBytes } from "node:crypto";
-import { and, asc, eq, gt, isNull } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNull, sum } from "drizzle-orm";
+import { INCOME_STATUSES } from "@/admin/catalog";
 import { checkoutHref, PRO_SEASON_SLUG } from "@/content/services";
 import type { Db } from "@/db/client";
-import { proPaymentLinks } from "@/db/schema";
+import { orders, proPaymentLinks, sales } from "@/db/schema";
 import type { Locale } from "@/i18n/routing";
 import { SITE_URL } from "@/lib/site-url";
 import { PRO_LINK_TTL_MS } from "@/payments/policy";
@@ -75,10 +76,30 @@ export function proPaymentLinkUrl(token: string, locale: Locale = "es"): string 
   return `${SITE_URL}${checkoutHref(PRO_SEASON_SLUG, locale, { link: token })}`;
 }
 
-/** Marca el link como usado. Corre dentro de la transacción que aprueba el pedido. */
-export async function markProPaymentLinkPaid(tx: Db, id: string, now: Date): Promise<void> {
-  await tx
+/**
+ * Marca el link como usado. Corre dentro de la transacción que aplica un pago que cobró. Devuelve si
+ * lo marcó: `false` es que ya estaba pagado, y este es un segundo pago del mismo link.
+ */
+export async function markProPaymentLinkPaid(tx: Db, id: string, now: Date): Promise<boolean> {
+  const marked = await tx
     .update(proPaymentLinks)
     .set({ paidAt: now })
-    .where(and(eq(proPaymentLinks.id, id), isNull(proPaymentLinks.paidAt)));
+    .where(and(eq(proPaymentLinks.id, id), isNull(proPaymentLinks.paidAt)))
+    .returning({ id: proPaymentLinks.id });
+  return marked.length > 0;
+}
+
+/**
+ * Lo cobrado por una aplicación, en centavos de dólar: la suma de las ventas de los pedidos de sus
+ * links que cuentan como ingreso (cobradas o entregadas). Dos pagos de un mismo link suman los dos, y
+ * una venta reembolsada o cancelada no suma.
+ */
+export async function collectedForApplication(db: Db, applicationId: string): Promise<number> {
+  const [row] = await db
+    .select({ total: sum(sales.amountUsdMinor).mapWith(Number) })
+    .from(proPaymentLinks)
+    .innerJoin(orders, eq(orders.proPaymentLinkId, proPaymentLinks.id))
+    .innerJoin(sales, eq(sales.id, orders.saleId))
+    .where(and(eq(proPaymentLinks.applicationId, applicationId), inArray(sales.status, [...INCOME_STATUSES])));
+  return row?.total ?? 0;
 }

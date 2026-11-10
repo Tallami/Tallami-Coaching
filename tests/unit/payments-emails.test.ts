@@ -3,11 +3,12 @@ import type { Db } from "@/db/client";
 import { getPublicEmailSetup, sendPublicEmail, sendTallamiEmail, type EmailMessage } from "@/email/send";
 import { SITE_URL } from "@/lib/site-url";
 import { applyProviderPayment, type ApplyOutcome } from "@/payments/apply";
-import { sales } from "@/db/schema";
+import { proApplications, sales } from "@/db/schema";
 import { notifyPaymentOutcome, notifyReplayCodesSent } from "@/payments/emails";
+import { createProPaymentLink, readProPaymentLink } from "@/pro/payment-links";
 import { createTestDb } from "../helpers/db";
 import { insertTestCustomer, insertTestSale } from "../helpers/portal";
-import { insertTestOrder, testPayment, type TestOrder } from "../helpers/orders";
+import { PAYMENT_ID, insertTestOrder, testPayment, type TestOrder } from "../helpers/orders";
 
 const TALLAMI_EMAIL = "tallami-privado@example.com";
 const BUYER_EMAIL = "ana@example.com";
@@ -87,6 +88,14 @@ describe("getPublicEmailSetup", () => {
 });
 
 describe("sendPublicEmail", () => {
+  test("never carries a reply-to: an email to the public never points to an address of Tallami", async () => {
+    const { sent, transport } = recorder();
+
+    await sendPublicEmail({ ...MESSAGE, replyTo: TALLAMI_EMAIL }, { transport });
+
+    expect(sent).toEqual([{ ...MESSAGE, from: PUBLIC_FROM }]);
+  });
+
   test("sends from the public sender and says it went out", async () => {
     const { sent, transport } = recorder();
 
@@ -131,6 +140,14 @@ describe("sendTallamiEmail", () => {
     await expect(sendTallamiEmail({ subject: "S", text: "T" }, { transport })).resolves.toBe(true);
 
     expect(sent).toEqual([{ subject: "S", text: "T", to: TALLAMI_EMAIL, from: ALERT_FROM }]);
+  });
+
+  test("carries the reply-to it is given, so Tallami can answer with one click", async () => {
+    const { sent, transport } = recorder();
+
+    await sendTallamiEmail({ subject: "S", text: "T", replyTo: BUYER_EMAIL }, { transport });
+
+    expect(sent).toEqual([{ subject: "S", text: "T", replyTo: BUYER_EMAIL, to: TALLAMI_EMAIL, from: ALERT_FROM }]);
   });
 
   test("works with the test sender of Resend: it reaches the owner of the account, who is Tallami", async () => {
@@ -258,26 +275,46 @@ describe("notifyPaymentOutcome: a new sale", () => {
 });
 
 describe("notifyPaymentOutcome: what only Tallami hears about", () => {
-  test("a mismatch names the order and says that no sale was created", async () => {
+  test("a mismatch names the order, says that no sale was created, and tells the payment's amount from the order's", async () => {
     const order = await insertTestOrder(db);
+    const outcome = await outcomeOf(order, { providerPaymentId: "555000111", amountMinor: 1_234_500 });
 
-    const { sent, toTallami } = await notify(order, { kind: "mismatch", orderId: order.id });
+    const { sent, toTallami } = await notify(order, outcome);
 
+    expect(outcome.kind).toBe("mismatch");
     expect(sent).toHaveLength(1);
-    expect(toTallami[0].text).toContain(order.id);
-    expect(toTallami[0].text).toContain("Ana Compradora");
-    expect(toTallami[0].text).toContain("$ 45.000,00");
-    expect(toTallami[0].text).toMatch(/no cre[oó] ninguna venta/i);
+    const { text } = toTallami[0];
+    expect(text).toContain(order.id);
+    expect(text).toContain("Ana Compradora");
+    expect(text).toContain("Monto del pedido: $ 45.000,00 (USD 30,00)");
+    expect(text).toContain("Pago que no coincide: 555000111");
+    expect(text).toContain("Monto del pago: $ 12.345,00");
+    expect(text).not.toContain("Pago de la venta");
+    expect(text).toMatch(/no cre[oó] ninguna venta/i);
   });
 
-  test("a second payment on an order that already has a sale also links to that sale", async () => {
+  test("a mismatch in another currency shows that currency", async () => {
+    const order = await insertTestOrder(db);
+    const outcome = await outcomeOf(order, { currency: "EUR", amountMinor: 15_000 });
+
+    const { toTallami } = await notify(order, outcome);
+
+    expect(toTallami[0].text).toContain("Monto del pago: EUR 150,00");
+  });
+
+  test("a second payment on an order that already has a sale links to that sale and names the payment of the sale", async () => {
     const order = await insertTestOrder(db);
     const first = await outcomeOf(order, {});
     if (first.kind !== "sale-created") throw new Error("Sin venta.");
+    const outcome = await outcomeOf(order, { providerPaymentId: "555000222" });
 
-    const { toTallami } = await notify(order, { kind: "mismatch", orderId: order.id });
+    const { toTallami } = await notify(order, outcome);
 
-    expect(toTallami[0].text).toContain(`${SITE_URL}/admin/ventas/${first.saleId}`);
+    const { text } = toTallami[0];
+    expect(text).toContain(`${SITE_URL}/admin/ventas/${first.saleId}`);
+    expect(text).toContain("Pago que no coincide: 555000222");
+    expect(text).toContain("Monto del pago: $ 45.000,00");
+    expect(text).toContain(`Pago de la venta: ${PAYMENT_ID}`);
   });
 
   test.each([
@@ -298,6 +335,45 @@ describe("notifyPaymentOutcome: what only Tallami hears about", () => {
     expect(toTallami[0].subject).toMatch(word);
     expect(toTallami[0].text).toContain(`${SITE_URL}/admin/ventas/${created.saleId}`);
     expect(toTallami[0].text).toContain("Ana Compradora");
+  });
+});
+
+describe("notifyPaymentOutcome: a Temporada Pro link paid twice", () => {
+  async function twoOrdersOnOneLink() {
+    const [application] = await db
+      .insert(proApplications)
+      .values({ name: "Equipo", discord: "d", teamMembers: "t", results: "r", locale: "es" })
+      .returning({ id: proApplications.id });
+    const link = await readProPaymentLink(db, await createProPaymentLink(db, application.id, 3000, NOW), NOW);
+    const first = await insertTestOrder(db, { item: "proSeason", proPaymentLinkId: link!.id });
+    const second = await insertTestOrder(db, { item: "proSeason", proPaymentLinkId: link!.id, buyerEmail: "beto@example.com" });
+    return { first, second };
+  }
+
+  test("the second sale also tells Tallami, with the links to both sales; the buyer still gets the confirmation", async () => {
+    const { first, second } = await twoOrdersOnOneLink();
+    const one = await outcomeOf(first, { providerPaymentId: "111" });
+    const two = await outcomeOf(second, { providerPaymentId: "222" });
+    if (one.kind !== "sale-created" || two.kind !== "sale-created") throw new Error("Sin venta.");
+
+    const { sent, toTallami } = await notify(second, two);
+
+    expect(two).toMatchObject({ linkAlreadyPaid: true });
+    const twice = toTallami.find(({ subject }) => /link .*pagado dos veces/i.test(subject));
+    expect(twice).toBeDefined();
+    expect(twice!.text).toContain(`${SITE_URL}/admin/ventas/${one.saleId}`);
+    expect(twice!.text).toContain(`${SITE_URL}/admin/ventas/${two.saleId}`);
+    expect(toTallami.filter(({ subject }) => subject.startsWith("Venta nueva"))).toHaveLength(1);
+    expect(sent.filter(({ to }) => to === "beto@example.com")).toHaveLength(1);
+  });
+
+  test("the first payment of a link sends no such email", async () => {
+    const { first } = await twoOrdersOnOneLink();
+    const one = await outcomeOf(first, { providerPaymentId: "111" });
+
+    const { toTallami } = await notify(first, one);
+
+    expect(toTallami.map(({ subject }) => subject)).toEqual([expect.stringMatching(/^Venta nueva/)]);
   });
 });
 
@@ -350,7 +426,7 @@ describe("notifyPaymentOutcome: what nobody hears about", () => {
   test("an order that is gone sends nothing and does not break", async () => {
     const order = await insertTestOrder(db);
 
-    const { sent } = await notify(order, { kind: "mismatch", orderId: "00000000-0000-4000-8000-000000000000" });
+    const { sent } = await notify(order, { kind: "mismatch", orderId: "00000000-0000-4000-8000-000000000000", providerPaymentId: "1", amountMinor: 1, currency: "ARS" });
 
     expect(sent).toEqual([]);
   });
@@ -378,7 +454,13 @@ describe("notifyPaymentOutcome: it never breaks anything", () => {
     } as unknown as Db;
 
     await expect(
-      notifyPaymentOutcome(broken, { kind: "mismatch", orderId: "00000000-0000-4000-8000-000000000000" }),
+      notifyPaymentOutcome(broken, {
+        kind: "mismatch",
+        orderId: "00000000-0000-4000-8000-000000000000",
+        providerPaymentId: "1",
+        amountMinor: 1,
+        currency: "ARS",
+      }),
     ).resolves.toBeUndefined();
 
     expect(loggedText().length).toBeGreaterThan(0);

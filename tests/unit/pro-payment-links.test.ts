@@ -9,7 +9,13 @@ import { startCheckout } from "@/payments/checkout";
 import { PRO_LINK_TTL_MS } from "@/payments/policy";
 import { savePesosPerDollar } from "@/payments/pricing";
 import type { PaymentProviderClient } from "@/payments/provider";
-import { createProPaymentLink, markProPaymentLinkPaid, proPaymentLinkUrl, readProPaymentLink } from "@/pro/payment-links";
+import {
+  collectedForApplication,
+  createProPaymentLink,
+  markProPaymentLinkPaid,
+  proPaymentLinkUrl,
+  readProPaymentLink,
+} from "@/pro/payment-links";
 import type { PortalAccount } from "@/portal/accounts";
 import { getAccount } from "@/portal/accounts";
 import { createTestDb } from "../helpers/db";
@@ -68,6 +74,18 @@ describe("createProPaymentLink / readProPaymentLink", () => {
     expect(await readProPaymentLink(db, token, new Date(NOW.getTime() + 14 * DAY_MS))).toBeNull();
   });
 
+  test("marking a link says whether it marked it: the first time yes, the second no, and the first date stays", async () => {
+    const token = await createProPaymentLink(db, applicationId, 100_000, NOW);
+    const link = await readProPaymentLink(db, token, NOW);
+    const later = new Date(NOW.getTime() + DAY_MS);
+
+    expect(await db.transaction((tx) => markProPaymentLinkPaid(tx, link!.id, NOW))).toBe(true);
+    expect(await db.transaction((tx) => markProPaymentLinkPaid(tx, link!.id, later))).toBe(false);
+
+    const [row] = await db.select().from(proPaymentLinks);
+    expect(row.paidAt).toEqual(NOW);
+  });
+
   test("a paid link, an unknown token and garbage read as null", async () => {
     const token = await createProPaymentLink(db, applicationId, 100_000, NOW);
     const link = await readProPaymentLink(db, token, NOW);
@@ -122,6 +140,10 @@ describe("paying a link", () => {
     vi.stubEnv("MERCADOPAGO_WEBHOOK_SECRET", "clave");
     vi.stubEnv("RESEND_API_KEY", "re_test");
     vi.stubEnv("PUBLIC_EMAIL_FROM", "Tallami <pagos@tallami.example>");
+    vi.stubEnv("ADMIN_ALERT_EMAIL", "avisos@example.test");
+    vi.stubEnv("PORTAL_SESSION_SECRET", "secreto-del-portal-de-los-tests-0123456789");
+    vi.stubEnv("DISCORD_CLIENT_ID", "id-de-discord");
+    vi.stubEnv("DISCORD_CLIENT_SECRET", "secreto-de-discord");
     vi.stubEnv("VERCEL", "");
     await savePesosPerDollar(db, "1500");
     account = (await getAccount(db, await insertTestAccount(db)))!;
@@ -198,6 +220,59 @@ describe("paying a link", () => {
     expect(await readProPaymentLink(db, token, NOW)).not.toBeNull();
   });
 
+  /** Dos pedidos armados con el mismo link, antes de que se pague ninguno: el link no bloquea el segundo. */
+  async function twoOrdersOnOneLink() {
+    const token = await createProPaymentLink(db, applicationId, 100_000, NOW);
+    await checkout(fakeClient(), token, 150_000_000);
+    await checkout(fakeClient(), token, 150_000_000);
+    const [first, second] = await db.select().from(orders);
+    return { token, first, second };
+  }
+
+  function pay(order: { id: string; amountArsMinor: number }, overrides: Parameters<typeof testPayment>[1] = {}) {
+    return applyProviderPayment(db, "mercadopago", testPayment(order.id, { amountMinor: order.amountArsMinor, ...overrides }), NOW);
+  }
+
+  test("a link paid by two people makes two sales, and the second outcome says the link was already paid", async () => {
+    const { first, second } = await twoOrdersOnOneLink();
+
+    const one = await pay(first, { providerPaymentId: "111" });
+    const two = await pay(second, { providerPaymentId: "222" });
+
+    expect(one).toEqual({ kind: "sale-created", orderId: first.id, saleId: expect.any(String), status: "paid" });
+    expect(two).toEqual({ kind: "sale-created", orderId: second.id, saleId: expect.any(String), status: "paid", linkAlreadyPaid: true });
+    expect(await db.select().from(sales)).toHaveLength(2);
+  });
+
+  test("the same approval twice is not a second payment of the link", async () => {
+    const { first } = await twoOrdersOnOneLink();
+
+    await pay(first);
+
+    expect(await pay(first)).toEqual({ kind: "no-change", orderId: first.id });
+  });
+
+  test.each(["refunded", "charged_back", "partially_refunded", "in_mediation"] as const)(
+    "a payment that took money (%s) before its approval arrived also uses the link",
+    async (status) => {
+      const { token, first, second } = await twoOrdersOnOneLink();
+
+      await pay(first, { status });
+
+      expect(await readProPaymentLink(db, token, NOW)).toBeNull();
+      const outcome = await pay(second, { providerPaymentId: "222" });
+      expect(outcome).toMatchObject({ kind: "sale-created", linkAlreadyPaid: true });
+    },
+  );
+
+  test.each(["rejected", "cancelled", "pending"] as const)("a %s payment leaves the link usable", async (status) => {
+    const { token, first } = await twoOrdersOnOneLink();
+
+    await pay(first, { status, approvedAt: null });
+
+    expect(await readProPaymentLink(db, token, NOW)).not.toBeNull();
+  });
+
   test("an order without a link leaves the links alone", async () => {
     const token = await createProPaymentLink(db, applicationId, 100_000, NOW);
     const order = await insertTestOrder(db);
@@ -207,5 +282,53 @@ describe("paying a link", () => {
     expect(await readProPaymentLink(db, token, NOW)).not.toBeNull();
     const [row] = await db.select().from(orders).where(eq(orders.id, order.id));
     expect(row.status).toBe("approved");
+  });
+});
+
+describe("collectedForApplication", () => {
+  async function linkSale(status: "paid" | "delivered" | "refunded" | "cancelled" | "pending", amountUsdMinor: number, application = applicationId) {
+    const token = await createProPaymentLink(db, application, amountUsdMinor, NOW);
+    const link = await readProPaymentLink(db, token, NOW);
+    const order = await insertTestOrder(db, { item: "proSeason", amountUsdMinor, proPaymentLinkId: link!.id });
+    const outcome = await applyProviderPayment(db, "mercadopago", testPayment(order.id, { providerPaymentId: order.id }), NOW);
+    if (outcome.kind !== "sale-created") throw new Error("Sin venta.");
+    await db.update(sales).set({ status }).where(eq(sales.id, outcome.saleId));
+    return { link, order };
+  }
+
+  test("without sales it is zero", async () => {
+    expect(await collectedForApplication(db, applicationId)).toBe(0);
+  });
+
+  test("adds the sales of its link orders that count as income, in dollar cents", async () => {
+    await linkSale("paid", 100_000);
+    await linkSale("delivered", 150_000);
+    await linkSale("refunded", 70_000);
+    await linkSale("cancelled", 30_000);
+
+    expect(await collectedForApplication(db, applicationId)).toBe(250_000);
+  });
+
+  test("two payments on one link count twice, and a refund drops out", async () => {
+    const { link } = await linkSale("paid", 250_000);
+    const again = await insertTestOrder(db, { item: "proSeason", amountUsdMinor: 250_000, proPaymentLinkId: link!.id });
+    const outcome = await applyProviderPayment(db, "mercadopago", testPayment(again.id, { providerPaymentId: again.id }), NOW);
+    if (outcome.kind !== "sale-created") throw new Error("Sin venta.");
+
+    expect(await collectedForApplication(db, applicationId)).toBe(500_000);
+
+    await db.update(sales).set({ status: "refunded" }).where(eq(sales.id, outcome.saleId));
+    expect(await collectedForApplication(db, applicationId)).toBe(250_000);
+  });
+
+  test("another application's sales do not count", async () => {
+    const [other] = await db
+      .insert(proApplications)
+      .values({ name: "Otro", discord: "d", teamMembers: "t", results: "r", locale: "es" })
+      .returning({ id: proApplications.id });
+    await linkSale("paid", 100_000, other.id);
+
+    expect(await collectedForApplication(db, applicationId)).toBe(0);
+    expect(await collectedForApplication(db, other.id)).toBe(100_000);
   });
 });

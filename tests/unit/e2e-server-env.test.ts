@@ -87,14 +87,24 @@ describe("environment of the e2e servers", () => {
     expect((await securityServerEnv()).DATABASE_URL).toBe("");
   });
 
-  test("every server blanks the alert address and sender, so the panel says 'sin configurar'", async () => {
+  test("the demo and security servers blank the alert address and sender, so the panel says 'sin configurar'", async () => {
     vi.stubEnv("ADMIN_ALERT_EMAIL", "alguien@example.com");
     vi.stubEnv("ADMIN_ALERT_FROM", "Panel <avisos@example.com>");
 
-    for (const env of [await adminServerEnv(), await demoServerEnv(), await securityServerEnv()]) {
+    for (const env of [await demoServerEnv(), await securityServerEnv()]) {
       expect(env.ADMIN_ALERT_EMAIL).toBe("");
       expect(env.ADMIN_ALERT_FROM).toBe("");
     }
+  });
+
+  test("the main server sends its alerts to a test address, never to the one of whoever runs the tests: without one it could not take payments", async () => {
+    vi.stubEnv("ADMIN_ALERT_EMAIL", "alguien@example.com");
+    vi.stubEnv("ADMIN_ALERT_FROM", "Panel <avisos@example.com>");
+
+    const env = await adminServerEnv();
+
+    expect(env.ADMIN_ALERT_EMAIL).toBe("avisos@example.test");
+    expect(env.ADMIN_ALERT_FROM).toBe("");
   });
 
   test("the demo and security servers have no way to send an email or to charge", async () => {

@@ -78,6 +78,7 @@ beforeEach(async () => {
   vi.stubEnv("MERCADOPAGO_WEBHOOK_SECRET", "clave-de-los-avisos");
   vi.stubEnv("RESEND_API_KEY", "re_test");
   vi.stubEnv("PUBLIC_EMAIL_FROM", "Tallami <pagos@tallami.example>");
+  vi.stubEnv("ADMIN_ALERT_EMAIL", "avisos@example.test");
   vi.spyOn(console, "error").mockImplementation(() => undefined);
   vi.spyOn(console, "warn").mockImplementation(() => undefined);
 });

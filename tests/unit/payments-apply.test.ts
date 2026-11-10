@@ -39,6 +39,12 @@ async function approvedOrder(overrides: Parameters<typeof insertTestOrder>[1] = 
   return { order, saleId: outcome.saleId };
 }
 
+/** El resultado de un pago que no coincide: trae el pago que llegó, no el del pedido. */
+function mismatch(orderId: string, payment: Partial<Parameters<typeof testPayment>[1]> = {}): ApplyOutcome {
+  const { providerPaymentId, amountMinor, currency } = testPayment(orderId, payment);
+  return { kind: "mismatch", orderId, providerPaymentId, amountMinor, currency };
+}
+
 async function saleRow(id: string) {
   const [row] = await db.select().from(sales).where(eq(sales.id, id));
   return row;
@@ -264,7 +270,7 @@ describe("applyProviderPayment: a payment that does not match its order", () => 
 
     const outcome = await apply(order, "approved", overrides);
 
-    expect(outcome).toEqual({ kind: "mismatch", orderId: order.id });
+    expect(outcome).toEqual(mismatch(order.id, overrides));
     expect(await db.select().from(sales)).toEqual([]);
     expect(await db.select().from(customers)).toEqual([]);
     expect(await orderRow(order.id)).toMatchObject({ status: "created", saleId: null, providerPaymentId: null });
@@ -275,7 +281,7 @@ describe("applyProviderPayment: a payment that does not match its order", () => 
 
     const outcome = await apply(order, "refunded", { amountMinor: 1 });
 
-    expect(outcome).toEqual({ kind: "mismatch", orderId: order.id });
+    expect(outcome).toEqual(mismatch(order.id, { amountMinor: 1 }));
     expect((await saleRow(saleId)).status).toBe("paid");
     expect((await orderRow(order.id)).status).toBe("approved");
   });
@@ -297,7 +303,7 @@ describe("applyProviderPayment: a payment that does not match its order", () => 
 
     const outcome = await apply(second);
 
-    expect(outcome).toEqual({ kind: "mismatch", orderId: second.id });
+    expect(outcome).toEqual(mismatch(second.id));
     expect(await db.select().from(sales)).toHaveLength(1);
     expect((await orderRow(second.id)).providerPaymentId).toBeNull();
   });
@@ -388,7 +394,7 @@ describe("applyProviderPayment: several attempts on one order", () => {
 
       const outcome = await apply(order, status, { providerPaymentId: OTHER_PAYMENT_ID });
 
-      expect(outcome).toEqual({ kind: "mismatch", orderId: order.id });
+      expect(outcome).toEqual(mismatch(order.id, { providerPaymentId: OTHER_PAYMENT_ID }));
       expect(await orderRow(order.id)).toEqual(orderBefore);
       expect(await saleRow(saleId)).toEqual(saleBefore);
       expect(await db.select().from(sales)).toHaveLength(1);
@@ -402,7 +408,7 @@ describe("applyProviderPayment: several attempts on one order", () => {
     await apply(order);
     const outcome = await apply(order, "approved", { providerPaymentId: OTHER_PAYMENT_ID });
 
-    expect(outcome).toEqual({ kind: "mismatch", orderId: order.id });
+    expect(outcome).toEqual(mismatch(order.id, { providerPaymentId: OTHER_PAYMENT_ID }));
     expect(await db.select().from(sales)).toHaveLength(1);
     expect((await orderRow(order.id)).providerPaymentId).toBe(PAYMENT_ID);
   });

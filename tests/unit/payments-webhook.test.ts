@@ -335,6 +335,20 @@ describe("handleMercadoPagoWebhook: failures", () => {
     expect(schedule).not.toHaveBeenCalled();
   });
 
+  test("a payment that does not match its order leaves one line in the log, with ids only, and still schedules the email", async () => {
+    const order = await insertTestOrder(db);
+    const { deps, schedule } = setup(async () => testPayment(order.id, { amountMinor: 7_070_707 }));
+
+    const response = await handleMercadoPagoWebhook(notice(), deps);
+
+    expect(response.status).toBe(200);
+    expect(schedule).toHaveBeenCalledTimes(1);
+    const lines = vi.mocked(console.error).mock.calls.map((call) => call.map(String).join(" "));
+    expect(lines).toEqual([`[mercadopago] el pago ${PAYMENT_ID} no coincide con el pedido ${order.id}`]);
+    expect(lines[0]).not.toContain("70707");
+    expect(lines[0]).not.toContain(order.buyerName);
+  });
+
   test("the database failing is a 500, and the error text goes nowhere near the log", async () => {
     const order = await insertTestOrder(db);
     const { deps } = setup(async () => testPayment(order.id));

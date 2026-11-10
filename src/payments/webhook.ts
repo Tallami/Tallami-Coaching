@@ -15,7 +15,7 @@
 // monto salen siempre de consultar el pago con el token privado, así que un aviso repetido o
 // un cuerpo cambiado no pueden hacer más que pedir que se mire de nuevo un pago.
 //
-// Los logs llevan solo el paso y el tipo de error.
+// Los logs llevan solo el paso y el tipo de error, y de un pago que no coincide con su pedido, los dos ids.
 
 import { readLimitedText } from "@/admin/interest/endpoint";
 import type { Db } from "@/db/client";
@@ -119,6 +119,10 @@ async function lookUpAndApply(
     const db = await deps.getDb();
     const outcome = await applyProviderPayment(db, client.id, payment, deps.now?.() ?? new Date());
     if (outcome.kind === "unknown-order") console.warn("[mercadopago] aviso de un pago sin pedido conocido.");
+    if (outcome.kind === "mismatch") {
+      // Solo ids: un cobro doble o un monto distinto queda en el log aunque el email no salga.
+      console.error(`[mercadopago] el pago ${outcome.providerPaymentId} no coincide con el pedido ${outcome.orderId}`);
+    }
     scheduleEmails(deps, () => notifyPaymentOutcome(db, outcome));
     return ok();
   } catch (error) {

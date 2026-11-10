@@ -23,13 +23,15 @@ import type { PaymentStatus, ProviderPayment } from "./provider";
 
 export type ApplyOutcome =
   | { kind: "unknown-order" }
-  | { kind: "mismatch"; orderId: string }
-  | { kind: "sale-created"; orderId: string; saleId: string; status: "paid" | "refunded" }
+  /** El pago que llegó y no le corresponde al pedido: su id, su monto y su moneda, no los del pedido. */
+  | { kind: "mismatch"; orderId: string; providerPaymentId: string; amountMinor: number; currency: string }
+  | { kind: "sale-created"; orderId: string; saleId: string; status: "paid" | "refunded"; linkAlreadyPaid?: true }
   | {
       kind: "sale-updated";
       orderId: string;
       saleId: string;
       change: "refunded" | "partial-refund" | "mediation" | "charged-back";
+      linkAlreadyPaid?: true;
     }
   | { kind: "order-updated"; orderId: string; status: string }
   | { kind: "no-change"; orderId: string };
@@ -83,19 +85,33 @@ function noChange(order: Order): ApplyOutcome {
   return { kind: "no-change", orderId: order.id };
 }
 
+/**
+ * Guarda el estado del pedido. Devuelve `true` si este pago crea una venta con un link de Temporada Pro
+ * que ya había pagado otro pedido: el link no bloquea un segundo pedido, así que Tallami se tiene que
+ * enterar.
+ */
 async function saveOrder(
   { tx, order, payment, now }: Application,
   status: OrderStatus,
   saleId: string | null = order.saleId,
-): Promise<void> {
-  // Un pedido aprobado gasta el link de Temporada Pro con el que se armó: solo ese.
-  if (status === "approved" && order.proPaymentLinkId !== null) {
-    await markProPaymentLinkPaid(tx, order.proPaymentLinkId, now);
+): Promise<boolean> {
+  // Un pago que cobró gasta el link de Temporada Pro con el que se armó el pedido, solo ese, aunque se
+  // haya devuelto antes de que llegara su aprobación: un link pagado no se vuelve a usar.
+  let linkAlreadyPaid = false;
+  if (TOOK_MONEY[payment.status] && order.proPaymentLinkId !== null) {
+    const marked = await markProPaymentLinkPaid(tx, order.proPaymentLinkId, now);
+    linkAlreadyPaid = !marked && saleId !== order.saleId;
   }
   await tx
     .update(orders)
     .set({ status, saleId, providerPaymentId: payment.providerPaymentId })
     .where(eq(orders.id, order.id));
+  return linkAlreadyPaid;
+}
+
+/** Le suma al resultado la marca de un link pagado dos veces. */
+function flagLink<T extends ApplyOutcome>(outcome: T, linkAlreadyPaid: boolean): T {
+  return linkAlreadyPaid ? { ...outcome, linkAlreadyPaid: true } : outcome;
 }
 
 async function insertCustomer(
@@ -114,8 +130,15 @@ async function insertCustomer(
  * cuenta bloqueada para que dos pedidos de la misma cuenta a la vez hagan un solo alumno: el
  * segundo espera y lee el alumno que creó el primero. Es `no key update` y no `update` por lo
  * que explica `createInvite`: armar un pedido o una sesión toma `key share` sobre la cuenta, y
- * eso no tiene por qué esperar a un cobro. No se busca coincidencia por email: abriría el
- * historial de un alumno a quien tenga ese email en otra cuenta.
+ * leer la cuenta no tiene por qué esperarlos. Pero vincularla sí choca: `customer_id` tiene un
+ * índice único, así que el `update` de `linkAccountToCustomer` toma la fuerza de `for update`, que
+ * espera a cualquier `key share`. Con `redeemInvite` a la vez sobre la misma cuenta (su invitación
+ * toma `key share` sobre la cuenta y después la quiere vincular) puede haber un interbloqueo: es raro
+ * y no rompe nada, Postgres aborta a uno de los dos. Si es este cobro, todo se deshace, el aviso
+ * contesta 500 y Mercado Pago reintenta; si es el canje, el alumno lo vuelve a intentar.
+ *
+ * No se busca coincidencia por email: abriría el historial de un alumno a quien tenga ese email en
+ * otra cuenta.
  */
 async function customerForOrder(tx: Db, order: Order): Promise<string> {
   const orderCopy = { name: order.buyerName, email: order.buyerEmail, discord: order.buyerHandle };
@@ -212,8 +235,8 @@ async function applyApproved(application: Application): Promise<ApplyOutcome> {
   const { order } = application;
   if (isSettled(order)) return noChange(order);
   const saleId = await createSale(application, "paid");
-  await saveOrder(application, "approved", saleId);
-  return { kind: "sale-created", orderId: order.id, saleId, status: "paid" };
+  const linkAlreadyPaid = await saveOrder(application, "approved", saleId);
+  return flagLink({ kind: "sale-created", orderId: order.id, saleId, status: "paid" }, linkAlreadyPaid);
 }
 
 /** `pending`, `rejected` o `cancelled`: sin venta. Otro pago del mismo pedido todavía puede aprobarse. */
@@ -231,8 +254,8 @@ async function applyRefund(application: Application): Promise<ApplyOutcome> {
   if (!isSettled(order)) {
     // La aprobación nunca llegó: la plata entró y salió, y el panel lo tiene que mostrar.
     const saleId = await createSale(application, "refunded");
-    await saveOrder(application, "refunded", saleId);
-    return { kind: "sale-created", orderId: order.id, saleId, status: "refunded" };
+    const linkAlreadyPaid = await saveOrder(application, "refunded", saleId);
+    return flagLink({ kind: "sale-created", orderId: order.id, saleId, status: "refunded" }, linkAlreadyPaid);
   }
   await saveOrder(application, "refunded");
   if (order.saleId !== null && (await refundSale(tx, order.saleId))) {
@@ -246,10 +269,10 @@ async function applyChargeback(application: Application): Promise<ApplyOutcome> 
   if (order.status === "charged_back") return noChange(order);
   const saleId = isSettled(order) ? order.saleId : await createSale(application, "refunded");
   if (isSettled(order) && saleId !== null) await refundSale(tx, saleId);
-  await saveOrder(application, "charged_back", saleId);
+  const linkAlreadyPaid = await saveOrder(application, "charged_back", saleId);
   if (saleId === null) return { kind: "order-updated", orderId: order.id, status: "charged_back" };
   // Aunque Tallami ya la hubiera marcado: un contracargo siempre se avisa.
-  return { kind: "sale-updated", orderId: order.id, saleId, change: "charged-back" };
+  return flagLink({ kind: "sale-updated", orderId: order.id, saleId, change: "charged-back" }, linkAlreadyPaid);
 }
 
 async function applyPartialRefund(application: Application): Promise<ApplyOutcome> {
@@ -258,8 +281,8 @@ async function applyPartialRefund(application: Application): Promise<ApplyOutcom
   if (!isSettled(order)) {
     // La aprobación nunca llegó y esta plata se cobró: se crea la venta, ya con su nota.
     const saleId = await createSale(application, "paid", partialRefundLine(application));
-    await saveOrder(application, "approved", saleId);
-    return { kind: "sale-updated", orderId: order.id, saleId, change: "partial-refund" };
+    const linkAlreadyPaid = await saveOrder(application, "approved", saleId);
+    return flagLink({ kind: "sale-updated", orderId: order.id, saleId, change: "partial-refund" }, linkAlreadyPaid);
   }
   if (order.saleId === null || !(await notePartialRefund(application, order.saleId))) return noChange(order);
   return { kind: "sale-updated", orderId: order.id, saleId: order.saleId, change: "partial-refund" };
@@ -271,8 +294,8 @@ async function applyMediation(application: Application): Promise<ApplyOutcome> {
   if (!isSettled(order)) {
     // La aprobación nunca llegó: el aviso a Tallami necesita una venta con la que enlazar.
     const saleId = await createSale(application, "paid");
-    await saveOrder(application, "approved", saleId);
-    return { kind: "sale-updated", orderId: order.id, saleId, change: "mediation" };
+    const linkAlreadyPaid = await saveOrder(application, "approved", saleId);
+    return flagLink({ kind: "sale-updated", orderId: order.id, saleId, change: "mediation" }, linkAlreadyPaid);
   }
   if (order.saleId === null) return noChange(order);
   return { kind: "sale-updated", orderId: order.id, saleId: order.saleId, change: "mediation" };
@@ -351,7 +374,10 @@ export async function applyProviderPayment(
     if (!order) return { kind: "unknown-order" };
 
     const application: Application = { tx, provider, order, payment, now };
-    if (await isMismatch(application)) return { kind: "mismatch", orderId: order.id };
+    if (await isMismatch(application)) {
+      const { providerPaymentId, amountMinor, currency } = payment;
+      return { kind: "mismatch", orderId: order.id, providerPaymentId, amountMinor, currency };
+    }
     return applyStatus(application);
   });
 }

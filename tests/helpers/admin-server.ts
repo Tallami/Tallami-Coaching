@@ -149,7 +149,9 @@ const PORTAL_E2E_ENV = {
 
 /**
  * Los pagos en el servidor principal: Mercado Pago y Resend son el servidor falso. La clave de Resend
- * solo vale ahí, y `ADMIN_ALERT_EMAIL` sigue vacío: el panel sigue diciendo "sin configurar".
+ * solo vale ahí. Sin dirección de avisos la web no cobra (`src/payments/availability.ts`): este servidor
+ * tiene una de prueba, y sus avisos también terminan en el servidor falso. Los de datos de ejemplo y de
+ * seguridad siguen sin ella: su panel dice "sin configurar".
  */
 const PAYMENTS_E2E_ENV = {
   MERCADOPAGO_ACCESS_TOKEN: "TEST-token-solo-para-los-e2e",
@@ -158,6 +160,7 @@ const PAYMENTS_E2E_ENV = {
   PUBLIC_EMAIL_FROM: "Tallami <pagos@tallami.example>",
   RESEND_API_KEY: "re_test",
   RESEND_BASE_URL: e2eBaseUrl(E2E_PORTS.mercadopago),
+  ADMIN_ALERT_EMAIL: "avisos@example.test",
 } as const;
 
 /** Variables de entorno con las que Playwright arranca el servidor del panel (y del portal del alumno y de la compra). */
