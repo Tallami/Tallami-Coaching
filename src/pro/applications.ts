@@ -77,7 +77,7 @@ export async function submitProApplication(
   if (context.honeypotFilled) return { ok: true };
   const fieldErrors = validate(input);
   if (Object.keys(fieldErrors).length > 0) return { ok: false, fieldErrors };
-  if (await isOverPublicFormLimit(db, "proApplications", context.ipHash, now)) return { ok: false, limited: true };
+  if (await isOverPublicFormLimit(db, { table: "proApplications" }, context.ipHash, now)) return { ok: false, limited: true };
 
   const message = clean(input.message);
   const [saved] = await db

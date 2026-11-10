@@ -11,7 +11,11 @@ import { getAlertConfig, RESEND_TEST_DOMAIN } from "@/admin/alerts/config";
 /** Cómo está el remitente para el público. `test-sender`: la dirección de prueba de Resend, que solo le entrega al dueño de la cuenta. */
 export type PublicEmailSetup = { kind: "ready"; apiKey: string; from: string } | { kind: "missing" } | { kind: "test-sender" };
 
-export type EmailMessage = { to: string; subject: string; text: string };
+/**
+ * Un email. `replyTo` va solo en los emails a Tallami (la dirección de quien escribió, para contestarle
+ * con un clic): `sendPublicEmail` nunca lo manda.
+ */
+export type EmailMessage = { to: string; subject: string; text: string; replyTo?: string };
 
 /** Lo que manda un email de verdad: tira si no salió. */
 export type EmailTransport = (message: EmailMessage & { from: string }) => Promise<void>;
@@ -75,7 +79,9 @@ export async function sendPublicEmail(message: EmailMessage, deps: EmailDeps = {
     console.error(`[email] no se mandó: el remitente para el público no está listo (${setup.kind}).`);
     return false;
   }
-  return deliver({ ...message, from: setup.from }, deps.transport ?? resendTransport(setup.apiKey));
+  // Solo lo que va al público: nunca un `replyTo`.
+  const { to, subject, text } = message;
+  return deliver({ to, subject, text, from: setup.from }, deps.transport ?? resendTransport(setup.apiKey));
 }
 
 /**

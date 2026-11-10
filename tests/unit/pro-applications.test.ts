@@ -236,8 +236,8 @@ describe("the public form guard", () => {
   });
 
   test("it counts the rows of the table it is asked about", async () => {
-    expect(await isOverPublicFormLimit(db, "proApplications", IP_HASH, NOW)).toBe(false);
-    expect(await isOverPublicFormLimit(db, "siteRequests", IP_HASH, NOW)).toBe(false);
+    expect(await isOverPublicFormLimit(db, { table: "proApplications" }, IP_HASH, NOW)).toBe(false);
+    expect(await isOverPublicFormLimit(db, { table: "siteRequests", kind: "contact" }, IP_HASH, NOW)).toBe(false);
   });
 });
 

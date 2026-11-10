@@ -31,7 +31,7 @@ async function remainingStatuses(): Promise<string[]> {
 }
 
 describe("purgeExpiredRecords: orders", () => {
-  test.each(["created", "rejected", "cancelled"] as const)("deletes a %s order of 91 days and keeps one of 89", async (status) => {
+  test.each(["created", "pending", "rejected", "cancelled"] as const)("deletes a %s order of 91 days and keeps one of 89", async (status) => {
     await insertTestOrder(db, { status, createdAt: daysAgo(91) });
     await insertTestOrder(db, { status, createdAt: daysAgo(89) });
 

@@ -8,7 +8,8 @@ import { orders, proApplications, siteRequests } from "@/db/schema";
 import { PUBLIC_RECORD_RETENTION_MONTHS, UNPAID_ORDER_RETENTION_DAYS, type OrderStatus } from "./policy";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const UNPAID_STATUSES: OrderStatus[] = ["created", "rejected", "cancelled"];
+/** Los pedidos que nunca cobraron, `pending` incluido: guardan un nombre y un email y no respaldan ninguna venta. */
+const UNPAID_STATUSES: OrderStatus[] = ["created", "pending", "rejected", "cancelled"];
 
 function monthsBefore(now: Date, months: number): Date {
   const date = new Date(now);

@@ -102,7 +102,7 @@ export async function submitSiteRequest(
   if (context.honeypotFilled) return { ok: true, code: newRequestCode(kind) };
   const fieldErrors = validate(kind, input);
   if (Object.keys(fieldErrors).length > 0) return { ok: false, fieldErrors };
-  if (await isOverPublicFormLimit(db, "siteRequests", context.ipHash, now)) return { ok: false, limited: true };
+  if (await isOverPublicFormLimit(db, { table: "siteRequests", kind }, context.ipHash, now)) return { ok: false, limited: true };
 
   const message = clean(input.message);
   const reference = clean(input.orderReference);

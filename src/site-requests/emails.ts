@@ -37,6 +37,8 @@ function noticeForTallami(request: SiteRequestRow) {
   const label = KIND_LABELS[request.kind as keyof typeof KIND_LABELS];
   return {
     subject: `${label}: ${request.name} (${request.code})`,
+    // Para contestarle con un clic. Solo en el aviso a Tallami, nunca en la constancia.
+    replyTo: request.email,
     text: [
       `Llegó un pedido nuevo desde la web: ${label}.`,
       "",

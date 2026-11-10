@@ -89,6 +89,9 @@ describe("submitSiteRequest", () => {
     expect(toTallami?.text).toContain("ana@example.com");
     expect(toTallami?.text).toContain("pedido 123");
     expect(toTallami?.text).toContain("/admin/pedidos");
+    // Tallami contesta con un clic; la constancia de quien escribió no lleva ninguna dirección de él.
+    expect(toTallami?.replyTo).toBe("ana@example.com");
+    expect(toRequester).not.toHaveProperty("replyTo");
     const [row] = await stored();
     expect(row.emailSentAt).toEqual(NOW);
   });
@@ -107,6 +110,7 @@ describe("submitSiteRequest", () => {
     expect(sent).toHaveLength(1);
     expect(sent[0].to).toBe("tallami@example.com");
     expect(sent[0].text).toContain("Quiero pedir esto.");
+    expect(sent[0].replyTo).toBe("ana@example.com");
     expect((await stored())[0].emailSentAt).toEqual(NOW);
   });
 
@@ -174,6 +178,28 @@ describe("submitSiteRequest", () => {
     await db.insert(siteRequests).values(rows);
 
     expect(await submit("contact", {}, { ipHash: "una-nueva" })).toEqual({ ok: false, limited: true });
+  });
+
+  test("the cap of the whole site counts each kind apart: contact spam does not block a withdrawal or a cancellation", async () => {
+    const rows = Array.from({ length: PUBLIC_FORM_GLOBAL_MAX_PER_HOUR }, (_, n) => ({
+      kind: "contact",
+      code: `CON-SPAM${String(n).padStart(2, "0")}`,
+      name: "x",
+      email: "x@example.com",
+      locale: "es",
+      createdAt: NOW,
+    }));
+    await db.insert(siteRequests).values(rows);
+
+    expect(await submit("contact", {}, { ipHash: "una-nueva" })).toEqual({ ok: false, limited: true });
+    expect((await submit("withdrawal", {}, { ipHash: "una-nueva" })).ok).toBe(true);
+    expect((await submit("cancellation", { orderReference: "Pedido 1" }, { ipHash: "otra-nueva" })).ok).toBe(true);
+  });
+
+  test("the cap of one connection still counts every kind together", async () => {
+    for (let n = 0; n < PUBLIC_FORM_MAX_PER_HOUR; n += 1) expect((await submit("contact")).ok).toBe(true);
+
+    expect(await submit("withdrawal")).toEqual({ ok: false, limited: true });
   });
 });
 

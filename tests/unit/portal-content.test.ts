@@ -516,6 +516,18 @@ describe("PortalContent when the buyer comes back from paying", () => {
     expect(notice?.retryHref).toBeUndefined();
   });
 
+  test("coming back with a payment id while the order still has no payment seen offers no way back: that buyer just paid", async () => {
+    currentStudent.mockResolvedValue(ACCOUNT);
+    accountNow.mockResolvedValue(ACCOUNT);
+    // La consulta falló o todavía no ve el pago, y el aviso no llegó: el pedido sigue `created`.
+    orderOf.mockResolvedValue(orderWith("created", "gamePlan"));
+
+    const notice = propsOf(await page({ compra: ORDER_ID, payment_id: "123" }), PortalNotice);
+
+    expect(notice).toMatchObject({ notice: { key: "paymentPending", tone: "info" } });
+    expect(notice?.retryHref).toBeUndefined();
+  });
+
   test("the waiting notice words the link for someone who may just not have paid, and keeps its text", async () => {
     const html = renderToStaticMarkup(
       await PortalNotice({ notice: { key: "paymentPending", tone: "info" }, retryHref: "/es/comprar/vod-torneo" }),
