@@ -127,7 +127,8 @@ describe("pending work", () => {
         customerName: "Bruno",
         dueAt: "2026-10-12T18:00:00.000Z",
         overdue: true,
-        waitingForCodes: true,
+        // Cargada a mano con fecha: Tallami ya tiene lo que necesita, no espera códigos.
+        waitingForCodes: false,
       },
       {
         id: "plan-soon",
@@ -590,5 +591,20 @@ describe("pending work: replay codes and sales to coordinate", () => {
     expect(waiting.get(sales[1].id)).toBe(true);
     expect(waiting.get(sales[2].id)).toBe(false);
     expect(waiting.get(sales[3].id)).toBe(false);
+  });
+
+  test("a VOD review entered by hand with a due date and no codes is not waiting for codes: it is due or overdue", () => {
+    const sales = [
+      sale({ id: "manual-overdue", item: "vodRecorded", dueAt: "2026-10-12T18:00:00.000Z" }),
+      sale({ id: "manual-soon", item: "tournamentReview", dueAt: "2026-10-16T18:00:00.000Z" }),
+      sale({ id: "web-no-codes", item: "vodRecorded", dueAt: null }),
+    ];
+
+    const { deliveries } = pendingWork(sales, NOW);
+
+    const byId = new Map(deliveries.map((delivery) => [delivery.id, delivery]));
+    expect(byId.get(sales[0].id)).toMatchObject({ waitingForCodes: false, overdue: true });
+    expect(byId.get(sales[1].id)).toMatchObject({ waitingForCodes: false, overdue: false });
+    expect(byId.get(sales[2].id)).toMatchObject({ waitingForCodes: true, dueAt: null });
   });
 });

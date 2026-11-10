@@ -135,6 +135,18 @@ describe("submitReplayCodes", () => {
     expect(open).toBe("saved");
   });
 
+  test("a sale entered by hand with a due date and no codes is closed, and its due date stays", async () => {
+    const dueAt = new Date("2026-10-22T21:00:00.000Z");
+    const { customerId, saleId } = await vodSale({ dueAt });
+
+    expect(await submitReplayCodes(db, { customerId, saleId, codes: "ABC-123" }, NOW)).toBe("closed");
+
+    const row = await saleRow(saleId);
+    expect(row.dueAt).toEqual(dueAt);
+    expect(row.replayCodes).toBeNull();
+    expect(row.replayCodesSentAt).toBeNull();
+  });
+
   test("two first submissions at once leave a single due date", async () => {
     const { customerId, saleId } = await vodSale();
     const later = new Date(NOW.getTime() + 2 * HOUR_MS);
@@ -187,6 +199,18 @@ describe("replayState", () => {
     });
     expect(replayState(sent, 1, NOW)).toMatchObject({ state: "sent", editable: false });
     expect(replayState({ ...sent, status: "delivered" }, 0, NOW)).toMatchObject({ state: "sent", editable: false });
+  });
+
+  test("a sale entered by hand with a due date and no codes has none: Tallami already has what he needs", () => {
+    expect(replayState({ ...base, dueAt: new Date("2026-10-22T21:00:00.000Z") }, 0, NOW)).toEqual({ state: "none" });
+  });
+
+  test("a cancelled or refunded sale has none, even with codes", () => {
+    const sent = { ...base, replayCodes: "ABC-123", replayCodesSentAt: NOW, dueAt: new Date(NOW.getTime() + 72 * HOUR_MS) };
+
+    expect(replayState({ ...sent, status: "cancelled" }, 0, NOW)).toEqual({ state: "none" });
+    expect(replayState({ ...sent, status: "refunded" }, 0, NOW)).toEqual({ state: "none" });
+    expect(replayState({ ...base, status: "cancelled" }, 0, NOW)).toEqual({ state: "none" });
   });
 
   test("without codes and with a delivery already uploaded, there is nothing to ask for", () => {

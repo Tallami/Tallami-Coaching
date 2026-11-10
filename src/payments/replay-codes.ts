@@ -3,7 +3,7 @@
 // envío fija la hora y la fecha de entrega; corregir los códigos antes de que Tallami cargue una
 // entrega cambia solo el texto. Una compra sin usar vence a los 150 días del cobro.
 
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { argentinaLocalToDate } from "@/admin/dates";
 import type { Db } from "@/db/client";
 import { deliveries, sales } from "@/db/schema";
@@ -51,9 +51,20 @@ function deliveryDueAt(item: ReplayItem, sentAt: Date): Date {
   return new Date(sentAt.getTime() + REPLAY_DELIVERY_HOURS[item] * HOUR_MS);
 }
 
+/** Una venta cancelada o reembolsada no muestra ni pide códigos. */
+const CLOSED_SALE_STATUSES: ReadonlySet<string> = new Set(["cancelled", "refunded"]);
+
+/**
+ * Una fecha de entrega sin códigos la puso Tallami (una venta cargada a mano): ya tiene lo que necesita,
+ * y los códigos del alumno no la pueden pisar.
+ */
+function hasManualDueAt(sale: Pick<ReplaySale, "dueAt" | "replayCodesSentAt">): boolean {
+  return sale.dueAt !== null && sale.replayCodesSentAt === null;
+}
+
 /** El estado de los códigos de una compra para el alumno. `deliveryCount`: las entregas que ya tiene. */
 export function replayState(sale: ReplaySale, deliveryCount: number, now: Date): StudentReplayCodes {
-  if (!isReplayItem(sale.item)) return { state: "none" };
+  if (!isReplayItem(sale.item) || CLOSED_SALE_STATUSES.has(sale.status)) return { state: "none" };
   if (sale.replayCodes !== null && sale.replayCodesSentAt !== null) {
     const dueAt = sale.dueAt ?? deliveryDueAt(sale.item, sale.replayCodesSentAt);
     return {
@@ -63,7 +74,7 @@ export function replayState(sale: ReplaySale, deliveryCount: number, now: Date):
       editable: sale.status === "paid" && deliveryCount === 0,
     };
   }
-  if (sale.status !== "paid" || deliveryCount > 0) return { state: "none" };
+  if (sale.status !== "paid" || deliveryCount > 0 || hasManualDueAt(sale)) return { state: "none" };
   return hasExpired(sale, now) ? { state: "expired" } : { state: "open" };
 }
 
@@ -73,8 +84,9 @@ const noDeliveries = sql`not exists (select 1 from ${deliveries} where ${deliver
  * Recibe los códigos de `customerId` para su venta `saleId`. La cuenta sale siempre de la sesión de
  * quien llama. Una venta ajena, de otro servicio o que no existe da lo mismo: `not-found`.
  *
- * El primer envío es un `update … where replay_codes_sent_at is null`: si dos llegan a la vez, uno
- * gana y fija la fecha de entrega; el otro cae en una corrección y no la mueve.
+ * El primer envío es un `update … where replay_codes_sent_at is null and due_at is null`: si dos llegan a
+ * la vez, uno gana y fija la fecha de entrega; el otro cae en una corrección y no la mueve. Una venta con
+ * fecha y sin códigos la cargó Tallami a mano: da `closed` y su fecha no se toca.
  */
 export async function submitReplayCodes(
   db: Db,
@@ -88,13 +100,14 @@ export async function submitReplayCodes(
       item: sales.item,
       status: sales.status,
       paidOn: sales.paidOn,
+      dueAt: sales.dueAt,
       replayCodes: sales.replayCodes,
       replayCodesSentAt: sales.replayCodesSentAt,
     })
     .from(sales)
     .where(and(eq(sales.id, saleId), eq(sales.customerId, customerId)));
   if (!sale || !isReplayItem(sale.item)) return "not-found";
-  if (sale.status !== "paid") return "closed";
+  if (sale.status !== "paid" || hasManualDueAt(sale)) return "closed";
 
   const codes = input.codes.trim();
   if (codes.length === 0 || codes.length > REPLAY_CODES_MAX_LENGTH) return "invalid";
@@ -106,15 +119,16 @@ export async function submitReplayCodes(
     const first = await db
       .update(sales)
       .set({ replayCodes: codes, replayCodesSentAt: now, dueAt: deliveryDueAt(sale.item, now) })
-      .where(and(target, isNull(sales.replayCodesSentAt)))
+      .where(and(target, isNull(sales.replayCodesSentAt), isNull(sales.dueAt)))
       .returning({ id: sales.id });
     if (first.length > 0) return "saved";
   }
 
+  // Corregir es solo después de un primer envío: si Tallami puso una fecha mientras tanto, no se escribe nada.
   const corrected = await db
     .update(sales)
     .set({ replayCodes: codes })
-    .where(target)
+    .where(and(target, isNotNull(sales.replayCodesSentAt)))
     .returning({ id: sales.id });
   return corrected.length > 0 ? "corrected" : "closed";
 }

@@ -31,13 +31,13 @@ const SESSION_ITEMS: ReadonlySet<SaleItem> = new Set([
   "proSeason",
 ]);
 
-/** Servicios de varias sesiones: no se marcan como hechos con una sola fecha. */
 /** Servicios que se coordinan por mensaje: cobrados, esperan que Tallami y el alumno acuerden el día. */
 const COORDINATE_ITEMS: ReadonlySet<SaleItem> = new Set(["vodLive", "proSeason"]);
 
 /** VOD reviews que empiezan cuando el alumno manda los códigos de replay. */
 const REPLAY_ITEMS: ReadonlySet<SaleItem> = new Set(["vodRecorded", "tournamentReview"]);
 
+/** Servicios de varias sesiones: no se marcan como hechos con una sola fecha. */
 const MULTI_SESSION_ITEMS: ReadonlySet<SaleItem> = new Set(["lessonPack", "proSeason"]);
 
 /** Cuántos días hacia adelante cuentan como "próximos" para las sesiones. */
@@ -57,7 +57,7 @@ export interface PendingDelivery extends PendingSaleRef {
   dueAt: string | null;
   /** La fecha comprometida ya pasó (la que vence ahora mismo todavía no). */
   overdue: boolean;
-  /** VOD review cobrado al que todavía le faltan los códigos de replay del alumno. */
+  /** VOD review cobrado, sin fecha de entrega, al que todavía le faltan los códigos de replay del alumno. */
   waitingForCodes: boolean;
 }
 
@@ -180,7 +180,9 @@ export function pendingWork(sales: readonly MetricSale[], now: Date): PendingWor
       ...ref(sale),
       dueAt: dueMs === null ? null : sale.dueAt,
       overdue: dueMs !== null && dueMs < nowMs,
-      waitingForCodes: REPLAY_ITEMS.has(sale.item) && sale.replayCodesSentAt === null,
+      // Una fecha que Tallami ya puso dice que tiene lo que necesita: solo una compra de la web sin
+      // fecha espera los códigos.
+      waitingForCodes: REPLAY_ITEMS.has(sale.item) && sale.replayCodesSentAt === null && sale.dueAt === null,
     }));
 
   const toCoordinate = open
