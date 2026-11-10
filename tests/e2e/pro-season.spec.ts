@@ -5,6 +5,7 @@ import { expect, loginAsAdmin, test } from "../helpers/admin";
 import { choosePayment, ensureSharedRate, tickAndPay } from "../helpers/checkout-e2e";
 import { newStudentBrowser, signIn, uniqueProviderStudent } from "../helpers/portal-e2e";
 import es from "../../messages/es.json" with { type: "json" };
+import pt from "../../messages/pt.json" with { type: "json" };
 
 // Temporada Pro de punta a punta: el equipo aplica sin entrar, Tallami lee la aplicación en el panel, cambia su
 // estado y genera dos links; dos alumnos pagan uno cada uno, y un link usado ya no sirve. Los tests corren en
@@ -149,7 +150,11 @@ test("the language switcher of the purchase screen keeps the link", async ({ pag
     await expect(page.getByRole("link", { name: "EN", exact: true })).toHaveAttribute("href", new RegExp(`/en/comprar/temporada-pro\\?link=${token}$`));
     await page.getByRole("link", { name: "PT", exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/pt/comprar/temporada-pro\\?link=${token}$`));
-    await expect(page.getByTestId("price")).toHaveText("USD 2.500");
+    // Después de una navegación con `Link`, Next deja la página anterior montada y oculta: se busca dentro
+    // de `getByRole("main")`, que solo ve la página visible.
+    const main = page.getByRole("main");
+    await expect(main.getByText(pt.Checkout.eyebrow)).toBeVisible();
+    await expect(main.getByTestId("price")).toHaveText("USD 2.500");
   } finally {
     await panel.context.close();
   }

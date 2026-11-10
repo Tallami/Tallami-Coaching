@@ -11,6 +11,7 @@ import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { ADMIN_SECTIONS } from "../../src/admin/ui/sections";
 import { PanelError } from "../../src/components/admin/panel-error";
 import { SetupChecklist } from "../../src/components/admin/setup-checklist";
 import { expect, loginAsAdmin, test } from "../helpers/admin";
@@ -374,15 +375,11 @@ test.describe("panel keyboard", () => {
   test("Tab walks the sidebar in order at 1440 px", async ({ page }) => {
     await openPanelPage(page, PANEL_PAGES[0], DESKTOP_WIDTH);
 
+    // El orden de las secciones sale de la barra lateral misma: una sección nueva no deja este test viejo.
     const order = [
       "Saltar al contenido",
       "Tallami, panel de administración",
-      "Resumen",
-      "Ventas",
-      "Servicios",
-      "Alumnos",
-      "Facturación",
-      "Configuración",
+      ...ADMIN_SECTIONS.map(({ label }) => label),
       "Salir",
     ];
     const reached: string[] = [];
