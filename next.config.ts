@@ -30,6 +30,12 @@ const SECURITY_HEADERS = [
 const PORTAL_PAGE_SOURCE = `/:locale(${routing.locales.join("|")})/portal`;
 
 /**
+ * La página de los mensajes del alumno con Tallami (`/es/portal/mensajes`…), privada por lo mismo: la regla
+ * de arriba es exacta y no la cubre. Ninguna conversación tiene que filtrarse en un `Referer` a otro sitio.
+ */
+const PORTAL_MESSAGES_PAGE_SOURCE = `/:locale(${routing.locales.join("|")})/portal/mensajes`;
+
+/**
  * La pantalla de compra, por lo mismo: el link de pago de Temporada Pro lleva su token en la dirección,
  * y desde acá se sale a Mercado Pago. El ingreso que empieza acá también necesita el `Referer` propio.
  */
@@ -57,6 +63,7 @@ const nextConfig: NextConfig = {
       // Van después de la regla de todas las rutas: cuando dos reglas ponen el mismo encabezado,
       // gana la última, y acá la política es más estricta que la base: nada sale hacia otros sitios.
       { source: PORTAL_PAGE_SOURCE, headers: [{ key: "Referrer-Policy", value: "same-origin" }] },
+      { source: PORTAL_MESSAGES_PAGE_SOURCE, headers: [{ key: "Referrer-Policy", value: "same-origin" }] },
       { source: CHECKOUT_PAGE_SOURCE, headers: [{ key: "Referrer-Policy", value: "same-origin" }] },
     ];
   },

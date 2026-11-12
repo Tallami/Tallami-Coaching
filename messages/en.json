@@ -289,6 +289,49 @@
       }
     }
   },
+  "Chat": {
+    "metaTitle": "Messages with Tallami · Tallami Coaching",
+    "metaDescription": "Your conversation with Tallami to set up your sessions and deliveries.",
+    "title": "Messages with Tallami",
+    "intro": "To set the day of a session, what is left to send or where to talk. Tallami answers here and lets you know by email.",
+    "backToPortal": "Back to your portal",
+    "card": {
+      "title": "Messages with Tallami",
+      "body": "Set up your sessions with Tallami and what is left to send.",
+      "unread": "{count, plural, =0 {No new messages} one {# unread message} other {# unread messages}}",
+      "open": "See messages"
+    },
+    "thread": {
+      "label": "Conversation with Tallami",
+      "own": "You",
+      "other": "Tallami",
+      "empty": "No messages yet. Write to Tallami whatever you need: the day of your session, a question or your Discord username."
+    },
+    "compose": {
+      "label": "Your message",
+      "hint": "Tallami does not see what you type until you press Send. Ctrl + Enter sends it too.",
+      "submit": "Send",
+      "submitting": "Sending…",
+      "sent": "Message sent.",
+      "signIn": "Sign in again",
+      "opensInNewTab": "(opens in a new tab)",
+      "errors": {
+        "invalid": "Write a message of up to {max} characters.",
+        "rateLimited": "You sent a lot of messages in a short time. Wait a while and try again: your message is still here.",
+        "signedOut": "Your session ended. Sign in again and press Send once more: your message is still here.",
+        "failed": "We could not send your message. Try again in a few minutes: it is still here."
+      }
+    },
+    "signIn": {
+      "title": "Sign in to see your messages",
+      "body": "With your Discord or Google account, no password."
+    },
+    "unlinked": {
+      "title": "Messages open up with your first purchase",
+      "body": "Once you buy a service you can write to Tallami from here. If you already bought from him some other way, ask him for your portal invitation.",
+      "services": "See the services"
+    }
+  },
   "Checkout": {
     "metaTitle": "Confirm your purchase · Tallami Coaching",
     "metaDescription": "Check the service and the price before paying with Mercado Pago.",

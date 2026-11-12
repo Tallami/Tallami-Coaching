@@ -72,6 +72,20 @@ describe("next.config headers", () => {
     expect(portal).toBeGreaterThan(baseline);
   });
 
+  test("the messages page of the portal, in every language, sends no Referer to other sites either, and overrides the baseline", async () => {
+    const rules = await headerRules();
+    const source = `/:locale(${routing.locales.join("|")})/portal/mensajes`;
+    const rule = rules.find((candidate) => candidate.source === source);
+
+    expect(rule?.headers).toEqual([{ key: "Referrer-Policy", value: "same-origin" }]);
+    expect(rules.indexOf(rule as HeaderRule)).toBeGreaterThan(rules.findIndex((candidate) => candidate.source === "/:path*"));
+    for (const locale of routing.locales) {
+      expect(getPathMatch(source)(`/${locale}/portal/mensajes`), locale).not.toBe(false);
+    }
+    // La regla de la página del portal no la cubría: es exacta.
+    expect(getPathMatch(portalSource)("/es/portal/mensajes")).toBe(false);
+  });
+
   test("the purchase screen, in every language, sends no Referer to other sites either: it can carry a payment link in its address", async () => {
     const rules = await headerRules();
     const source = `/:locale(${routing.locales.join("|")})/comprar/:path*`;

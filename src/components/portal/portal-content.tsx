@@ -1,5 +1,6 @@
 import { unstable_rethrow } from "next/navigation";
 import { after, connection } from "next/server";
+import { unreadForStudent } from "@/chat/conversations";
 import { SERVICES, bookingHref } from "@/content/services";
 import { getDb, type Db } from "@/db/client";
 import type { Locale } from "@/i18n/routing";
@@ -14,6 +15,7 @@ import { parsePortalQuery, portalNotice, type NoticeKey, type PortalQuery, type 
 import { listStudentPurchases, type StudentPurchase } from "@/portal/purchases";
 import { AccountBar } from "./account-bar";
 import { MessageView } from "./message-view";
+import { MessagesCard } from "./messages-card";
 import { PortalNotice } from "./portal-notice";
 import { PurchaseList } from "./purchase-list";
 import { SignInView } from "./sign-in-view";
@@ -30,7 +32,7 @@ interface PortalContentProps {
 type Visitor =
   | { view: "signedOut"; order: null }
   | { view: "unlinked"; account: PortalAccount; order: Order | null; orderState: AccountOrderState }
-  | { view: "linked"; account: PortalAccount; order: Order | null; purchases: StudentPurchase[] };
+  | { view: "linked"; account: PortalAccount; order: Order | null; purchases: StudentPurchase[]; unread: number };
 
 /**
  * El pedido con el que volvió de pagar, solo si es de esta cuenta. Si todavía no se confirmó, se consulta
@@ -57,7 +59,8 @@ async function unlinkedOrderState(db: Db, accountId: string, order: Order | null
 }
 
 /**
- * Lee la sesión y, si la cuenta es de un alumno, sus compras. Es la única puerta a los datos del
+ * Lee la sesión y, si la cuenta es de un alumno, sus compras y cuántos mensajes de Tallami no leyó
+ * (la tarjeta de los mensajes). Es la única puerta a los datos del
  * portal de esta página: sin sesión (o con una que no vale) no se abre ninguna consulta de compras, y
  * las compras que se piden son siempre las del alumno de esa cuenta.
  *
@@ -73,8 +76,11 @@ async function loadVisitor(query: PortalQuery, now: Date): Promise<Visitor> {
   if (!account.customerId) {
     return { view: "unlinked", account, order, orderState: await unlinkedOrderState(db, account.id, order, now) };
   }
-  const purchases = await listStudentPurchases(db, account.customerId);
-  return { view: "linked", account, order, purchases };
+  const [purchases, unread] = await Promise.all([
+    listStudentPurchases(db, account.customerId),
+    unreadForStudent(db, account.customerId),
+  ]);
+  return { view: "linked", account, order, purchases, unread };
 }
 
 /**
@@ -150,7 +156,10 @@ export async function PortalContent({ locale, searchParams }: PortalContentProps
               orderState={visitor.orderState}
             />
           ) : (
-            <PurchaseList purchases={visitor.purchases} />
+            <>
+              <MessagesCard unread={visitor.unread} locale={locale} />
+              <PurchaseList purchases={visitor.purchases} />
+            </>
           )}
         </>
       )}

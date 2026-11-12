@@ -3,6 +3,7 @@ import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { AccountBar } from "@/components/portal/account-bar";
+import { MessagesCard } from "@/components/portal/messages-card";
 import { MessageView } from "@/components/portal/message-view";
 import { PortalContent } from "@/components/portal/portal-content";
 import { PortalNotice } from "@/components/portal/portal-notice";
@@ -12,6 +13,7 @@ import { SignInView } from "@/components/portal/sign-in-view";
 import { StripInviteFromUrl } from "@/components/portal/strip-invite-from-url";
 import { UnlinkedView } from "@/components/portal/unlinked-view";
 import { after } from "next/server";
+import { unreadForStudent } from "@/chat/conversations";
 import { reconcileOrder } from "@/payments/checkout";
 import { getMercadoPagoClient } from "@/payments/mercadopago";
 import { accountOrderState, orderForAccount, type Order } from "@/payments/orders";
@@ -48,6 +50,10 @@ vi.mock("@/portal/purchases", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/portal/purchases")>()),
   listStudentPurchases: vi.fn(),
 }));
+vi.mock("@/chat/conversations", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/chat/conversations")>()),
+  unreadForStudent: vi.fn(),
+}));
 vi.mock("next-intl/server", async () => {
   const { createTranslator } = await import("next-intl");
   const messages = (await import("../../messages/es.json")).default;
@@ -79,6 +85,7 @@ const stateOfAccount = vi.mocked(accountOrderState);
 const reconcile = vi.mocked(reconcileOrder);
 const accountNow = vi.mocked(getAccount);
 const providerClient = vi.mocked(getMercadoPagoClient);
+const unreadOf = vi.mocked(unreadForStudent);
 
 const ORDER_ID = "33333333-0000-4000-8000-000000000001";
 const PROVIDER = { id: "mercadopago" } as NonNullable<ReturnType<typeof getMercadoPagoClient>>;
@@ -143,6 +150,8 @@ beforeEach(() => {
   accountNow.mockReset();
   providerClient.mockReset();
   providerClient.mockReturnValue(PROVIDER);
+  unreadOf.mockReset();
+  unreadOf.mockResolvedValue(0);
   vi.mocked(after).mockClear();
   vi.spyOn(console, "error").mockImplementation(() => {});
   vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -348,6 +357,57 @@ describe("PortalContent with a session", () => {
     purchasesOf.mockResolvedValue([]);
 
     expect(propsOf(await page({ invitacion: outcome }), PortalNotice)).toEqual({ notice: { key, tone } });
+  });
+});
+
+describe("the card of the messages with Tallami", () => {
+  test("a linked account sees the card above its purchases, with the unread messages of its own student", async () => {
+    currentStudent.mockResolvedValue(ACCOUNT);
+    purchasesOf.mockResolvedValue([]);
+    unreadOf.mockResolvedValue(2);
+
+    const tree = await page({}, "pt");
+
+    expect(unreadOf).toHaveBeenCalledTimes(1);
+    expect(unreadOf.mock.calls[0][1]).toBe(CUSTOMER_ID);
+    expect(propsOf(tree, MessagesCard)).toEqual({ unread: 2, locale: "pt" });
+    const order = elementsOf(tree).map((element) => element.type);
+    expect(order.indexOf(MessagesCard)).toBeGreaterThanOrEqual(0);
+    expect(order.indexOf(MessagesCard)).toBeLessThan(order.indexOf(PurchaseList));
+  });
+
+  test.each([
+    ["an account that is not linked", UNLINKED],
+    ["someone without a session", null],
+  ] as const)("%s sees no card, and nothing of the messages is read", async (_label, account) => {
+    currentStudent.mockResolvedValue(account);
+
+    const tree = await page();
+
+    expect(propsOf(tree, MessagesCard)).toBeUndefined();
+    expect(unreadOf).not.toHaveBeenCalled();
+  });
+
+  test("when the unread messages cannot be read, the page says it could not load, like with the purchases", async () => {
+    currentStudent.mockResolvedValue(ACCOUNT);
+    purchasesOf.mockResolvedValue([]);
+    unreadOf.mockRejectedValue(new Error("se cayó la base"));
+
+    expect(propsOf(await page(), MessageView)).toEqual({ messageKey: "loadFailed" });
+  });
+
+  test.each([
+    [0, "Sin mensajes nuevos"],
+    [1, "1 mensaje sin leer"],
+    [3, "3 mensajes sin leer"],
+  ] as const)("with %i unread it says %j and links to the messages page in the language of the page", async (unread, text) => {
+    const html = renderToStaticMarkup(await MessagesCard({ unread, locale: "es" }));
+
+    expect(html).toContain(es.Chat.card.title);
+    expect(html).toContain(text);
+    expect(html).toContain('href="/es/portal/mensajes"');
+    expect(html).toContain(es.Chat.card.open);
+    expect(html).not.toContain("<article");
   });
 });
 

@@ -1,3 +1,4 @@
+import { createTranslator } from "next-intl";
 import { describe, expect, test } from "vitest";
 import en from "../../messages/en.json";
 import es from "../../messages/es.json";
@@ -141,6 +142,39 @@ describe("messages", () => {
       for (const key of ["terms", "refunds", "privacy"]) {
         expect(typeof footer[key], `${locale}: Footer.${key}`).toBe("string");
       }
+    }
+  });
+
+  test.each(catalogs)("the card of the messages in %s counts the unread ones with a plural that has its own text for none", (locale, messages) => {
+    const unread = ((messages.Chat as Messages).card as Messages).unread as string;
+    const t = createTranslator({ locale: locale as "es" | "pt" | "en", messages: { unread } });
+
+    expect(unread).toMatch(/\{count, plural,/);
+    expect(t("unread", { count: 0 })).not.toMatch(/\d/);
+    expect(t("unread", { count: 1 })).toMatch(/^1 /);
+    expect(t("unread", { count: 3 })).toMatch(/^3 /);
+    expect(t("unread", { count: 3 })).not.toBe(t("unread", { count: 1 }).replace("1", "3"));
+  });
+
+  test("the card of the messages says it the way the design asks, in Spanish", () => {
+    const t = createTranslator({ locale: "es", messages: es, namespace: "Chat.card" });
+
+    expect(t("title")).toBe("Mensajes con Tallami");
+    expect(t("unread", { count: 0 })).toBe("Sin mensajes nuevos");
+    expect(t("unread", { count: 1 })).toBe("1 mensaje sin leer");
+    expect(t("unread", { count: 4 })).toBe("4 mensajes sin leer");
+  });
+
+  test("the messages page keeps the same ICU arguments the page passes", () => {
+    const spanish = placeholdersByKey(es);
+
+    expect(spanish.get("Chat.compose.errors.invalid")).toEqual(["max"]);
+    expect(spanish.get("Chat.card.unread")).toEqual(["count"]);
+  });
+
+  test.each(catalogs)("no message of the chat in %s carries an email address or a tax id", (_locale, messages) => {
+    for (const [path, value] of flattenMessages(messages.Chat as Messages)) {
+      expect(String(value), path).not.toMatch(/@|CUIT|\d{2}-\d{8}-\d/);
     }
   });
 

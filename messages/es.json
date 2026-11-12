@@ -289,6 +289,49 @@
       }
     }
   },
+  "Chat": {
+    "metaTitle": "Mensajes con Tallami · Tallami Coaching",
+    "metaDescription": "Tu conversación con Tallami para coordinar tus sesiones y tus entregas.",
+    "title": "Mensajes con Tallami",
+    "intro": "Para coordinar el día de una sesión, lo que falta mandar o por dónde hablar. Tallami te contesta acá y te avisa por email.",
+    "backToPortal": "Volver a tu portal",
+    "card": {
+      "title": "Mensajes con Tallami",
+      "body": "Coordiná con Tallami tus sesiones y lo que te falta mandar.",
+      "unread": "{count, plural, =0 {Sin mensajes nuevos} one {# mensaje sin leer} other {# mensajes sin leer}}",
+      "open": "Ver mensajes"
+    },
+    "thread": {
+      "label": "Conversación con Tallami",
+      "own": "Vos",
+      "other": "Tallami",
+      "empty": "Todavía no hay mensajes. Escribile a Tallami lo que necesites: el día de tu sesión, una duda o tu usuario de Discord."
+    },
+    "compose": {
+      "label": "Tu mensaje",
+      "hint": "Tallami no ve lo que escribís hasta que tocás Enviar. Con Ctrl + Enter también se envía.",
+      "submit": "Enviar",
+      "submitting": "Enviando…",
+      "sent": "Mensaje enviado.",
+      "signIn": "Entrar de nuevo",
+      "opensInNewTab": "(se abre en una pestaña nueva)",
+      "errors": {
+        "invalid": "Escribí un mensaje de hasta {max} caracteres.",
+        "rateLimited": "Mandaste muchos mensajes en poco tiempo. Esperá un rato y probá de nuevo: tu mensaje sigue acá.",
+        "signedOut": "Tu sesión se cerró. Entrá de nuevo y volvé a tocar Enviar: tu mensaje sigue acá.",
+        "failed": "No pudimos enviar tu mensaje. Probá de nuevo en unos minutos: sigue acá."
+      }
+    },
+    "signIn": {
+      "title": "Entrá para ver tus mensajes",
+      "body": "Con tu cuenta de Discord o de Google, sin contraseña."
+    },
+    "unlinked": {
+      "title": "Los mensajes se habilitan con tu primera compra",
+      "body": "Cuando compres un servicio vas a poder escribirle a Tallami desde acá. Si ya le compraste por otro lado, pedile tu invitación al portal.",
+      "services": "Ver los servicios"
+    }
+  },
   "Checkout": {
     "metaTitle": "Confirmá tu compra · Tallami Coaching",
     "metaDescription": "Revisá el servicio y el precio antes de pagar con Mercado Pago.",
