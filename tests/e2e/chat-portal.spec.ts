@@ -141,6 +141,59 @@ test.describe("the messages of a linked student", () => {
     await student.context.close();
   });
 
+  test("two submits of the same text that both reach the server leave a single message", async ({ page, browser }) => {
+    await loginAsAdmin(page);
+    const student = await linkedChatStudent(page, browser, "Alumna de los dos envíos");
+    const s = student.page;
+    await openMessages(s);
+    const posts: string[] = [];
+    s.on("request", (request) => {
+      if (request.method() === "POST" && new URL(request.url()).pathname === MESSAGES_PATH) posts.push(request.url());
+    });
+
+    await composeBox(s).fill("dos veces el mismo");
+    // Los dos en la misma tarea: React todavía no volvió a dibujar, así que el segundo lleva el mismo texto
+    // y no hay botón deshabilitado que lo frene. Los dos pedidos salen al servidor.
+    await s.getByRole("main").locator("form").evaluate((form: HTMLFormElement) => {
+      form.requestSubmit();
+      form.requestSubmit();
+    });
+
+    await expect.poll(() => posts.length).toBe(2);
+    await expect(composeBox(s)).toHaveValue("");
+    await s.reload();
+    await expect(chatMessages(s).filter({ hasText: "dos veces el mismo" })).toHaveCount(1);
+    await student.context.close();
+  });
+
+  test("without JavaScript, sending the same form again (Back and resubmit) leaves a single message", async ({ page, browser }) => {
+    await loginAsAdmin(page);
+    const student = await linkedChatStudent(page, browser, "Alumno que vuelve atrás");
+    const context = await browser.newContext({
+      baseURL: test.info().project.use.baseURL,
+      javaScriptEnabled: false,
+      storageState: await student.context.storageState(),
+      extraHTTPHeaders: { "x-forwarded-for": uniqueTestIp() },
+    });
+    const s = await context.newPage();
+    await s.goto(MESSAGES_PATH);
+    await composeBox(s).fill("lo mando de nuevo");
+
+    const [submitted] = await Promise.all([
+      s.waitForRequest((request) => request.method() === "POST" && new URL(request.url()).pathname === MESSAGES_PATH),
+      sendButton(s).click(),
+    ]);
+    await expect(chatMessages(s).filter({ hasText: "lo mando de nuevo" })).toHaveCount(1);
+    // Volver atrás y reenviar manda otra vez el mismo pedido, con la misma sesión: se repite tal cual.
+    const again = await s.request.fetch(submitted);
+    expect(again.status()).toBe(200);
+
+    await s.goto(MESSAGES_PATH);
+    await expect(chatMessages(s).filter({ hasText: "lo mando de nuevo" })).toHaveCount(1);
+    await context.close();
+    await student.context.close();
+  });
+
   test("with the session gone and the page open, sending asks to sign in again, keeps the text and saves nothing", async ({ page, browser }) => {
     await loginAsAdmin(page);
     const student = await linkedChatStudent(page, browser, "Alumna sin sesión");
