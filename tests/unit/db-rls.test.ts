@@ -35,6 +35,9 @@ const PORTAL_TABLES = [
 /** Las tablas de los pagos en la web: pedidos, aplicaciones a la Temporada Pro, sus links y los pedidos del sitio. */
 const PAYMENT_TABLES = ["orders", "pro_applications", "pro_payment_links", "site_requests"];
 
+/** Las tablas de los mensajes entre el alumno y Tallami. */
+const CHAT_TABLES = ["conversations", "messages"];
+
 /** Las tablas que exporta el schema de Drizzle. */
 function schemaTables(): PgTable[] {
   const tables: PgTable[] = [];
@@ -92,6 +95,12 @@ describe("row level security", () => {
     const names = schemaTables().map(getTableName);
 
     expect(names).toEqual(expect.arrayContaining(PAYMENT_TABLES));
+  });
+
+  test("the two tables of the student messages are in the schema", () => {
+    const names = schemaTables().map(getTableName);
+
+    expect(names).toEqual(expect.arrayContaining(CHAT_TABLES));
   });
 
   test("every table of the schema declares row level security, so a new table cannot skip it", () => {
@@ -197,6 +206,15 @@ describe("row level security at work", () => {
       sql`insert into site_requests (kind, code, name, email, locale)
           values ('contact', 'TAL-RLS', 'Persona RLS', 'persona@example.com', 'es')`,
     );
+    // Y una en cada tabla de los mensajes.
+    await db.execute(
+      sql`insert into conversations (id, customer_id, last_message_at)
+          select '44444444-4444-4444-8444-444444444444', id, now() from customers limit 1`,
+    );
+    await db.execute(
+      sql`insert into messages (conversation_id, sender, body)
+          values ('44444444-4444-4444-8444-444444444444', 'student', 'Hola RLS')`,
+    );
   });
 
   async function asApiRole<T>(run: () => Promise<T>): Promise<T> {
@@ -257,6 +275,14 @@ describe("row level security at work", () => {
 
   test("the owner sees the rows of the web payments tables that the Data API role will not", async () => {
     for (const name of PAYMENT_TABLES) {
+      const result = await db.execute(sql`select count(*)::int as total from ${sql.identifier(name)}`);
+
+      expect(Number(rowsOf(result)[0].total), name).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  test("the owner sees the rows of the message tables that the Data API role will not", async () => {
+    for (const name of CHAT_TABLES) {
       const result = await db.execute(sql`select count(*)::int as total from ${sql.identifier(name)}`);
 
       expect(Number(rowsOf(result)[0].total), name).toBeGreaterThanOrEqual(1);

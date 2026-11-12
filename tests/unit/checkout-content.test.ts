@@ -43,6 +43,7 @@ const ACCOUNT: PortalAccount = {
   email: "ana@example.com",
   customerId: null,
   handle: null,
+  locale: "es",
 };
 
 const currentStudent = vi.mocked(getCurrentStudent);

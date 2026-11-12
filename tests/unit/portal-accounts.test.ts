@@ -48,7 +48,20 @@ describe("upsertAccountFromIdentity", () => {
       email: "ana@example.com",
       customerId: null,
       handle: "ana_fn",
+      locale: "es",
     });
+  });
+
+  test("stores the language it is given, keeps it when none is given and changes it when another is", async () => {
+    const created = await upsertAccountFromIdentity(db, ANA, START, "pt");
+    expect(created.locale).toBe("pt");
+
+    const untouched = await upsertAccountFromIdentity(db, ANA, START);
+    expect(untouched.locale).toBe("pt");
+
+    const changed = await upsertAccountFromIdentity(db, ANA, START, "en");
+    expect(changed.locale).toBe("en");
+    expect((await getAccount(db, created.id))?.locale).toBe("en");
   });
 
   test("stores the provider handle and updates it when the user renames", async () => {
@@ -307,6 +320,7 @@ describe("accountForCustomer", () => {
       email: "ana@example.com",
       customerId: linked,
       handle: null,
+      locale: "es",
     });
     expect(await accountForCustomer(db, alone)).toBeNull();
   });

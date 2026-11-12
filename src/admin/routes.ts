@@ -10,6 +10,7 @@ export const ADMIN_ROUTES = {
   salesExport: "/admin/ventas/exportar",
   applications: "/admin/aplicaciones",
   siteRequests: "/admin/pedidos",
+  messages: "/admin/mensajes",
   students: "/admin/alumnos",
   newStudent: "/admin/alumnos/nuevo",
   services: "/admin/servicios",
@@ -32,6 +33,11 @@ export function saleDeliveryFileHref(saleId: string, deliveryId: string): string
 /** La ficha del alumno `id`. */
 export function studentHref(id: string): string {
   return `${ADMIN_ROUTES.students}/${id}`;
+}
+
+/** La conversación con el alumno `customerId`. */
+export function conversationHref(customerId: string): string {
+  return `${ADMIN_ROUTES.messages}/${customerId}`;
 }
 
 /** La ficha de la aplicación a Temporada Pro `id`. */

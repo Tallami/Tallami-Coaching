@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, test } from "vitest";
 import type { Db } from "@/db/client";
-import { orders, proApplications, proPaymentLinks, sales, siteRequests } from "@/db/schema";
+import { sendStudentMessage } from "@/chat/conversations";
+import { conversations, orders, proApplications, proPaymentLinks, sales, siteRequests } from "@/db/schema";
 import { purgeExpiredRecords } from "@/payments/retention";
 import { createProPaymentLink } from "@/pro/payment-links";
 import { createTestDb } from "../helpers/db";
 import { insertTestOrder } from "../helpers/orders";
-import { insertTestCustomer, insertTestSale } from "../helpers/portal";
+import { insertTestAccount, insertTestCustomer, insertTestSale } from "../helpers/portal";
 
 const NOW = new Date("2026-11-05T12:00:00.000-03:00");
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -82,5 +83,20 @@ describe("purgeExpiredRecords: public records", () => {
     expect(await db.select().from(proPaymentLinks)).toEqual([]);
     expect(await db.select().from(sales)).toHaveLength(1);
     expect(await db.select().from(orders)).toHaveLength(1);
+  });
+});
+
+describe("purgeExpiredRecords: conversations", () => {
+  test("deletes a conversation with no new message in 24 months and a day, and keeps one of 23 months", async () => {
+    const stale = await insertTestCustomer(db, "Vieja");
+    const recent = await insertTestCustomer(db, "Reciente");
+    await insertTestAccount(db, { customerId: stale });
+    await insertTestAccount(db, { customerId: recent });
+    await sendStudentMessage(db, stale, "hola", monthsAgo(24, 1));
+    await sendStudentMessage(db, recent, "hola", monthsAgo(23));
+
+    await purgeExpiredRecords(db, NOW);
+
+    expect((await db.select().from(conversations)).map(({ customerId }) => customerId)).toEqual([recent]);
   });
 });

@@ -3,6 +3,7 @@
 // contracargo quedan, porque respaldan una venta.
 
 import { and, inArray, lt } from "drizzle-orm";
+import { purgeStaleConversations } from "@/chat/conversations";
 import type { Db } from "@/db/client";
 import { orders, proApplications, siteRequests } from "@/db/schema";
 import { PUBLIC_RECORD_RETENTION_MONTHS, UNPAID_ORDER_RETENTION_DAYS, type OrderStatus } from "./policy";
@@ -11,7 +12,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** Los pedidos que nunca cobraron, `pending` incluido: guardan un nombre y un email y no respaldan ninguna venta. */
 const UNPAID_STATUSES: OrderStatus[] = ["created", "pending", "rejected", "cancelled"];
 
-function monthsBefore(now: Date, months: number): Date {
+export function monthsBefore(now: Date, months: number): Date {
   const date = new Date(now);
   date.setUTCMonth(date.getUTCMonth() - months);
   return date;
@@ -27,4 +28,5 @@ export async function purgeExpiredRecords(db: Db, now: Date = new Date()): Promi
   await db.delete(orders).where(and(inArray(orders.status, UNPAID_STATUSES), lt(orders.createdAt, unpaidCutoff)));
   await db.delete(proApplications).where(lt(proApplications.createdAt, publicCutoff));
   await db.delete(siteRequests).where(lt(siteRequests.createdAt, publicCutoff));
+  await purgeStaleConversations(db, now);
 }

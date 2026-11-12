@@ -50,6 +50,7 @@ import {
   SALE_ITEMS,
   SALE_STATUSES,
 } from "@/admin/catalog";
+import { MESSAGE_MAX_LENGTH, MESSAGE_SENDERS } from "@/chat/policy";
 import {
   ORDER_STATUSES,
   PAYMENT_PROVIDERS,
@@ -376,11 +377,14 @@ export const portalAccounts = pgTable(
     /** El usuario público en el proveedor (el `username` de Discord), para que Tallami encuentre al alumno; `null` en Google. */
     providerHandle: text("provider_handle"),
     customerId: uuid("customer_id").references(() => customers.id, { onDelete: "set null" }),
+    /** El idioma de la última vez que entró: el de los avisos por email. */
+    locale: text("locale").notNull().default("es"),
     createdAt: timestamptz("created_at").notNull().defaultNow(),
     lastLoginAt: timestamptz("last_login_at").notNull().defaultNow(),
   },
   (t) => [
     check("portal_accounts_provider_valid", oneOf(t.provider, PORTAL_PROVIDERS)),
+    check("portal_accounts_locale_valid", oneOf(t.locale, INTEREST_LOCALES)),
     unique("portal_accounts_identity_unique").on(t.provider, t.providerUserId),
     // Un índice único (y no el `unique` de la columna): vale como restricción de una cuenta
     // por alumno y es además el índice de la clave foránea, que se busca al borrar un
@@ -620,6 +624,53 @@ export const siteRequests = pgTable(
     check("site_requests_kind_valid", oneOf(t.kind, SITE_REQUEST_KINDS)),
     check("site_requests_status_valid", oneOf(t.status, SITE_REQUEST_STATUSES)),
     check("site_requests_locale_valid", oneOf(t.locale, INTEREST_LOCALES)),
+  ],
+).enableRLS();
+
+// Mensajes entre el alumno y Tallami (`src/chat/`). Los límites viven en `src/chat/policy.ts`.
+
+/**
+ * La conversación de un alumno con Tallami: una por alumno, creada con el primer mensaje de
+ * cualquiera de los dos. Guarda cuándo leyó cada lado por última vez (los mensajes sin leer son
+ * los del otro posteriores a esa marca) y la hora del último mensaje. Se borra con el alumno, a
+ * pedido, o a los 24 meses sin mensajes nuevos.
+ */
+export const conversations = pgTable(
+  "conversations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    customerId: uuid("customer_id")
+      .notNull()
+      .references(() => customers.id, { onDelete: "cascade" }),
+    studentReadAt: timestamptz("student_read_at"),
+    coachReadAt: timestamptz("coach_read_at"),
+    lastMessageAt: timestamptz("last_message_at").notNull(),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    // Un índice único (y no el `unique` de la columna): vale como "una conversación por alumno" y es
+    // además el índice de la clave foránea, como en `portal_accounts`.
+    uniqueIndex("conversations_customer_id_unique").on(t.customerId),
+    index("conversations_last_message_at_idx").on(t.lastMessageAt),
+  ],
+).enableRLS();
+
+/** Un mensaje de una conversación: texto plano de 1 a 2.000 caracteres. */
+export const messages = pgTable(
+  "messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => conversations.id, { onDelete: "cascade" }),
+    sender: text("sender").notNull(),
+    body: text("body").notNull(),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    check("messages_sender_valid", oneOf(t.sender, MESSAGE_SENDERS)),
+    check("messages_body_length", sql`char_length(${t.body}) between 1 and ${sql.raw(String(MESSAGE_MAX_LENGTH))}`),
+    index("messages_conversation_id_created_at_idx").on(t.conversationId, t.createdAt),
   ],
 ).enableRLS();
 

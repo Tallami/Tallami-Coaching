@@ -64,6 +64,13 @@
       "when": 1793819866829,
       "tag": "0008_payments_mercadopago",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794498963823,
+      "tag": "0009_student_messages",
+      "breakpoints": true
     }
   ]
 }

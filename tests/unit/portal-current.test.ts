@@ -48,6 +48,7 @@ describe("getCurrentStudent", () => {
       email: "ana@example.com",
       customerId: null,
       handle: null,
+      locale: "es",
     });
   });
 

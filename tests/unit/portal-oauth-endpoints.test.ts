@@ -425,6 +425,7 @@ describe("GET /api/portal/auth/[provider]/callback", () => {
     const opened = await readPortalSession(db, session?.value);
     const [account] = await db.select().from(portalAccounts);
     expect(opened?.accountId).toBe(account.id);
+    expect(account.locale).toBe("pt");
     expect(account).toMatchObject({
       provider: "test",
       providerUserId: "alumno-1",

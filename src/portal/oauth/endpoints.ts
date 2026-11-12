@@ -205,7 +205,7 @@ async function completeSignIn(
 
   try {
     const db = await deps.getDb();
-    const account = await upsertAccountFromIdentity(db, identity, now);
+    const account = await upsertAccountFromIdentity(db, identity, now, flow.locale);
     // Una invitación que no sirve (o está ocupada) no impide entrar: el portal avisa qué pasó.
     const invite = flow.inviteToken
       ? inviteOutcome(await redeemInvite(db, flow.inviteToken, account.id, now))

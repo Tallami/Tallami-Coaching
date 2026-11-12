@@ -11,6 +11,7 @@
 import { and, eq, isNull } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { portalAccounts } from "../db/schema";
+import { routing, type Locale } from "../i18n/routing";
 import type { PortalProvider } from "./config";
 
 /** Lo que el portal sabe de una cuenta. */
@@ -23,6 +24,8 @@ export type PortalAccount = {
   customerId: string | null;
   /** El usuario público en el proveedor (el de Discord), o `null` (Google, prueba). */
   handle: string | null;
+  /** El idioma de la última vez que entró: el de los avisos por email. */
+  locale: Locale;
 };
 
 /** Lo que dice un proveedor de quien ingresó. */
@@ -46,14 +49,19 @@ const ACCOUNT_COLUMNS = {
   email: portalAccounts.email,
   customerId: portalAccounts.customerId,
   handle: portalAccounts.providerHandle,
+  locale: portalAccounts.locale,
 };
 
 /**
  * La fila como la devuelve la base. El proveedor llega como texto: la restricción
  * `portal_accounts_provider_valid` garantiza que sea uno de la lista.
  */
-function toAccount(row: Omit<PortalAccount, "provider"> & { provider: string }): PortalAccount {
-  return { ...row, provider: row.provider as PortalProvider };
+function toAccount(row: Omit<PortalAccount, "provider" | "locale"> & { provider: string; locale: string }): PortalAccount {
+  return {
+    ...row,
+    provider: row.provider as PortalProvider,
+    locale: routing.locales.find((locale) => locale === row.locale) ?? routing.defaultLocale,
+  };
 }
 
 /** Código de Postgres de una violación de restricción `unique`. */
@@ -70,11 +78,15 @@ function isUniqueViolation(error: unknown): boolean {
  * la misma cuenta: se actualizan el nombre, el email (puede dejar de venir) y la hora
  * del último ingreso, y el vínculo con el alumno se conserva. Es un solo
  * `insert … on conflict`, así dos ingresos a la vez no crean dos cuentas.
+ *
+ * `locale` es el idioma en el que entró: se guarda al crear y al actualizar cuando se pasa, y si no
+ * se pasa la cuenta nueva queda en español y la existente conserva el suyo.
  */
 export async function upsertAccountFromIdentity(
   db: Db,
   identity: ProviderIdentity,
   now: Date = new Date(),
+  locale?: Locale,
 ): Promise<PortalAccount> {
   const [account] = await db
     .insert(portalAccounts)
@@ -84,6 +96,7 @@ export async function upsertAccountFromIdentity(
       displayName: identity.displayName,
       email: identity.email,
       providerHandle: identity.handle,
+      ...(locale ? { locale } : {}),
       createdAt: now,
       lastLoginAt: now,
     })
@@ -93,6 +106,7 @@ export async function upsertAccountFromIdentity(
         displayName: identity.displayName,
         email: identity.email,
         providerHandle: identity.handle,
+        ...(locale ? { locale } : {}),
         lastLoginAt: now,
       },
     })

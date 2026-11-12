@@ -382,6 +382,13 @@
       "signature": "Tomás Allami (Tallami)",
       "replay": "Para começar, cole os códigos de replay das suas partidas no seu portal. O review chega {hours} horas depois de recebermos os códigos."
     },
+    "chat": {
+      "subject": "Tallami te escreveu",
+      "greeting": "Olá, {name}:",
+      "newMessage": "Você tem uma nova mensagem no seu portal.",
+      "link": "Leia aqui: {url}",
+      "signature": "Tomás Allami (Tallami)"
+    },
     "request": {
       "greeting": "Olá, {name}:",
       "signature": "Tomás Allami (Tallami)",

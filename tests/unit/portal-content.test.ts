@@ -68,6 +68,7 @@ const ACCOUNT: PortalAccount = {
   email: null,
   customerId: CUSTOMER_ID,
   handle: null,
+  locale: "es",
 };
 const UNLINKED: PortalAccount = { ...ACCOUNT, customerId: null };
 
