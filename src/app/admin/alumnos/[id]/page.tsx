@@ -8,7 +8,7 @@ import { StudentForm } from "@/admin/customers/student-form";
 import { StudentHistory } from "@/admin/customers/student-history";
 import { StudentSummary } from "@/admin/customers/student-summary";
 import { todayInArgentina } from "@/admin/dates";
-import { ADMIN_ROUTES } from "@/admin/routes";
+import { ADMIN_ROUTES, conversationHref } from "@/admin/routes";
 import { DRAFT_KEYS } from "@/admin/ui/draft-keys";
 import { EmptyState } from "@/admin/ui/empty-state";
 import { PageHeader } from "@/admin/ui/page-header";
@@ -73,9 +73,16 @@ export default async function StudentPage(props: PageProps<"/admin/alumnos/[id]"
         title={student.name}
         description="Lo que compró, todas sus ventas y sus datos."
         actions={
-          <Button asChild variant="ink-outline">
-            <Link href={ADMIN_ROUTES.students}>Volver a alumnos</Link>
-          </Button>
+          <>
+            <Button asChild variant="ink-outline">
+              <Link href={conversationHref(student.id)} prefetch={false}>
+                Mensajes
+              </Link>
+            </Button>
+            <Button asChild variant="ink-outline">
+              <Link href={ADMIN_ROUTES.students}>Volver a alumnos</Link>
+            </Button>
+          </>
         }
       />
       <StudentSummary student={student} />

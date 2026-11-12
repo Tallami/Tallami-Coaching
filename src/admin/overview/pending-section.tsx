@@ -6,7 +6,7 @@ import type { PendingDelivery, PendingSaleRef, SessionToMark, UpcomingSession } 
 import { formatDueDay, formatSessionWhen } from "@/admin/overview/labels";
 import type { OverviewData } from "@/admin/overview/overview-data";
 import { SectionCard } from "@/admin/overview/section-card";
-import { ADMIN_ROUTES, saleHref } from "@/admin/routes";
+import { ADMIN_ROUTES, conversationHref, saleHref } from "@/admin/routes";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/lib/money";
 
@@ -18,10 +18,12 @@ interface PendingRowProps {
   /** Lo que sigue al servicio en la segunda línea: la fecha. */
   when: string;
   badge?: ReactNode;
+  /** Muestra el enlace "Escribirle" a la conversación con el alumno. */
+  canWrite?: boolean;
 }
 
-/** Una fila: el alumno (enlace a su venta), el servicio con la fecha y, si hace falta, una insignia. */
-function PendingRow({ sale, when, badge }: PendingRowProps) {
+/** Una fila: el alumno (enlace a su venta), el servicio con la fecha y, si hace falta, una insignia y el enlace para escribirle. */
+function PendingRow({ sale, when, badge, canWrite = false }: PendingRowProps) {
   return (
     <li className="flex items-start justify-between gap-3 border-b border-rule py-2.5 last:border-b-0">
       <div className="min-w-0">
@@ -36,7 +38,21 @@ function PendingRow({ sale, when, badge }: PendingRowProps) {
           {ITEM_LABELS[sale.item]} · {when}
         </p>
       </div>
-      {badge ? <div className="shrink-0 pt-0.5">{badge}</div> : null}
+      {badge || canWrite ? (
+        <div className="flex shrink-0 items-center gap-3 pt-0.5">
+          {badge}
+          {canWrite ? (
+            <Link
+              href={conversationHref(sale.customerId)}
+              prefetch={false}
+              className="inline-flex min-h-11 items-center rounded-[2px] font-bold underline decoration-ink-2/50 underline-offset-4 hover:decoration-ink"
+            >
+              Escribirle
+              <span className="sr-only"> a {sale.customerName}</span>
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
     </li>
   );
 }
@@ -183,7 +199,7 @@ function Coordinate({ sales }: { sales: readonly PendingSaleRef[] }) {
       ) : (
         <FoldedRows
           items={sales}
-          renderRow={(sale) => <PendingRow key={sale.id} sale={sale} when="sin día acordado" />}
+          renderRow={(sale) => <PendingRow key={sale.id} sale={sale} when="sin día acordado" canWrite />}
         />
       )}
     </Block>

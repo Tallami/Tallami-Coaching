@@ -3,7 +3,7 @@
 // Los días se manejan como texto "AAAA-MM-DD" y las fechas con hora como el
 // valor de un `<input type="datetime-local">` ("AAAA-MM-DDTHH:mm").
 
-const BUSINESS_TIME_ZONE = "America/Argentina/Buenos_Aires";
+export const BUSINESS_TIME_ZONE = "America/Argentina/Buenos_Aires";
 /** Argentina no tiene horario de verano desde 2009: el desfase es fijo. */
 const ARGENTINA_UTC_OFFSET = "-03:00";
 

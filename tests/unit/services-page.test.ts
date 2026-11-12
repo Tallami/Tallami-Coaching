@@ -12,6 +12,8 @@ import { createTestDb } from "../helpers/db";
 
 vi.mock("@/admin/auth/require-admin", () => ({ requireAdmin: vi.fn() }));
 vi.mock("@/db/client", () => ({ getDb: vi.fn() }));
+// El marco lee el número de Mensajes (async): acá se renderiza de una vez, así que se deja pasar el contenido.
+vi.mock("@/app/admin/panel-shell", () => ({ PanelShell: ({ children }: { children: unknown }) => children }));
 vi.mock("next/navigation", () => ({
   redirect: vi.fn((url: string) => {
     throw new Error(`NEXT_REDIRECT ${url}`);

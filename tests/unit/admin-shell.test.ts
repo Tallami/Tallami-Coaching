@@ -27,11 +27,46 @@ describe("AdminShell", () => {
       "Ventas",
       "Servicios",
       "Alumnos",
+      "Mensajes",
       "Aplicaciones",
       "Pedidos del sitio",
       "Facturación",
       "Configuración",
     ]);
+  });
+
+  describe("the unread badge of Mensajes", () => {
+    function render(badges?: Parameters<typeof AdminShell>[0]["badges"]): string {
+      return renderToStaticMarkup(
+        AdminShell({ active: "sales", logoutAction: async () => {}, badges, children: createElement("p", null, "x") }),
+      );
+    }
+    const messagesLink = (html: string) => html.match(/<a [^>]*href="\/admin\/mensajes"[\s\S]*?<\/a>/)?.[0] ?? "";
+
+    test("shows the number and its reading for screen readers next to the section", () => {
+      const link = messagesLink(render({ messages: 3 }));
+
+      expect(link).toContain("3");
+      expect(link).toContain("3 sin leer");
+      expect(link).toContain("Mensajes");
+    });
+
+    test.each([
+      ["zero", { messages: 0 }],
+      ["no badges", undefined],
+      ["an empty object", {}],
+    ])("shows nothing with %s", (_name, badges) => {
+      const link = messagesLink(render(badges));
+
+      expect(link).toContain("Mensajes");
+      expect(link).not.toContain("sin leer");
+    });
+
+    test("comes right after Alumnos", () => {
+      const html = render();
+      expect(html.indexOf(">Alumnos</a>")).toBeLessThan(html.indexOf("/admin/mensajes"));
+      expect(html.indexOf("/admin/mensajes")).toBeLessThan(html.indexOf(">Aplicaciones</a>"));
+    });
   });
 
   test("marks only the current section", () => {

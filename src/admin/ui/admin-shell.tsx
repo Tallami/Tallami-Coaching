@@ -11,6 +11,8 @@ interface AdminShellProps {
   active: AdminSectionId;
   /** Lo que hace el botón Salir (cierra la sesión). Las páginas lo reciben ya conectado de `PanelShell`. */
   logoutAction: () => void | Promise<void>;
+  /** Un número junto a una sección (las conversaciones sin leer de Mensajes): solo se ve si es mayor que cero. */
+  badges?: Partial<Record<AdminSectionId, number>>;
   children: ReactNode;
 }
 
@@ -33,7 +35,7 @@ interface AdminShellProps {
  *
  * No lee datos, así que no verifica la sesión: eso es de la página.
  */
-export function AdminShell({ active, logoutAction, children }: AdminShellProps) {
+export function AdminShell({ active, logoutAction, badges, children }: AdminShellProps) {
   return (
     <>
       <a
@@ -48,6 +50,7 @@ export function AdminShell({ active, logoutAction, children }: AdminShellProps) 
             <ul className="flex flex-col gap-1">
               {ADMIN_SECTIONS.map(({ id, label, href, icon: Icon }) => {
                 const isActive = id === active;
+                const badge = badges?.[id] ?? 0;
                 return (
                   <li key={id}>
                     <Link
@@ -69,6 +72,17 @@ export function AdminShell({ active, logoutAction, children }: AdminShellProps) 
                       ) : null}
                       <Icon className="size-[1.15rem] shrink-0" aria-hidden="true" />
                       {label}
+                      {badge > 0 ? (
+                        <>
+                          <span
+                            aria-hidden="true"
+                            className="ml-auto min-w-6 rounded-full bg-gold px-1.5 py-0.5 text-center text-[0.8125rem] leading-4 font-extrabold text-stage tabular-nums"
+                          >
+                            {badge}
+                          </span>
+                          <span className="sr-only"> {badge} sin leer</span>
+                        </>
+                      ) : null}
                     </Link>
                   </li>
                 );
