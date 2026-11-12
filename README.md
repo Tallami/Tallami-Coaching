@@ -451,7 +451,9 @@ Al entrar con Discord o Google, la base guarda solo esto:
 - el nombre para mostrar que tiene en esa cuenta;
 - el email, solo si el proveedor dice que está verificado;
 - cuándo se creó la cuenta, cuándo entró por última vez y a qué alumno del panel está vinculada;
-- una huella de su sesión (no la sesión misma): dura 30 días.
+- una huella de su sesión (no la sesión misma): dura 30 días;
+- el idioma que tenía el sitio cuando entró, para escribirle los avisos en ese idioma;
+- los mensajes que se escribieron con vos en el chat del portal (ver "Mensajes"): quién los escribió, el texto y cuándo.
 
 En la base no se guarda el avatar, ni la contraseña (no hay), ni la IP, ni los permisos que da el proveedor: se descartan en cuanto se lee el perfil. Muchos alumnos son menores de edad, por eso se guarda lo mínimo.
 
@@ -460,6 +462,7 @@ Cuánto tiempo queda cada cosa. La limpieza corre de pasada, cuando alguien entr
 - Las sesiones y las invitaciones que ya no sirven se borran al día siguiente.
 - Una cuenta sin vincular a ningún alumno (alguien que entró sin invitación, o una cuenta que desvinculaste) se borra sola, con sus sesiones, unos 31 días después de su último ingreso: los 30 de la sesión más larga y el día que se guarda lo que ya no sirve.
 - Una cuenta vinculada se queda hasta que la borres vos: en la ficha del alumno, «Borrar cuenta del portal» borra la cuenta y se va todo lo de arriba.
+- Una conversación sin mensajes nuevos durante 24 meses se borra sola, con la misma limpieza que las aplicaciones y los pedidos del sitio.
 
 La política de privacidad del sitio (`/es/privacidad`, también en `/pt` y `/en`) dice esto mismo para el público, junto con lo que guardan las compras, los formularios y los clics; su texto está en `src/content/legal/privacy.ts` y es un borrador para el abogado (ver "Pagos" → "Antes de cobrar de verdad"). Si el portal empieza a guardar otra cosa, hay que cambiar esa página. El portal no guarda nada en la base de datos fuera de esta lista. Eso no incluye al servicio de hosting (Vercel), que lleva por su cuenta sus propios registros de los pedidos que recibe el sitio: no están en la base ni los maneja el código.
 
@@ -490,6 +493,41 @@ Solo para desarrollo: sin Discord ni Google, con un servidor OAuth falso que cor
 ### Tests del portal
 
 `npm run test` y `npm run test:e2e` cubren el portal sin salir a internet: el e2e arranca el servidor OAuth falso (puerto 3110) y el proveedor de prueba habla con él, nunca con Discord ni con Google. Los e2e del portal están en `tests/e2e/portal-*.spec.ts` (ingreso, invitaciones, entregas del panel y la página del alumno). `tests/unit/readme-portal-guide.test.ts` mantiene esta guía igual al código: las variables, las direcciones de vuelta, la migración y el comando del secreto.
+
+## Mensajes
+
+Un chat de texto entre cada alumno y vos, dentro de la web. Es el lugar donde se coordina todo lo que no se resuelve solo: el día y la hora de una sesión en vivo, una duda sobre una entrega, un pedido por coordinar. Esta guía sigue a "Portal del alumno": el chat usa las mismas cuentas.
+
+### Quién puede escribir y dónde se ve
+
+- **El alumno** escribe desde su portal, en `/es/portal/mensajes` (también en `/pt` y `/en`). Para eso su cuenta del portal tiene que estar vinculada a una ficha de alumno: alguien que compró en la web, o a quien invitaste desde su ficha. Una cuenta sin vincular no puede escribir. En la página principal del portal hay una tarjeta «Mensajes con Tallami» que muestra cuántos mensajes tiene sin leer.
+- **Vos** leés y contestás en el panel, en la sección **Mensajes** (`/admin/mensajes`). En el menú, al lado de «Mensajes», aparece cuántas conversaciones tienen algo sin leer.
+- **Escribirle vos primero.** Desde la ficha del alumno, con el botón «Mensajes»; o desde una fila de «Por coordinar», con el link «Escribirle».
+- Solo texto, de 1 a 2.000 caracteres. No hay imágenes ni archivos.
+
+### Avisos por email
+
+Cuando alguien escribe, al otro le llega un email. **El email nunca trae el texto del mensaje**, solo quién escribió y el enlace para leerlo en la web.
+
+- Solo el primer mensaje sin leer manda aviso. Si el alumno escribe cinco seguidos, te llega un email; el próximo llega recién cuando abras la conversación y después te vuelva a escribir. Lo mismo al revés.
+- Si la cuenta del alumno no tiene email (por ejemplo, entró con Discord y Discord no dio uno verificado), no sale aviso: se entera cuando entra al portal.
+- Al alumno el aviso le llega en el idioma que tenía el sitio cuando entró al portal.
+- Los avisos usan los mismos envíos de email que "Avisos por email (Resend)" y "Pagos": si el email no está configurado, el mensaje se guarda igual y el aviso no sale.
+
+### Límites y cómo se actualiza
+
+- El alumno puede mandar hasta 30 mensajes por hora; vos no tenés tope. Si repite el mismo texto dentro de los 10 segundos, se guarda una sola vez.
+- **No es en tiempo real.** La página abierta se actualiza sola cada 20 segundos mientras la pestaña está a la vista. Si un mensaje no aparece, recargá la página.
+
+### Borrar una conversación
+
+En el panel, dentro de la conversación, hay un botón para borrarla entera (todos sus mensajes). Es definitivo. Hacelo cuando un alumno lo pida por el formulario de contacto. Aunque nadie lo pida, una conversación sin mensajes nuevos durante 24 meses se borra sola con la limpieza de siempre, que corre de pasada cuando alguien entra al sitio.
+
+### Dejarlo listo y probarlo
+
+La migración `drizzle/0009_student_messages.sql` crea las conversaciones, los mensajes y el idioma de la cuenta del portal. Corré `npm run db:migrate` antes de desplegar, como en "Panel de admin" → "Ponerlo en línea". No hay variables nuevas. Los textos del sitio y los legales (términos y privacidad) ya hablan del chat; siguen siendo un borrador para el abogado. Para el abogado queda una pregunta nueva: si el chat privado con alumnos menores necesita algo más, por ejemplo un aviso al adulto que pagó.
+
+`npm run test` y `npm run test:e2e` cubren el chat sin salir a internet.
 
 ## Pagos
 

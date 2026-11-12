@@ -88,7 +88,7 @@
       },
       "schedule": {
         "title": "Combinamos",
-        "body": "Se for um VOD offline, você cola os seus códigos de replay no portal. Se for ao vivo, combinamos dia e horário."
+        "body": "Se for um VOD offline, você cola os seus códigos de replay no portal. Se for ao vivo, combinamos dia e horário pelo chat."
       },
       "train": {
         "title": "Você treina",
@@ -105,7 +105,7 @@
       },
       "afterPayment": {
         "question": "O que acontece depois de pagar?",
-        "answer": "Eu escrevo para você para combinarmos. Tudo o que eu entrego fica guardado no seu portal."
+        "answer": "Eu escrevo para você pelo chat do seu portal para combinarmos. Tudo o que eu entrego fica guardado lá."
       },
       "payment": {
         "question": "Como pago do meu país?",
@@ -121,7 +121,7 @@
       },
       "schedule": {
         "question": "Como agendo a sessão?",
-        "answer": "Combinamos dia e horário por mensagem. Para falar ao vivo, eu passo o meu Discord."
+        "answer": "Combinamos dia e horário pelo chat do seu portal. Para falar ao vivo, eu passo o meu Discord."
       },
       "vodInput": {
         "question": "O que eu mando para um VOD review?",
@@ -421,6 +421,7 @@
       "confirmed": "Seu pagamento de {amount} por {service} está confirmado.",
       "statement": "Se você pagou com cartão, na fatura aparece como {descriptor}.",
       "portal": "O que você comprou e o que eu te entregar fica no seu portal: {url}",
+      "chat": "Para combinarmos, escreva para mim pelo chat do seu portal: {url}",
       "refund": "Você tem 10 dias a partir da compra para pedir o reembolso completo, exceto se o serviço já tiver sido entregue.",
       "signature": "Tomás Allami (Tallami)",
       "replay": "Para começar, cole os códigos de replay das suas partidas no seu portal. O review chega {hours} horas depois de recebermos os códigos."

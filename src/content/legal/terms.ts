@@ -12,7 +12,7 @@ import { formatUsd } from "@/lib/format";
 import { PRO_LINK_TTL_MS, PURCHASE_EXPIRY_DAYS, REPLAY_DELIVERY_HOURS } from "@/payments/policy";
 import type { LegalDocument } from "./types";
 
-const UPDATED_ON = "2026-11-07";
+const UPDATED_ON = "2026-11-12";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const VOD_HOURS = REPLAY_DELIVERY_HOURS.vodRecorded;
@@ -73,7 +73,7 @@ export const TERMS: Record<Locale, LegalDocument> = {
         paragraphs: [
           `En los VOD review de 3 partidas y de torneo completo, pegás los códigos de replay en tu compra, dentro del portal. El plazo de ${VOD_HOURS} o ${TOURNAMENT_HOURS} horas corre desde que llegan los códigos.`,
           "Tallami entrega en tu portal: un video no listado de YouTube, un PDF o un link, según el servicio. Lo que te entrega queda guardado ahí.",
-          "Las sesiones en vivo y todo lo que haga falta se coordinan por mensaje: Tallami te escribe a tu Discord o al email de tu cuenta.",
+          "Las sesiones en vivo y todo lo que haga falta se coordinan por el chat del portal. Para hablar en vivo, Tallami te pasa su Discord por ahí.",
         ],
       },
       {
@@ -191,7 +191,7 @@ export const TERMS: Record<Locale, LegalDocument> = {
         paragraphs: [
           `Nos VOD reviews de 3 partidas e de torneio completo, você cola os códigos de replay na sua compra, dentro do portal. O prazo de ${VOD_HOURS} ou ${TOURNAMENT_HOURS} horas conta a partir da chegada dos códigos.`,
           "O Tallami entrega no seu portal: um vídeo não listado do YouTube, um PDF ou um link, conforme o serviço. O que ele entrega fica guardado lá.",
-          "As sessões ao vivo e tudo o que for preciso são combinados por mensagem: o Tallami escreve para o seu Discord ou para o e-mail da sua conta.",
+          "As sessões ao vivo e tudo o que for preciso são combinados pelo chat do portal. Para falar ao vivo, o Tallami passa o Discord dele por lá.",
         ],
       },
       {
@@ -309,7 +309,7 @@ export const TERMS: Record<Locale, LegalDocument> = {
         paragraphs: [
           `For the 3-game and full tournament VOD reviews, you paste the replay codes into your purchase, inside the portal. The ${VOD_HOURS} or ${TOURNAMENT_HOURS} hours start when the codes arrive.`,
           "Tallami delivers in your portal: an unlisted YouTube video, a PDF or a link, depending on the service. What he delivers stays saved there.",
-          "Live sessions and anything else that's needed are arranged by message: Tallami writes to your Discord or to your account's email.",
+          "Live sessions and anything else that's needed are arranged in the portal chat. To talk live, Tallami gives you his Discord there.",
         ],
       },
       {

@@ -282,7 +282,7 @@ test.describe("how it works", () => {
     ]);
     await expect(steps.nth(1)).toContainText("Con Mercado Pago, en pesos. Te llega la confirmación por email.");
     await expect(steps.nth(2)).toContainText(
-      "Si es un VOD offline, pegás tus códigos de replay en el portal. Si es en vivo, arreglamos día y hora.",
+      "Si es un VOD offline, pegás tus códigos de replay en el portal. Si es en vivo, arreglamos día y hora por el chat.",
     );
   });
 

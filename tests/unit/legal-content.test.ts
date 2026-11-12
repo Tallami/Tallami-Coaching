@@ -243,3 +243,26 @@ describe("the privacy policy", () => {
     }
   });
 });
+
+describe("the portal chat in the legal texts", () => {
+  const privacy = textOf(PRIVACY.es);
+  const terms = textOf(TERMS.es);
+
+  test("the privacy policy in Spanish names the messages, who reads them and the 24 months", () => {
+    expect(privacy).toMatch(/mensajes que .* se escriben en el portal/);
+    expect(privacy).toMatch(/los leen solo ellos dos/);
+    expect(privacy).toMatch(/conversación sin mensajes nuevos durante 24 meses/);
+    expect(privacy).toMatch(/aviso por email que no trae el texto/);
+    expect(privacy).toMatch(/chat del portal es solo para coordinar/);
+  });
+
+  test("the terms in Spanish say the live sessions are arranged in the portal chat", () => {
+    expect(terms).toMatch(/chat del portal/);
+    expect(terms).not.toMatch(/se coordinan por mensaje/);
+  });
+
+  test.each(LOCALES)("the documents in %s were updated after the chat", (locale) => {
+    expect(PRIVACY[locale].updatedOn).toBe("2026-11-12");
+    expect(TERMS[locale].updatedOn).toBe("2026-11-12");
+  });
+});

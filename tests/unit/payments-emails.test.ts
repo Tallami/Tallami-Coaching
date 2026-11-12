@@ -224,6 +224,7 @@ describe("notifyPaymentOutcome: a new sale", () => {
     expect(email.text).toContain(amount);
     expect(email.text).toContain("TALLAMI");
     expect(email.text).toContain(`${SITE_URL}/${locale}/portal`);
+    expect(email.text).toContain(`${SITE_URL}/${locale}/portal/mensajes`);
     expect(email.text).toMatch(refund);
   });
 

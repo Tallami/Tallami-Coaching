@@ -19,7 +19,7 @@ Español (principal), portugués de Brasil e inglés. Rutas `/es`, `/pt`, `/en` 
 Next.js (App Router) + TypeScript + Tailwind + shadcn/ui · Vercel · Supabase (DB, login con Discord y Google, storage) · Sanity (CMS) · Cal.com · Resend · bot de Discord.
 
 ## Pagos
-Mercado Pago (Argentina), ya en la web · Takenos (Pix, a confirmar con ellos) · PayPal (exterior) · cripto, más adelante. Todos los proveedores escriben en una sola tabla de pedidos; un pedido pagado crea la venta en el panel, manda los emails y muestra la compra en el portal. Lo demás se coordina por mensaje. Guía en el README, sección "Pagos".
+Mercado Pago (Argentina), ya en la web · Takenos (Pix, a confirmar con ellos) · PayPal (exterior) · cripto, más adelante. Todos los proveedores escriben en una sola tabla de pedidos; un pedido pagado crea la venta en el panel, manda los emails y muestra la compra en el portal. Lo demás se coordina por el chat del portal. Guía en el README, sección "Pagos".
 
 ## Servicios y precios (USD)
 | Servicio | Precio |

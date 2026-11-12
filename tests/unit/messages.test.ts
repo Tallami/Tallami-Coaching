@@ -188,3 +188,10 @@ describe("messages", () => {
     }
   });
 });
+
+describe("the portal chat in the site texts", () => {
+  test.each(catalogs)("the purchase email in %s links the messages with the url", (_locale, messages) => {
+    const chat = flattenMessages(messages).find(([path]) => path === "Emails.purchase.chat")?.[1];
+    expect(String(chat)).toContain("{url}");
+  });
+});

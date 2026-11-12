@@ -31,11 +31,11 @@ const SITE_NAME = "Tallami Coaching";
 /** Las preguntas frecuentes de `/es`, en el orden y con el texto del diseño. */
 const SPANISH_FAQ = [
   ["¿Cómo compro?", "Elegís el servicio y entrás con Discord o Google. Confirmás el precio y pagás en Mercado Pago. Tu compra aparece en el Portal de alumnos cuando se confirma el pago."],
-  ["¿Qué pasa después de pagar?", "Te escribo para coordinar. Todo lo que te entrego queda guardado en tu portal."],
+  ["¿Qué pasa después de pagar?", "Te escribo por el chat de tu portal para coordinar. Todo lo que te entrego queda guardado ahí."],
   ["¿Cómo pago desde mi país?", "Por ahora se paga con Mercado Pago, desde Argentina. Si estás en otro país, escribime y vemos cómo hacerlo."],
   ["¿Por qué veo dólares y pesos?", "El precio se fija en dólares. En Argentina pagás en pesos y ves el monto exacto antes de confirmar."],
   ["¿Puedo entrenar si tengo menos de 18 años?", "Sí, desde los 13. El pago lo hace un adulto responsable, y la sesión es con vos."],
-  ["¿Cómo agendo la sesión?", "Coordinamos día y hora por mensaje. Para hablar en vivo te paso mi Discord."],
+  ["¿Cómo agendo la sesión?", "Coordinamos día y hora por el chat de tu portal. Para hablar en vivo te paso mi Discord."],
   ["¿Qué te mando para un VOD review?", "Si es offline, pegás los códigos de replay en tu compra, en el portal, y veo las partidas en el juego. Si es en vivo, las vemos juntos en la sesión."],
   ["¿Cuándo recibo mi VOD review?", "El de 3 partidas, en 72 horas desde que me pasás los códigos. El de torneo completo, en 96 horas. El video queda en tu portal."],
   ["¿Y si no puedo ir a la sesión?", "Avisame con 24 horas y la cambiamos sin costo. Si no avisás y pasan 15 minutos del inicio, la sesión cuenta como usada. Si el que falta soy yo, elegís otra fecha o te devuelvo todo."],

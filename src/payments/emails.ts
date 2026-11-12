@@ -181,6 +181,7 @@ function emailForBuyer(order: Order, to: string): EmailMessage {
       t("Emails.purchase.statement", { descriptor: STATEMENT_DESCRIPTOR }),
       "",
       t("Emails.purchase.portal", { url: `${SITE_URL}/${locale}/portal` }),
+      t("Emails.purchase.chat", { url: `${SITE_URL}/${locale}/portal/mensajes` }),
       ...replayLines(order, t),
       "",
       t("Emails.purchase.refund"),

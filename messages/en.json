@@ -88,7 +88,7 @@
       },
       "schedule": {
         "title": "We set it up",
-        "body": "For an offline VOD, you paste your replay codes in the portal. For a live one, we agree on a day and time."
+        "body": "For an offline VOD, you paste your replay codes in the portal. For a live one, we agree on a day and time in the chat."
       },
       "train": {
         "title": "You train",
@@ -105,7 +105,7 @@
       },
       "afterPayment": {
         "question": "What happens after I pay?",
-        "answer": "I write to you to set things up. Everything I deliver stays saved in your portal."
+        "answer": "I write to you in your portal chat to set things up. Everything I deliver stays saved there."
       },
       "payment": {
         "question": "How do I pay from my country?",
@@ -121,7 +121,7 @@
       },
       "schedule": {
         "question": "How do I schedule the session?",
-        "answer": "We set the day and time by message. For the live call, I'll give you my Discord."
+        "answer": "We set the day and time in your portal chat. For the live call, I'll give you my Discord."
       },
       "vodInput": {
         "question": "What do I send you for a VOD review?",
@@ -421,6 +421,7 @@
       "confirmed": "Your payment of {amount} for {service} is confirmed.",
       "statement": "If you paid by card, your statement shows it as {descriptor}.",
       "portal": "What you bought and what I deliver stays in your portal: {url}",
+      "chat": "To set things up, write to me in your portal chat: {url}",
       "refund": "You have 10 days from the purchase to ask for a full refund, unless the service has already been delivered.",
       "signature": "Tomás Allami (Tallami)",
       "replay": "To get started, paste the replay codes of your matches in your portal. The review arrives {hours} hours after we receive them."

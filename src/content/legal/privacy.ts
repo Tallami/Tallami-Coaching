@@ -12,7 +12,7 @@ import { PUBLIC_RECORD_RETENTION_MONTHS, UNPAID_ORDER_RETENTION_DAYS } from "@/p
 import { PORTAL_OAUTH_FLOW_MS, PORTAL_RECORD_RETENTION_MS, PORTAL_SESSION_MS } from "@/portal/policy";
 import type { LegalDocument } from "./types";
 
-const UPDATED_ON = "2026-11-07";
+const UPDATED_ON = "2026-11-12";
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MINUTE_MS = 60 * 1000;
 
@@ -51,6 +51,7 @@ export const PRIVACY: Record<Locale, LegalDocument> = {
           "De cada compra se guarda qué compraste, cuánto pagaste en pesos y en dólares, el valor del dólar que se usó, el estado del pago y los datos de la factura. El pedido guarda además una copia de tu nombre, tu email y tu usuario de Discord, por si la cuenta se borra, y la hora en que confirmaste que el pago lo hace un adulto.",
           "De Mercado Pago llega solo el resultado del pago: su número, el estado, el monto y la fecha. Los datos de tu tarjeta nunca pasan por esta web.",
           "También se guardan los videos, PDF y links que te entrega Tallami, y los códigos de replay que pegás en tu compra, con la hora en que llegaron. Los códigos los ven solo vos y Tallami.",
+          "Los mensajes que vos y Tallami se escriben en el portal se guardan para coordinar el servicio, y los leen solo ellos dos. Cuando uno escribe, al otro le llega un aviso por email que no trae el texto del mensaje.",
         ],
       },
       {
@@ -76,6 +77,7 @@ export const PRIVACY: Record<Locale, LegalDocument> = {
           `Los pedidos que no se pagaron se borran a los ${UNPAID_ORDER_DAYS} días, con su copia de tu nombre y tu email.`,
           `Las aplicaciones a la Temporada Pro y los pedidos del sitio se borran a los ${PUBLIC_RECORD_MONTHS} meses, o antes si Tallami los borra.`,
           `Los clics en los botones de los servicios se borran a los ${CLICK_DAYS} días.`,
+          `Una conversación sin mensajes nuevos durante ${PUBLIC_RECORD_MONTHS} meses se borra sola, y podés pedir que se borre antes desde el formulario de contacto.`,
           "Las ventas y los pedidos pagados se guardan el tiempo que pidan las normas impositivas y de defensa del consumidor. Tu ficha de alumno y tus entregas quedan junto a tus ventas.",
         ],
       },
@@ -110,6 +112,7 @@ export const PRIVACY: Record<Locale, LegalDocument> = {
         paragraphs: [
           "Muchos alumnos son menores. Por eso la web guarda de cada uno solo lo necesario para el servicio, y el pago lo hace siempre un adulto responsable.",
           "Los formularios no piden la edad ni datos que el servicio no necesita.",
+          "El chat del portal es solo para coordinar el servicio.",
         ],
       },
       {
@@ -144,6 +147,7 @@ export const PRIVACY: Record<Locale, LegalDocument> = {
           "De cada compra se guarda o que você comprou, quanto pagou em pesos e em dólares, o valor do dólar usado, o status do pagamento e os dados da nota fiscal. O pedido também guarda uma cópia do seu nome, do seu e-mail e do seu usuário do Discord, caso a conta seja apagada, e a hora em que você confirmou que o pagamento é feito por um adulto.",
           "Do Mercado Pago chega só o resultado do pagamento: o número, o status, o valor e a data. Os dados do seu cartão nunca passam por este site.",
           "Também são guardados os vídeos, PDFs e links que o Tallami entrega, e os códigos de replay que você cola na sua compra, com a hora em que chegaram. Os códigos só você e o Tallami veem.",
+          "As mensagens que você e o Tallami escrevem um para o outro no portal são guardadas para combinar o serviço, e só os dois as leem. Quando um escreve, o outro recebe um aviso por e-mail que não traz o texto da mensagem.",
         ],
       },
       {
@@ -169,6 +173,7 @@ export const PRIVACY: Record<Locale, LegalDocument> = {
           `Os pedidos que não foram pagos são apagados em ${UNPAID_ORDER_DAYS} dias, com a cópia do seu nome e do seu e-mail.`,
           `As candidaturas à Temporada Pro e os pedidos do site são apagados em ${PUBLIC_RECORD_MONTHS} meses, ou antes se o Tallami os apagar.`,
           `Os cliques nos botões dos serviços são apagados em ${CLICK_DAYS} dias.`,
+          `Uma conversa sem mensagens novas por ${PUBLIC_RECORD_MONTHS} meses é apagada sozinha, e você pode pedir que seja apagada antes pelo formulário de contato.`,
           "As vendas e os pedidos pagos são guardados pelo tempo que as normas fiscais e de defesa do consumidor exigirem. A sua ficha de aluno e as suas entregas ficam junto com as suas vendas.",
         ],
       },
@@ -203,6 +208,7 @@ export const PRIVACY: Record<Locale, LegalDocument> = {
         paragraphs: [
           "Muitos alunos são menores de idade. Por isso o site guarda de cada um só o necessário para o serviço, e o pagamento é sempre feito por um adulto responsável.",
           "Os formulários não pedem a idade nem dados de que o serviço não precisa.",
+          "O chat do portal serve só para combinar o serviço.",
         ],
       },
       {
@@ -237,6 +243,7 @@ export const PRIVACY: Record<Locale, LegalDocument> = {
           "For each purchase the site keeps what you bought, how much you paid in pesos and in dollars, the dollar rate used, the payment status and the invoice details. The order also keeps a copy of your name, your email and your Discord username, in case the account is deleted, and the time you confirmed that an adult is making the payment.",
           "From Mercado Pago only the payment result arrives: its number, status, amount and date. Your card details never go through this site.",
           "The site also keeps the videos, PDFs and links Tallami delivers, and the replay codes you paste into your purchase, with the time they arrived. Only you and Tallami see the codes.",
+          "The messages you and Tallami write to each other in the portal are kept to arrange the service, and only the two of you read them. When one writes, the other gets an email notice that doesn't include the text of the message.",
         ],
       },
       {
@@ -262,6 +269,7 @@ export const PRIVACY: Record<Locale, LegalDocument> = {
           `Orders that were never paid are deleted after ${UNPAID_ORDER_DAYS} days, with the copy of your name and email.`,
           `Temporada Pro applications and site requests are deleted after ${PUBLIC_RECORD_MONTHS} months, or sooner if Tallami deletes them.`,
           `Clicks on the service buttons are deleted after ${CLICK_DAYS} days.`,
+          `A conversation with no new messages for ${PUBLIC_RECORD_MONTHS} months deletes itself, and you can ask for it to be deleted sooner through the contact form.`,
           "Sales and paid orders are kept for as long as tax and consumer protection rules require. Your student file and your deliveries stay with your sales.",
         ],
       },
@@ -296,6 +304,7 @@ export const PRIVACY: Record<Locale, LegalDocument> = {
         paragraphs: [
           "Many students are minors. That's why the site keeps only what the service needs about each one, and payment is always made by a responsible adult.",
           "The forms don't ask for age or for data the service doesn't need.",
+          "The portal chat is only for arranging the service.",
         ],
       },
       {
