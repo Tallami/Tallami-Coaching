@@ -6,17 +6,12 @@ import { and, inArray, lt } from "drizzle-orm";
 import { purgeStaleConversations } from "@/chat/conversations";
 import type { Db } from "@/db/client";
 import { orders, proApplications, siteRequests } from "@/db/schema";
+import { monthsBefore } from "@/lib/months";
 import { PUBLIC_RECORD_RETENTION_MONTHS, UNPAID_ORDER_RETENTION_DAYS, type OrderStatus } from "./policy";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Los pedidos que nunca cobraron, `pending` incluido: guardan un nombre y un email y no respaldan ninguna venta. */
 const UNPAID_STATUSES: OrderStatus[] = ["created", "pending", "rejected", "cancelled"];
-
-export function monthsBefore(now: Date, months: number): Date {
-  const date = new Date(now);
-  date.setUTCMonth(date.getUTCMonth() - months);
-  return date;
-}
 
 /**
  * Borra los pedidos sin pagar de más de 90 días, y las aplicaciones y pedidos del sitio de más de

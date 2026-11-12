@@ -9,7 +9,7 @@ import { and, count, desc, eq, gt, isNull, lt, or, sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { conversations, customers, messages, portalAccounts } from "@/db/schema";
 import { isUuid } from "@/db/uuid";
-import { monthsBefore } from "@/payments/retention";
+import { monthsBefore } from "@/lib/months";
 import { PUBLIC_RECORD_RETENTION_MONTHS } from "@/payments/policy";
 import {
   DUPLICATE_WINDOW_MS,
