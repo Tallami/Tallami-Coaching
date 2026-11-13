@@ -6,6 +6,7 @@ import { listMessages, type ChatMessage } from "@/chat/conversations";
 import { CHAT_IDLE } from "@/chat/form-state";
 import { MESSAGE_MAX_LENGTH, MESSAGES_REFRESH_MS } from "@/chat/policy";
 import { AutoRefresh } from "@/components/chat/auto-refresh";
+import { chatDraftKey } from "@/components/chat/chat-draft";
 import { ComposeForm, type ComposeLabels } from "@/components/chat/compose-form";
 import { MessageThread } from "@/components/chat/message-thread";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,10 @@ import { MessageView } from "./message-view";
 import { SignInButtons } from "./sign-in-buttons";
 
 /** Lo que se sabe de quien mira: sin sesión, cuenta sin vincular o alumno con su conversación. */
-type ChatVisitor = { view: "signedOut" } | { view: "unlinked" } | { view: "linked"; messages: ChatMessage[] };
+type ChatVisitor =
+  | { view: "signedOut" }
+  | { view: "unlinked" }
+  | { view: "linked"; customerId: string; messages: ChatMessage[] };
 
 /**
  * Lee la sesión y, si la cuenta es de un alumno, su conversación. Es la única puerta a los mensajes de
@@ -28,7 +32,7 @@ async function loadChatVisitor(): Promise<ChatVisitor> {
   const account = await getCurrentStudent();
   if (!account) return { view: "signedOut" };
   if (!account.customerId) return { view: "unlinked" };
-  return { view: "linked", messages: await listMessages(await getDb(), account.customerId) };
+  return { view: "linked", customerId: account.customerId, messages: await listMessages(await getDb(), account.customerId) };
 }
 
 /** Solo el nombre del error: el mensaje podría traer la conexión a la base. */
@@ -66,7 +70,7 @@ async function UnlinkedChat({ locale }: { locale: Locale }) {
   );
 }
 
-async function Conversation({ locale, messages }: { locale: Locale; messages: ChatMessage[] }) {
+async function Conversation({ locale, customerId, messages }: { locale: Locale; customerId: string; messages: ChatMessage[] }) {
   const t = await getTranslations("Chat");
   const labels: ComposeLabels = {
     label: t("compose.label"),
@@ -89,7 +93,14 @@ async function Conversation({ locale, messages }: { locale: Locale; messages: Ch
         labels={{ own: t("thread.own"), other: t("thread.other"), empty: t("thread.empty"), thread: t("thread.label") }}
         locale={INTL_TAG[locale]}
       />
-      <ComposeForm action={sendStudentMessageAction} initialState={CHAT_IDLE} labels={labels} maxLength={MESSAGE_MAX_LENGTH} />
+      {/* El borrador es del alumno (su propio id): vuelve si el refresco saca el formulario y entra de nuevo en esta pestaña. */}
+      <ComposeForm
+        action={sendStudentMessageAction}
+        initialState={CHAT_IDLE}
+        labels={labels}
+        maxLength={MESSAGE_MAX_LENGTH}
+        draftKey={chatDraftKey("portal", customerId)}
+      />
       <AutoRefresh
         intervalMs={MESSAGES_REFRESH_MS}
         incoming={messages.filter(({ sender }) => sender === "coach").length}
@@ -123,6 +134,6 @@ export async function MessagesContent({ locale }: { locale: Locale }) {
     case "unlinked":
       return <UnlinkedChat locale={locale} />;
     case "linked":
-      return <Conversation locale={locale} messages={visitor.messages} />;
+      return <Conversation locale={locale} customerId={visitor.customerId} messages={visitor.messages} />;
   }
 }

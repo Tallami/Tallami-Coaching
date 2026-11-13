@@ -22,7 +22,7 @@ import {
   studentName,
   tickAndPay,
 } from "../helpers/checkout-e2e";
-import { createStudent } from "../helpers/portal-admin-ui";
+import { createStudent, inviteStudent } from "../helpers/portal-admin-ui";
 import { newStudentBrowser, signIn, uniqueProviderStudent } from "../helpers/portal-e2e";
 import es from "../../messages/es.json" with { type: "json" };
 
@@ -255,6 +255,49 @@ test.describe("a student that cannot receive messages", () => {
     await page.reload();
     await expect(chatMessages(page)).toHaveCount(0);
     await expect(main(page).getByText(/no puede recibir mensajes/)).toBeVisible();
+    await student.context.close();
+  });
+});
+
+test.describe("the text Tallami was writing", () => {
+  test("survives the refresh that removes the form when the account is unlinked, and is back when the student is linked again", async ({
+    page,
+    browser,
+  }) => {
+    await loginAsAdmin(page);
+    const student = await linkedChatStudent(page, browser, "Alumna que se va y vuelve");
+    const id = await studentIdOf(page, student.name);
+    await page.clock.install();
+    await openConversation(page, id);
+    await whenComposeReady(page);
+    await composeBox(page, PANEL_COPY).click();
+    await composeBox(page, PANEL_COPY).pressSequentially("te escribo cuando vuelvas");
+
+    // En otra pestaña del panel se desvincula la cuenta; el refresco de esta saca el formulario.
+    const other = await page.context().newPage();
+    await other.goto(`/admin/alumnos/${id}`);
+    const portal = other.getByRole("region", { name: "Portal del alumno" });
+    await portal.getByRole("button", { name: "Desvincular" }).click();
+    await portal.getByRole("button", { name: "Sí, desvincular" }).click();
+    await expect(portal.getByRole("button", { name: "Invitar al portal" })).toBeVisible();
+
+    await expect(async () => {
+      await page.clock.fastForward(MESSAGES_REFRESH_MS);
+      await expect(main(page).getByText(/no puede recibir mensajes/)).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 30_000 });
+    await expect(composeBox(page, PANEL_COPY)).toHaveCount(0);
+
+    // Se lo vuelve a invitar y entra con la invitación: la cuenta queda vinculada otra vez.
+    const token = await inviteStudent(other, student.name);
+    await other.close();
+    const back = await newStudentBrowser(browser);
+    await signIn(back.page, { invitation: token, student: uniqueProviderStudent() });
+    await back.context.close();
+
+    await page.reload();
+    await whenComposeReady(page);
+    await expect(composeBox(page, PANEL_COPY)).toHaveValue("te escribo cuando vuelvas");
+    await expect(chatMessages(page)).toHaveCount(0);
     await student.context.close();
   });
 });

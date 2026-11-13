@@ -5,6 +5,7 @@ import { useHydrated } from "@/admin/ui/use-hydrated";
 import type { ChatFormState } from "@/chat/form-state";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { clearOwnDraft, saveOwnDraft, takeOwnDraft } from "./chat-draft";
 
 /** Los textos ya traducidos: el cliente no carga el catálogo de mensajes. */
 export interface ComposeLabels {
@@ -29,6 +30,11 @@ interface ComposeFormProps {
   initialState: ChatFormState;
   labels: ComposeLabels;
   maxLength: number;
+  /**
+   * El dueño del borrador (`chatDraftKey(...)`). Con él, lo que se escribe se guarda en la pestaña y vuelve
+   * al abrir de nuevo el formulario con el mismo dueño (ver `chat-draft.ts`). Sin él, no se guarda nada.
+   */
+  draftKey?: string;
 }
 
 function noticeFor(state: ChatFormState, labels: ComposeLabels): { text: string; isError: boolean } | null {
@@ -60,8 +66,13 @@ function noticeFor(state: ChatFormState, labels: ComposeLabels): { text: string;
  * envía, el botón queda ocupado y el cuadro de solo lectura: lo que se escriba en ese momento no se pierde
  * cuando el envío lo vacía. Un segundo clic que llegue igual manda el mismo texto, y el servidor lo toma
  * como repetido.
+ *
+ * Con `draftKey`, el texto además se guarda en la pestaña con cada cambio, porque el refresco sí puede
+ * sacar el formulario (la sesión se cerró, la cuenta se desvinculó). Las tres fuentes no se pisan: lo que
+ * se escribe se guarda al escribirse; lo que devuelve un envío reemplaza al cuadro y al lugar (vacío si
+ * salió); y lo guardado solo entra al montarse, y solo si el cuadro sigue vacío.
  */
-export function ComposeForm({ action, initialState, labels, maxLength }: ComposeFormProps) {
+export function ComposeForm({ action, initialState, labels, maxLength, draftKey }: ComposeFormProps) {
   const [state, formAction, pending] = useActionState(action, initialState);
   const [draft, setDraft] = useState(state.body);
   const [shown, setShown] = useState(state);
@@ -80,6 +91,14 @@ export function ComposeForm({ action, initialState, labels, maxLength }: Compose
   }
 
   useEffect(() => {
+    // Lo guardado vuelve después de hidratar (nunca al dibujar: el servidor no lo conoce), solo a su dueño
+    // y sin pisar lo que ya se haya escrito.
+    if (!draftKey) return;
+    const saved = takeOwnDraft(draftKey);
+    if (saved !== null && box.current?.value === "") setDraft(saved);
+  }, [draftKey]);
+
+  useEffect(() => {
     if (isFirstState.current) {
       isFirstState.current = false;
       return;
@@ -87,6 +106,21 @@ export function ComposeForm({ action, initialState, labels, maxLength }: Compose
     // Después de enviar, el foco vuelve al cuadro (el botón lo tuvo, y mientras enviaba estuvo deshabilitado).
     if (state.outcome === "sent") box.current?.focus();
   }, [state]);
+
+  const savedState = useRef(state);
+  useEffect(() => {
+    // El lugar de la pestaña sigue al resultado: vacío si salió; si no, con lo que el servidor devolvió.
+    if (savedState.current === state) return;
+    savedState.current = state;
+    if (!draftKey) return;
+    if (state.outcome === "sent") clearOwnDraft(draftKey);
+    else saveOwnDraft(draftKey, state.body);
+  }, [state, draftKey]);
+
+  function changeDraft(value: string) {
+    setDraft(value);
+    if (draftKey) saveOwnDraft(draftKey, value);
+  }
 
   useEffect(() => {
     // Al abrir la página, el formulario y lo último de la conversación, que está justo arriba, quedan a la vista.
@@ -116,7 +150,7 @@ export function ComposeForm({ action, initialState, labels, maxLength }: Compose
         maxLength={maxLength}
         rows={3}
         value={draft}
-        onChange={(event) => setDraft(event.target.value)}
+        onChange={(event) => changeDraft(event.target.value)}
         onKeyDown={sendWithKeyboard}
         readOnly={pending}
         aria-describedby={describedBy}
@@ -133,8 +167,9 @@ export function ComposeForm({ action, initialState, labels, maxLength }: Compose
           {pending ? labels.submitting : labels.submit}
         </Button>
       </div>
+      {/* Dos nodos distintos (`key`): un aviso que pasa de estado a error entra como un `alert` nuevo y se anuncia. */}
       {notice?.isError ? (
-        <p id={noticeId} role="alert" className="m-0 border-l-4 border-danger bg-danger-tint px-3 py-2 text-danger-ink">
+        <p key="alert" id={noticeId} role="alert" className="m-0 border-l-4 border-danger bg-danger-tint px-3 py-2 text-danger-ink">
           {notice.text}
           {state.outcome === "signed-out" && labels.signIn ? (
             <>
@@ -147,7 +182,7 @@ export function ComposeForm({ action, initialState, labels, maxLength }: Compose
           ) : null}
         </p>
       ) : (
-        <p role="status" className="sr-only">
+        <p key="status" role="status" className="sr-only">
           {notice?.text ?? ""}
         </p>
       )}

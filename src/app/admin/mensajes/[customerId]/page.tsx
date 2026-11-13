@@ -13,6 +13,7 @@ import { listMessages } from "@/chat/conversations";
 import { CHAT_IDLE } from "@/chat/form-state";
 import { MESSAGE_MAX_LENGTH, MESSAGES_REFRESH_MS } from "@/chat/policy";
 import { AutoRefresh } from "@/components/chat/auto-refresh";
+import { chatDraftKey } from "@/components/chat/chat-draft";
 import { ComposeForm, type ComposeLabels } from "@/components/chat/compose-form";
 import { MessageThread } from "@/components/chat/message-thread";
 import { Button } from "@/components/ui/button";
@@ -100,6 +101,7 @@ export default async function ConversationPage(props: PageProps<"/admin/mensajes
             initialState={CHAT_IDLE}
             labels={COMPOSE_LABELS}
             maxLength={MESSAGE_MAX_LENGTH}
+            draftKey={chatDraftKey("admin", customerId)}
           />
         ) : null}
         <AutoRefresh

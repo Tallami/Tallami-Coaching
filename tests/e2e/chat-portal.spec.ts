@@ -166,7 +166,7 @@ test.describe("the messages of a linked student", () => {
     await student.context.close();
   });
 
-  test("without JavaScript, sending the same form again (Back and resubmit) leaves a single message", async ({ page, browser }) => {
+  test("without JavaScript, the same form sent again within the 10 seconds (Back and resubmit at once) leaves a single message", async ({ page, browser }) => {
     await loginAsAdmin(page);
     const student = await linkedChatStudent(page, browser, "Alumno que vuelve atrás");
     const context = await browser.newContext({
@@ -208,12 +208,75 @@ test.describe("the messages of a linked student", () => {
     await expect(alerts(s).getByRole("link", { name: new RegExp(`^${es.Chat.compose.signIn}`) })).toHaveAttribute("href", "/es/portal");
     await expect(composeBox(s)).toHaveValue("se me venció la sesión");
     await expect(chatMessages(s)).toHaveCount(0);
+    // El aviso de sesión cerrada, también sin problemas serios de accesibilidad.
+    const results = await new AxeBuilder({ page: s }).withTags(WCAG_TAGS).analyze();
+    const serious = results.violations.filter(({ impact }) => impact === "serious" || impact === "critical");
+    expect(serious.map(({ id, nodes }) => ({ id, targets: nodes.map((node) => node.target) }))).toEqual([]);
 
     await signIn(s, { student: student.providerStudent });
     await openMessages(s);
     await expect(s.getByRole("main").getByText(es.Chat.thread.empty)).toBeVisible();
-    await expect(s.getByText("se me venció la sesión")).toHaveCount(0);
+    await expect(chatMessages(s)).toHaveCount(0);
+    // No se guardó nada, pero lo escrito vuelve al cuadro en esta pestaña.
+    await expect(composeBox(s)).toHaveValue("se me venció la sesión");
     await student.context.close();
+  });
+
+  test("when the refresh finds the session gone and swaps the form for the sign-in, the text comes back after signing in again in the same tab", async ({
+    page,
+    browser,
+  }) => {
+    await loginAsAdmin(page);
+    const student = await linkedChatStudent(page, browser, "Alumna que vuelve a entrar");
+    const s = student.page;
+    await s.clock.install();
+    await openMessages(s);
+    await composeBox(s).click();
+    await composeBox(s).pressSequentially("lo escribí antes de que se cerrara");
+
+    await student.context.clearCookies({ name: STUDENT_COOKIE });
+    const signInTitle = s.getByRole("main").getByRole("heading", { level: 2, name: es.Chat.signIn.title });
+    await expect(async () => {
+      await s.clock.fastForward(MESSAGES_REFRESH_MS);
+      await expect(signInTitle).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 30_000 });
+    await expect(composeBox(s)).toHaveCount(0);
+
+    await signIn(s, { student: student.providerStudent });
+    await openMessages(s);
+    await expect(composeBox(s)).toHaveValue("lo escribí antes de que se cerrara");
+    await expect(chatMessages(s)).toHaveCount(0);
+    await student.context.close();
+  });
+
+  test("a different student who signs in in that tab gets an empty box, and the draft is gone for good", async ({ page, browser }) => {
+    await loginAsAdmin(page);
+    const ana = await linkedChatStudent(page, browser, "Ana del borrador");
+    const beto = await linkedChatStudent(page, browser, "Beto del borrador");
+    await beto.context.close();
+    const s = ana.page;
+    await s.clock.install();
+    await openMessages(s);
+    await composeBox(s).click();
+    await composeBox(s).pressSequentially("esto es solo de Ana");
+
+    await ana.context.clearCookies({ name: STUDENT_COOKIE });
+    const signInTitle = s.getByRole("main").getByRole("heading", { level: 2, name: es.Chat.signIn.title });
+    await expect(async () => {
+      await s.clock.fastForward(MESSAGES_REFRESH_MS);
+      await expect(signInTitle).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 30_000 });
+
+    await signIn(s, { student: beto.providerStudent });
+    await openMessages(s);
+    await expect(composeBox(s)).toHaveValue("");
+    expect(await s.locator("body").innerText()).not.toContain("esto es solo de Ana");
+
+    // El borrador se borró al verlo otro dueño: Ana tampoco lo recupera después.
+    await signIn(s, { student: ana.providerStudent });
+    await openMessages(s);
+    await expect(composeBox(s)).toHaveValue("");
+    await ana.context.close();
   });
 
   test("an empty message is not sent, and 2,001 characters are rejected also without the maxlength of the page", async ({ page, browser }) => {
