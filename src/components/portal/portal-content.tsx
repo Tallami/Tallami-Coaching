@@ -78,9 +78,23 @@ async function loadVisitor(query: PortalQuery, now: Date): Promise<Visitor> {
   }
   const [purchases, unread] = await Promise.all([
     listStudentPurchases(db, account.customerId),
-    unreadForStudent(db, account.customerId),
+    unreadOrZero(db, account.customerId),
   ]);
   return { view: "linked", account, order, purchases, unread };
+}
+
+/**
+ * Cuántos mensajes de Tallami no leyó el alumno; si no se puede saber, 0 (la tarjeta sale sin número):
+ * el número de una tarjeta no puede tapar las compras. Las señales de Next pasan.
+ */
+async function unreadOrZero(db: Db, customerId: string): Promise<number> {
+  try {
+    return await unreadForStudent(db, customerId);
+  } catch (error) {
+    unstable_rethrow(error);
+    console.error(`Portal: no se pudo contar los mensajes sin leer. ${errorName(error)}`);
+    return 0;
+  }
 }
 
 /**

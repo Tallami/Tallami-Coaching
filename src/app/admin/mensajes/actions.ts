@@ -80,9 +80,21 @@ export async function markCoachReadAction(customerId: string): Promise<void> {
   }
 }
 
-/** Borra la conversación entera del alumno y vuelve a la bandeja con un aviso. */
-export async function deleteConversationAction(customerId: string): Promise<void> {
+/** Lo que vuelve cuando no se pudo borrar: la página lo dice y deja probar de nuevo. Si se borró, redirige. */
+export type DeleteConversationResult = { ok: false };
+
+/**
+ * Borra la conversación entera del alumno y vuelve a la bandeja con un aviso. Si la base no contesta, no
+ * tira: devuelve `{ ok: false }` (y anota solo el tipo del error).
+ */
+export async function deleteConversationAction(customerId: string): Promise<DeleteConversationResult> {
   await requireAdmin();
-  await deleteConversation(await getDb(), customerId);
+  try {
+    await deleteConversation(await getDb(), customerId);
+  } catch (error) {
+    unstable_rethrow(error);
+    console.error(`[mensajes] no se pudo borrar la conversación: ${errorName(error)}`);
+    return { ok: false };
+  }
   redirect(`${ADMIN_ROUTES.messages}?borrada=1`);
 }

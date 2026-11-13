@@ -45,6 +45,9 @@ export function AutoRefresh({ intervalMs, incoming, markRead }: AutoRefreshProps
 
   useEffect(() => {
     latest.current = { incoming, markRead };
+    // Hay menos que los ya marcados: la conversación se borró (y quizás se volvió a escribir). Se cuenta
+    // desde lo que hay ahora, así el próximo mensaje que llegue se marca.
+    if (markedUpTo.current !== null && incoming < markedUpTo.current) markedUpTo.current = incoming;
     markIfNew(markedUpTo, incoming, markRead);
   }, [incoming, markRead]);
 

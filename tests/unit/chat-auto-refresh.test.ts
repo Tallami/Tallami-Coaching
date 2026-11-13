@@ -125,6 +125,28 @@ describe("AutoRefresh", () => {
     expect(markRead).toHaveBeenCalledTimes(2);
   });
 
+  test("a conversation that was emptied and written again marks the new message read", async () => {
+    await render(2);
+    expect(markRead).toHaveBeenCalledTimes(1);
+
+    await render(0); // Tallami borró la conversación
+    await render(1); // y llegó un mensaje nuevo
+
+    expect(markRead).toHaveBeenCalledTimes(2);
+  });
+
+  test("the count is reset also when it drops with the tab hidden", async () => {
+    await render(2);
+    visibility = "hidden";
+    await render(0);
+    await render(1);
+    expect(markRead).toHaveBeenCalledTimes(1);
+
+    await setVisibility("visible");
+
+    expect(markRead).toHaveBeenCalledTimes(2);
+  });
+
   test("stops asking once unmounted", async () => {
     await render(0);
     await act(async () => root.unmount());

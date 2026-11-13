@@ -388,12 +388,27 @@ describe("the card of the messages with Tallami", () => {
     expect(unreadOf).not.toHaveBeenCalled();
   });
 
-  test("when the unread messages cannot be read, the page says it could not load, like with the purchases", async () => {
+  test("when only the unread messages cannot be read, the purchases and the card are shown, without a number, and the log has only the type", async () => {
     currentStudent.mockResolvedValue(ACCOUNT);
     purchasesOf.mockResolvedValue([]);
-    unreadOf.mockRejectedValue(new Error("se cayó la base"));
+    unreadOf.mockRejectedValue(new TypeError("conexión a postgres://usuario:clave-secreta@db"));
 
-    expect(propsOf(await page(), MessageView)).toEqual({ messageKey: "loadFailed" });
+    const tree = await page({}, "es");
+
+    expect(propsOf(tree, MessageView)).toBeUndefined();
+    expect(propsOf(tree, PurchaseList)).toEqual({ purchases: [] });
+    expect(propsOf(tree, MessagesCard)).toEqual({ unread: 0, locale: "es" });
+    const logged = vi.mocked(console.error).mock.calls.flat().join(" ");
+    expect(logged).toContain("TypeError");
+    expect(logged).not.toMatch(/clave-secreta|postgres:\/\//);
+  });
+
+  test("a control-flow error of Next in the unread count goes through", async () => {
+    currentStudent.mockResolvedValue(ACCOUNT);
+    purchasesOf.mockResolvedValue([]);
+    unreadOf.mockImplementation(async () => notFound());
+
+    await expect(page()).rejects.toMatchObject({ digest: expect.stringContaining("404") });
   });
 
   test.each([

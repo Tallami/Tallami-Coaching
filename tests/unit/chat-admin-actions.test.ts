@@ -218,6 +218,15 @@ describe("deleteConversationAction", () => {
     await expect(deleteConversationAction(linked)).rejects.toBe(NO_SESSION);
     expect(await db.select().from(messages)).toHaveLength(1);
   });
+
+  test("when the database fails it does not throw: it says so to the page, and the log has only the type of the error", async () => {
+    vi.mocked(getDb).mockRejectedValue(new TypeError("conexión a postgres://usuario:clave@db"));
+
+    await expect(deleteConversationAction(linked)).resolves.toEqual({ ok: false });
+    const logged = vi.mocked(console.error).mock.calls.flat().join(" ");
+    expect(logged).toContain("TypeError");
+    expect(logged).not.toMatch(/postgres:\/\/|clave/);
+  });
 });
 
 describe("unreadConversationsForMenu", () => {
