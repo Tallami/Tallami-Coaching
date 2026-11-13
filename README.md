@@ -461,7 +461,8 @@ Cuánto tiempo queda cada cosa. La limpieza corre de pasada, cuando alguien entr
 
 - Las sesiones y las invitaciones que ya no sirven se borran al día siguiente.
 - Una cuenta sin vincular a ningún alumno (alguien que entró sin invitación, o una cuenta que desvinculaste) se borra sola, con sus sesiones, unos 31 días después de su último ingreso: los 30 de la sesión más larga y el día que se guarda lo que ya no sirve.
-- Una cuenta vinculada se queda hasta que la borres vos: en la ficha del alumno, «Borrar cuenta del portal» borra la cuenta y se va todo lo de arriba.
+- Una cuenta vinculada se queda hasta que la borres vos: en la ficha del alumno, «Borrar cuenta del portal» borra la cuenta y se va todo lo de arriba, menos los mensajes.
+- Los mensajes son del alumno del panel, no de la cuenta: siguen ahí aunque borres o desvincules la cuenta del portal (si el alumno vuelve a entrar con una cuenta vinculada, ve la misma conversación). Para borrarlos, usá «Borrar la conversación» en Mensajes, o borrá al alumno.
 - Una conversación sin mensajes nuevos durante 24 meses se borra sola, con la misma limpieza que las aplicaciones y los pedidos del sitio.
 
 La política de privacidad del sitio (`/es/privacidad`, también en `/pt` y `/en`) dice esto mismo para el público, junto con lo que guardan las compras, los formularios y los clics; su texto está en `src/content/legal/privacy.ts` y es un borrador para el abogado (ver "Pagos" → "Antes de cobrar de verdad"). Si el portal empieza a guardar otra cosa, hay que cambiar esa página. El portal no guarda nada en la base de datos fuera de esta lista. Eso no incluye al servicio de hosting (Vercel), que lleva por su cuenta sus propios registros de los pedidos que recibe el sitio: no están en la base ni los maneja el código.
@@ -521,7 +522,7 @@ Cuando alguien escribe, al otro le llega un email. **El email nunca trae el text
 
 ### Borrar una conversación
 
-En el panel, dentro de la conversación, hay un botón para borrarla entera (todos sus mensajes). Es definitivo. Hacelo cuando un alumno lo pida por el formulario de contacto. Aunque nadie lo pida, una conversación sin mensajes nuevos durante 24 meses se borra sola con la limpieza de siempre, que corre de pasada cuando alguien entra al sitio.
+En el panel, dentro de la conversación, hay un botón para borrarla entera (todos sus mensajes). Es definitivo. Hacelo cuando un alumno lo pida por el formulario de contacto. Aunque nadie lo pida, una conversación sin mensajes nuevos durante 24 meses se borra sola con la limpieza de siempre, que corre de pasada cuando alguien entra al portal.
 
 ### Dejarlo listo y probarlo
 

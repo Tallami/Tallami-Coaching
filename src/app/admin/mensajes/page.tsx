@@ -8,6 +8,7 @@ import { firstValue } from "@/admin/ui/search-params";
 import { PanelShell } from "@/app/admin/panel-shell";
 import { listInbox } from "@/chat/conversations";
 import { getDb } from "@/db/client";
+import { PUBLIC_RECORD_RETENTION_MONTHS } from "@/payments/policy";
 
 export const metadata: Metadata = { title: "Mensajes" };
 
@@ -20,7 +21,7 @@ export default async function MessagesInboxPage(props: PageProps<"/admin/mensaje
     <PanelShell active="messages">
       <PageHeader
         title="Mensajes"
-        description="Las conversaciones con tus alumnos: arriba las que tienen algo sin leer. Se borran solas a los 24 meses sin mensajes nuevos."
+        description={`Las conversaciones con tus alumnos: arriba las que tienen algo sin leer. Se borran solas a los ${PUBLIC_RECORD_RETENTION_MONTHS} meses sin mensajes nuevos.`}
       />
       {deleted ? (
         <Notice tone="ok" className="mb-6">

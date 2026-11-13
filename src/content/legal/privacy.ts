@@ -40,7 +40,7 @@ export const PRIVACY: Record<Locale, LegalDocument> = {
       {
         heading: "Tu cuenta del portal",
         paragraphs: [
-          "Cuando entrás con Discord o con Google se guarda: el proveedor, tu número de usuario en ese servicio, tu nombre para mostrar, tu email si el proveedor dice que está verificado y, con Discord, tu nombre de usuario.",
+          "Cuando entrás con Discord o con Google se guarda: el proveedor, tu número de usuario en ese servicio, tu nombre para mostrar, tu email si el proveedor dice que está verificado, con Discord, tu nombre de usuario, y el idioma de la web cuando entraste (español, portugués o inglés), para escribirte los avisos en ese idioma.",
           "Sirve para que entres a tu portal y para que Tallami pueda escribirte. La cuenta no guarda tu contraseña, tu foto ni tu IP.",
         ],
       },
@@ -86,7 +86,7 @@ export const PRIVACY: Record<Locale, LegalDocument> = {
         paragraphs: [
           "Vercel aloja la web y recibe cada visita, con tu IP. La web corre en su región de San Pablo, Brasil.",
           "Supabase guarda la base de datos, también en San Pablo: todo lo que se describe arriba. Por eso tus datos se guardan en Brasil.",
-          "Resend manda los emails de la web: ve tu email y el texto de cada mensaje.",
+          "Resend manda los emails de la web: ve tu email y el texto de cada email.",
           "Mercado Pago procesa el pago: recibe tus datos de pago directamente, sin pasar por esta web.",
           "Discord y Google te dejan entrar al portal: saben que entraste a esta web con tu cuenta.",
           "YouTube muestra los videos de tus entregas en modo sin cookies hasta que tocás play; desde ahí, YouTube sabe que mirás el video.",
@@ -136,7 +136,7 @@ export const PRIVACY: Record<Locale, LegalDocument> = {
       {
         heading: "Sua conta do portal",
         paragraphs: [
-          "Quando você entra com Discord ou com Google, são guardados: o provedor, o seu número de usuário nesse serviço, o seu nome de exibição, o seu e-mail se o provedor disser que está verificado e, com Discord, o seu nome de usuário.",
+          "Quando você entra com Discord ou com Google, são guardados: o provedor, o seu número de usuário nesse serviço, o seu nome de exibição, o seu e-mail se o provedor disser que está verificado, com Discord, o seu nome de usuário, e o idioma do site quando você entrou (espanhol, português ou inglês), para escrever os avisos nesse idioma.",
           "Isso serve para você entrar no seu portal e para o Tallami poder escrever para você. A conta não guarda a sua senha, a sua foto nem o seu IP.",
         ],
       },
@@ -182,7 +182,7 @@ export const PRIVACY: Record<Locale, LegalDocument> = {
         paragraphs: [
           "A Vercel hospeda o site e recebe cada visita, com o seu IP. O site roda na região de São Paulo, Brasil, da Vercel.",
           "O Supabase guarda o banco de dados, também em São Paulo: tudo o que está descrito acima. Por isso os seus dados ficam guardados no Brasil.",
-          "O Resend envia os e-mails do site: vê o seu e-mail e o texto de cada mensagem.",
+          "O Resend envia os e-mails do site: vê o seu e-mail e o texto de cada e-mail.",
           "O Mercado Pago processa o pagamento: recebe os seus dados de pagamento diretamente, sem passar por este site.",
           "O Discord e o Google permitem a sua entrada no portal: sabem que você entrou neste site com a sua conta.",
           "O YouTube mostra os vídeos das suas entregas em modo sem cookies até você tocar no play; a partir daí, o YouTube sabe que você assiste ao vídeo.",
@@ -232,7 +232,7 @@ export const PRIVACY: Record<Locale, LegalDocument> = {
       {
         heading: "Your portal account",
         paragraphs: [
-          "When you sign in with Discord or Google, the site keeps: the provider, your user number on that service, your display name, your email if the provider says it's verified and, with Discord, your username.",
+          "When you sign in with Discord or Google, the site keeps: the provider, your user number on that service, your display name, your email if the provider says it's verified, with Discord, your username, and the site's language when you signed in (Spanish, Portuguese or English), so notices reach you in that language.",
           "This lets you sign in to your portal and lets Tallami write to you. The account doesn't keep your password, your picture or your IP.",
         ],
       },
@@ -278,7 +278,7 @@ export const PRIVACY: Record<Locale, LegalDocument> = {
         paragraphs: [
           "Vercel hosts the site and receives every visit, with your IP. The site runs in its São Paulo, Brazil region.",
           "Supabase keeps the database, also in São Paulo: everything described above. That's why your data is stored in Brazil.",
-          "Resend sends the site's emails: it sees your email and the text of each message.",
+          "Resend sends the site's emails: it sees your email and the text of each email.",
           "Mercado Pago processes the payment: it receives your payment details directly, without going through this site.",
           "Discord and Google let you sign in to the portal: they know you signed in to this site with your account.",
           "YouTube shows the videos of your deliveries in no-cookie mode until you press play; from then on, YouTube knows you're watching the video.",

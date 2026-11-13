@@ -261,6 +261,25 @@ describe("the portal chat in the legal texts", () => {
     expect(terms).not.toMatch(/se coordinan por mensaje/);
   });
 
+  test.each([
+    ["es", /Resend .*el texto de cada email\./, /el texto de cada mensaje/],
+    ["pt", /Resend .*o texto de cada e-mail\./, /o texto de cada mensagem/],
+    ["en", /Resend .*the text of each email\./, /the text of each message/],
+  ] as const)("in %s, Resend sees the text of each email, never said of the chat messages", (locale, says, never) => {
+    const text = textOf(PRIVACY[locale]);
+    expect(text).toMatch(says);
+    expect(text).not.toMatch(never);
+  });
+
+  test.each([
+    ["es", "Tu cuenta del portal", /idioma de la web/],
+    ["pt", "Sua conta do portal", /idioma do site/],
+    ["en", "Your portal account", /site's language/],
+  ] as const)("in %s, the portal account section lists the site language among what it keeps", (locale, heading, language) => {
+    const section = PRIVACY[locale].sections.find((candidate) => candidate.heading === heading);
+    expect(section?.paragraphs[0]).toMatch(language);
+  });
+
   test.each(LOCALES)("the documents in %s were updated after the chat", (locale) => {
     expect(PRIVACY[locale].updatedOn).toBe("2026-11-12");
     expect(TERMS[locale].updatedOn).toBe("2026-11-12");
