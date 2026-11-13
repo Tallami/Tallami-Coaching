@@ -12,7 +12,7 @@ import { PUBLIC_RECORD_RETENTION_MONTHS, UNPAID_ORDER_RETENTION_DAYS } from "@/p
 import { PORTAL_OAUTH_FLOW_MS, PORTAL_RECORD_RETENTION_MS, PORTAL_SESSION_MS } from "@/portal/policy";
 import type { LegalDocument } from "./types";
 
-const UPDATED_ON = "2026-11-12";
+const UPDATED_ON = "2026-11-13";
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MINUTE_MS = 60 * 1000;
 

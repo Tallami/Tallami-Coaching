@@ -8,6 +8,7 @@ import {
   chatMessages,
   composeBox,
   linkedChatStudent,
+  markReadDone,
   sendButton,
   whenComposeReady,
   writeAndSend,
@@ -106,18 +107,21 @@ test.describe("the conversation in both directions", () => {
     await expect(row).toContainText("sin leer");
     await expect(row).toHaveAttribute("data-unread", "true");
 
+    const conversationPath = (await row.getByRole("link").first().getAttribute("href")) ?? "";
+    expect(conversationPath).toMatch(/^\/admin\/mensajes\/[0-9a-f-]{36}$/);
+    // La marca de leída sale al hidratarse la página: se espera su respuesta antes de irse.
+    const coachMarked = markReadDone(page, conversationPath);
     await row.getByRole("link").first().click();
     await expect(main(page).getByRole("heading", { level: 1, name: student.name })).toBeVisible();
     await expect(chatMessages(page)).toHaveCount(1);
     await expect(chatMessages(page).first()).toContainText("Hola Tallami, ¿cuándo jugamos?");
+    await coachMarked;
 
     // Abrirla la marca como leída: de vuelta en la bandeja, la fila ya no está sin leer.
-    await expect(async () => {
-      await page.goto("/admin/mensajes");
-      await expect(inboxRow(page, student.name)).toBeVisible();
-      await expect(inboxRow(page, student.name)).not.toContainText("sin leer");
-      await expect(inboxRow(page, student.name)).toHaveAttribute("data-unread", "false");
-    }).toPass({ timeout: 20_000 });
+    await page.goto("/admin/mensajes");
+    await expect(inboxRow(page, student.name)).toBeVisible();
+    await expect(inboxRow(page, student.name)).not.toContainText("sin leer");
+    await expect(inboxRow(page, student.name)).toHaveAttribute("data-unread", "false");
 
     await inboxRow(page, student.name).getByRole("link").first().click();
     await whenComposeReady(page);
@@ -128,13 +132,13 @@ test.describe("the conversation in both directions", () => {
     await s.goto("/es/portal");
     const card = s.getByRole("region", { name: es.Chat.card.title });
     await expect(card).toContainText("1 mensaje sin leer");
+    const studentMarked = markReadDone(s, MESSAGES_PATH);
     await card.getByRole("link", { name: es.Chat.card.open }).click();
     await expect(chatMessages(s).filter({ hasText: "Mañana a las 18 nos vemos en Discord" })).toBeVisible();
     await expect(chatMessages(s).last()).toContainText(es.Chat.thread.other);
-    await expect(async () => {
-      await s.goto("/es/portal");
-      await expect(s.getByRole("region", { name: es.Chat.card.title })).toContainText("Sin mensajes nuevos");
-    }).toPass({ timeout: 20_000 });
+    await studentMarked;
+    await s.goto("/es/portal");
+    await expect(s.getByRole("region", { name: es.Chat.card.title })).toContainText("Sin mensajes nuevos");
     await student.context.close();
   });
 

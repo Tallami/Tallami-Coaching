@@ -5,7 +5,7 @@
 // Cada alumno es nuevo y su cuenta del proveedor de prueba también (`uniqueProviderStudent`): los
 // tests corren en paralelo sobre la misma base y ninguno ve la conversación de otro.
 
-import type { Browser, BrowserContext, Locator, Page } from "@playwright/test";
+import type { Browser, BrowserContext, Locator, Page, Response } from "@playwright/test";
 import { expect } from "./admin";
 import { uniqueName } from "./admin-ui";
 import { createStudent, inviteStudent } from "./portal-admin-ui";
@@ -64,6 +64,24 @@ export function sendButton(page: Page, copy: ComposeCopy = es.Chat.compose): Loc
 /** Espera a que el formulario esté hidratado: antes, un clic lo manda como un formulario sin JavaScript. */
 export async function whenComposeReady(page: Page): Promise<void> {
   await expect(page.getByRole("main").locator("form[data-hydrated='true']")).toHaveCount(1);
+}
+
+/**
+ * Espera la respuesta de la acción que marca la conversación como leída al abrir la página `path` (la
+ * del portal o la de una conversación del panel). Se llama ANTES de abrirla y se espera después: la marca
+ * sale recién cuando la página se hidrata, y un test que se va enseguida la corta antes de que salga.
+ * Se la distingue del envío de un mensaje porque no es un formulario (`multipart/form-data`).
+ */
+export function markReadDone(page: Page, path: string): Promise<Response> {
+  return page.waitForResponse((response) => {
+    const request = response.request();
+    return (
+      request.method() === "POST" &&
+      new URL(request.url()).pathname === path &&
+      request.headers()["next-action"] !== undefined &&
+      !(request.headers()["content-type"] ?? "").startsWith("multipart/form-data")
+    );
+  });
 }
 
 /** Escribe `text`, toca Enviar y espera a que el mensaje aparezca en la conversación. */

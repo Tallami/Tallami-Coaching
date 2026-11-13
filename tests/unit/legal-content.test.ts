@@ -281,7 +281,8 @@ describe("the portal chat in the legal texts", () => {
   });
 
   test.each(LOCALES)("the documents in %s were updated after the chat", (locale) => {
-    expect(PRIVACY[locale].updatedOn).toBe("2026-11-12");
+    // La privacidad cambió de nuevo el 13 (Resend y el idioma de la cuenta); los términos, no.
+    expect(PRIVACY[locale].updatedOn).toBe("2026-11-13");
     expect(TERMS[locale].updatedOn).toBe("2026-11-12");
   });
 });
